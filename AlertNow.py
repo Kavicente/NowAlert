@@ -71,12 +71,12 @@ except FileNotFoundError:
     logger.error("Decision tree model file not found. ML prediction will not work.")
     dt_classifier = None
 
-fire_model_path = os.path.join('training', 'Fire Models', 'fire_incident_model.onnx')
-road_model_path = os.path.join('training', 'Road Models', 'road_accident_model.onnx')
+fire_model = os.path.join('training', 'Fire Models', 'fire_incident_model.onnx')
+road_model = os.path.join('training', 'Road Models', 'road_accident_model.onnx')
 
 try:
-    fire_session = ort.InferenceSession(fire_model_path)
-    road_session = ort.InferenceSession(road_model_path)
+    fire_session = ort.InferenceSession(fire_model)
+    road_session = ort.InferenceSession(road_model)
     logger.info("ONNX models loaded successfully.")
 except Exception as e:
     logger.error(f"Error loading ONNX models: {e}")
@@ -157,16 +157,31 @@ def handle_alert(data):
         if 'image' in data:
             image = preprocess_image(data['image'])
             if image is not None:
-                predicted_type, probability = predict_barangay(image)
-                data['predicted_type'] = predicted_type
-                data['probability'] = float(probability)
+                pred_barangay = predict_barangay(image)
+                pred_cdrrmo = predict_cdrrmo(image)
+                pred_pnp = predict_pnp(image)
+                pred_bfp = predict_bfp(image)
+                data['predictions'] = {
+                    'barangay': {'type': pred_barangay[0], 'probability': float(pred_barangay[1])},
+                    'cdrrmo': {'type': pred_cdrrmo[0], 'probability': float(pred_cdrrmo[1])},
+                    'pnp': {'type': pred_pnp[0], 'probability': float(pred_pnp[1])},
+                    'bfp': {'type': pred_bfp[0], 'probability': float(pred_bfp[1])}
+                }
             else:
-                data['predicted_type'] = 'unknown'
-                data['probability'] = 0.0
+                data['predictions'] = {
+                    'barangay': {'type': 'unknown', 'probability': 0.0},
+                    'cdrrmo': {'type': 'unknown', 'probability': 0.0},
+                    'pnp': {'type': 'unknown', 'probability': 0.0},
+                    'bfp': {'type': 'unknown', 'probability': 0.0}
+                }
         else:
-            data['predicted_type'] = 'unknown'
-            data['probability'] = 0.0
-        logger.info(f"Alert received with prediction: {data}")
+            data['predictions'] = {
+                'barangay': {'type': 'unknown', 'probability': 0.0},
+                'cdrrmo': {'type': 'unknown', 'probability': 0.0},
+                'pnp': {'type': 'unknown', 'probability': 0.0},
+                'bfp': {'type': 'unknown', 'probability': 0.0}
+            }
+        logger.info(f"Alert received with predictions: {data['predictions']}")
         alerts.append(data)
         emit('new_alert', data, broadcast=True)
         logger.info("Broadcasted new_alert to all clients")
@@ -919,17 +934,17 @@ def get_bfp_analytics_data():
     except Exception as e:
         logger.error(f"Error in get_bfp_analytics_data: {e}", exc_info=True)
         return jsonify({'error': 'Failed to retrieve analytics data'}), 500
-def predict_barangay(image):
-    if fire_session is None or road_session is None:
-        logger.warning("ONNX models not loaded, returning default prediction")
+def predict_emergency_type(image):
+    if road_model is None or fire_model is None:
+        logger.warning("ONNX models not loaded, returning unknown prediction")
         return 'unknown', 0.0
     try:
-        input_name_road = road_session.get_inputs()[0].name
-        output_road = road_session.run(None, {input_name_road: image})
+        input_name_road = road_model.get_inputs()[0].name
+        output_road = road_model.run(None, {input_name_road: image})
         prob_road = float(output_road[0][0])
 
-        input_name_fire = fire_session.get_inputs()[0].name
-        output_fire = fire_session.run(None, {input_name_fire: image})
+        input_name_fire = fire_model.get_inputs()[0].name
+        output_fire = fire_model.run(None, {input_name_fire: image})
         prob_fire = float(output_fire[0][0])
 
         if prob_road > prob_fire and prob_road > 0.5:
@@ -937,78 +952,9 @@ def predict_barangay(image):
         elif prob_fire > prob_road and prob_fire > 0.5:
             return 'fire_incident', prob_fire
         else:
-            return 'unknown', max(prob_road, prob_fire)
+            return 'unknown', 0.0
     except Exception as e:
-        logger.error(f"Prediction failed: {e}")
-        return 'unknown', 0.0
-    
-def predict_cdrrmo(image):
-    if fire_session is None or road_session is None:
-        logger.warning("ONNX models not loaded, returning default prediction")
-        return 'unknown', 0.0
-    try:
-        input_name_road = road_session.get_inputs()[0].name
-        output_road = road_session.run(None, {input_name_road: image})
-        prob_road = float(output_road[0][0])
-
-        input_name_fire = fire_session.get_inputs()[0].name
-        output_fire = fire_session.run(None, {input_name_fire: image})
-        prob_fire = float(output_fire[0][0])
-
-        if prob_road > prob_fire and prob_road > 0.5:
-            return 'road_accident', prob_road
-        elif prob_fire > prob_road and prob_fire > 0.5:
-            return 'fire_incident', prob_fire
-        else:
-            return 'unknown', max(prob_road, prob_fire)
-    except Exception as e:
-        logger.error(f"Prediction failed: {e}")
-        return 'unknown', 0.0    
-    
-def predict_bfp(image):
-    if fire_session is None or road_session is None:
-        logger.warning("ONNX models not loaded, returning default prediction")
-        return 'unknown', 0.0
-    try:
-        input_name_road = road_session.get_inputs()[0].name
-        output_road = road_session.run(None, {input_name_road: image})
-        prob_road = float(output_road[0][0])
-
-        input_name_fire = fire_session.get_inputs()[0].name
-        output_fire = fire_session.run(None, {input_name_fire: image})
-        prob_fire = float(output_fire[0][0])
-
-        if prob_road > prob_fire and prob_road > 0.5:
-            return 'road_accident', prob_road
-        elif prob_fire > prob_road and prob_fire > 0.5:
-            return 'fire_incident', prob_fire
-        else:
-            return 'unknown', max(prob_road, prob_fire)
-    except Exception as e:
-        logger.error(f"Prediction failed: {e}")
-        return 'unknown', 0.0       
-    
-def predict_pnp(image):
-    if fire_session is None or road_session is None:
-        logger.warning("ONNX models not loaded, returning default prediction")
-        return 'unknown', 0.0
-    try:
-        input_name_road = road_session.get_inputs()[0].name
-        output_road = road_session.run(None, {input_name_road: image})
-        prob_road = float(output_road[0][0])
-
-        input_name_fire = fire_session.get_inputs()[0].name
-        output_fire = fire_session.run(None, {input_name_fire: image})
-        prob_fire = float(output_fire[0][0])
-
-        if prob_road > prob_fire and prob_road > 0.5:
-            return 'road_accident', prob_road
-        elif prob_fire > prob_road and prob_fire > 0.5:
-            return 'fire_incident', prob_fire
-        else:
-            return 'unknown', max(prob_road, prob_fire)
-    except Exception as e:
-        logger.error(f"Prediction failed: {e}")
+        logger.error(f"Prediction failed in BarangayDashboard: {e}")
         return 'unknown', 0.0
     
 if __name__ == '__main__':
