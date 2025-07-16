@@ -97,6 +97,7 @@
                 alertDiv.innerHTML = `
                     <p>${message}</p>
                     ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
+                    <p>Predicted Emergency: ${data.predicted_type} (${data.probability.toFixed(2)})</p>
                 `;
                 feed.prepend(alertDiv);
                 alertElements.set(data.alert_id, alertDiv);
