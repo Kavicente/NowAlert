@@ -44,10 +44,14 @@ from BFPAnalytics import (
     get_bfp_response_time, get_bfp_fire_duration
 )
 
+app = Flask(__name__)
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_http_buffer_size=10000000)
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
+barangay_coords = {}
 # Load datasets
 road_accident_df = pd.DataFrame()
 try:
@@ -124,9 +128,7 @@ except Exception as e:
     lr_road = rf_road = svm_road = xgb_road = None
     
 
-app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
-socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_http_buffer_size=10000000)
+
 
 # Initialize alerts list
 alerts = []
@@ -173,8 +175,10 @@ def handle_alert(data):
         logger.error(f"Error processing alert: {e}")
         emit('alert_sent', {'status': 'error', 'message': str(e)}, room=request.sid)
 
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
-barangay_coords = {}
+
+      
+
+
 try:
     with open(os.path.join('assets', 'coords.txt'), 'r') as f:
         barangay_coords = ast.literal_eval(f.read())
@@ -915,7 +919,98 @@ def get_bfp_analytics_data():
     except Exception as e:
         logger.error(f"Error in get_bfp_analytics_data: {e}", exc_info=True)
         return jsonify({'error': 'Failed to retrieve analytics data'}), 500
+def predict_barangay(image):
+    if fire_session is None or road_session is None:
+        logger.warning("ONNX models not loaded, returning default prediction")
+        return 'unknown', 0.0
+    try:
+        input_name_road = road_session.get_inputs()[0].name
+        output_road = road_session.run(None, {input_name_road: image})
+        prob_road = float(output_road[0][0])
 
+        input_name_fire = fire_session.get_inputs()[0].name
+        output_fire = fire_session.run(None, {input_name_fire: image})
+        prob_fire = float(output_fire[0][0])
+
+        if prob_road > prob_fire and prob_road > 0.5:
+            return 'road_accident', prob_road
+        elif prob_fire > prob_road and prob_fire > 0.5:
+            return 'fire_incident', prob_fire
+        else:
+            return 'unknown', max(prob_road, prob_fire)
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        return 'unknown', 0.0
+    
+def predict_cdrrmo(image):
+    if fire_session is None or road_session is None:
+        logger.warning("ONNX models not loaded, returning default prediction")
+        return 'unknown', 0.0
+    try:
+        input_name_road = road_session.get_inputs()[0].name
+        output_road = road_session.run(None, {input_name_road: image})
+        prob_road = float(output_road[0][0])
+
+        input_name_fire = fire_session.get_inputs()[0].name
+        output_fire = fire_session.run(None, {input_name_fire: image})
+        prob_fire = float(output_fire[0][0])
+
+        if prob_road > prob_fire and prob_road > 0.5:
+            return 'road_accident', prob_road
+        elif prob_fire > prob_road and prob_fire > 0.5:
+            return 'fire_incident', prob_fire
+        else:
+            return 'unknown', max(prob_road, prob_fire)
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        return 'unknown', 0.0    
+    
+def predict_bfp(image):
+    if fire_session is None or road_session is None:
+        logger.warning("ONNX models not loaded, returning default prediction")
+        return 'unknown', 0.0
+    try:
+        input_name_road = road_session.get_inputs()[0].name
+        output_road = road_session.run(None, {input_name_road: image})
+        prob_road = float(output_road[0][0])
+
+        input_name_fire = fire_session.get_inputs()[0].name
+        output_fire = fire_session.run(None, {input_name_fire: image})
+        prob_fire = float(output_fire[0][0])
+
+        if prob_road > prob_fire and prob_road > 0.5:
+            return 'road_accident', prob_road
+        elif prob_fire > prob_road and prob_fire > 0.5:
+            return 'fire_incident', prob_fire
+        else:
+            return 'unknown', max(prob_road, prob_fire)
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        return 'unknown', 0.0       
+    
+def predict_pnp(image):
+    if fire_session is None or road_session is None:
+        logger.warning("ONNX models not loaded, returning default prediction")
+        return 'unknown', 0.0
+    try:
+        input_name_road = road_session.get_inputs()[0].name
+        output_road = road_session.run(None, {input_name_road: image})
+        prob_road = float(output_road[0][0])
+
+        input_name_fire = fire_session.get_inputs()[0].name
+        output_fire = fire_session.run(None, {input_name_fire: image})
+        prob_fire = float(output_fire[0][0])
+
+        if prob_road > prob_fire and prob_road > 0.5:
+            return 'road_accident', prob_road
+        elif prob_fire > prob_road and prob_fire > 0.5:
+            return 'fire_incident', prob_fire
+        else:
+            return 'unknown', max(prob_road, prob_fire)
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        return 'unknown', 0.0
+    
 if __name__ == '__main__':
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     try:
