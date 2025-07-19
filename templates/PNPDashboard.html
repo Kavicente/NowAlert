@@ -56,15 +56,22 @@
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
-            const map = L.map('map').setView([lat, lon], 13);
-            L.tileLayer(`https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`, {
+            const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
+
+            const pnpMap = L.map('map').setView([lat, lon], 15);
+
+            var satellite = L.tileLayer(tileLayerUrl, {
+                attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
                 maxZoom: 18,
-                id: 'mapbox/streets-v11',
                 tileSize: 512,
-                zoomOffset: -1,
-                accessToken: mapboxToken
-            }).addTo(map);
-            const marker = L.marker([lat, lon]).addTo(map);
+                zoomOffset: -1
+            });
+
+            var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            });
+
+            satellite.addTo(pnpMap);
 
             const socket = io(window.location.origin);
             const alertContainer = document.getElementById('alert-container');
