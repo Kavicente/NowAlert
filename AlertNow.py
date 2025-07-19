@@ -14,6 +14,10 @@ import pytz
 import pandas as pd
 import uuid
 from models import lr_road, lr_fire  # Updated import
+import BarangayDashboard
+import CDRRMODashboard
+import PNPDashboard
+import BFPDashboard
 # Import dashboard and analytics functions
 from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
@@ -133,44 +137,66 @@ def classify_image(base64_image):
         logger.error(f"Image classification failed: {e}")
         return 'unknown'
 
-@socketio.on('join_room')
-def handle_join_room(room):
+@socketio.on('connect')
+def handle_connect():
+    logger.info(f"Client connected: {request.sid}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"Client disconnected: {request.sid}")
+
+@socketio.on('register_role')
+def handle_register_role(data):
+    role = data.get('role')
+    identifier = data.get('barangay') or data.get('municipality')
+    if not role or not identifier:
+        logger.error(f"Invalid registration data: {data}")
+        return
+    room = f"{role}_{identifier}"
     join_room(room)
-    logger.info(f"User joined room: {room}")
+    logger.info(f"Client {request.sid} registered as {role} in room {room}")
 
 @socketio.on('alert')
 def handle_alert(data):
-    try:
-        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        if data.get('image'):
-            emit('new_alert', data, room='barangay')
-        else:
-            emit('new_alert', data, room='barangay')
-        data['alert_id'] = str(uuid.uuid4())
-        data['user_barangay'] = data.get('barangay', 'Unknown')
-        
-        if data.get('image'):
-            prediction = classify_image(data['image'])
-            if prediction not in ['road_accident', 'fire_incident']:
-                data['image'] = None
-        
-        logger.info(f"Alert received: {data}")
-        alerts.append(data)
-        emit('new_alert', data, broadcast=True)
-        logger.info("Broadcasted new_alert to all clients")
-        emit('alert_sent', {'status': 'success'}, room=request.sid)
-    except Exception as e:
-        logger.error(f"Error processing alert: {e}")
-        emit('alert_sent', {'status': 'error', 'message': str(e)}, room=request.sid)
+    logger.debug(f"Received alert: {data}")
+    barangay = data.get('barangay')
+    if not barangay:
+        logger.error("No barangay specified in alert")
+        return
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+    room = f"barangay_{barangay}"
+    emit('new_alert', data, room=room)
+    logger.info(f"Alert sent to room {room}: {data}")
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
-    alert = data['alert']
-    targets = data['targets']
-    alert['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-    for room in targets:
-        emit('new_alert', alert, room=room)
-    logger.info(f"Forwarded alert to rooms: {targets}")
+    alert = data.get('alert', {})
+    targets = data.get('targets', [])
+    if not alert or not targets:
+        logger.error(f"Invalid forward_alert data: {data}")
+        return
+    alert['resident_barangay'] = alert.get('barangay', 'Unknown')
+    municipality = alert.get('municipality', 'default')
+    for target in targets:
+        if target in ['bfp', 'cdrrmo', 'pnp']:
+            room = f"{target}_{municipality}"
+            emit('forward_alert', alert, room=room)
+            logger.info(f"Alert forwarded to {room}: {alert}")
+        else:
+            logger.warning(f"Invalid target for forward_alert: {target}")
+
+@socketio.on('map_update')
+def handle_map_update(data):
+    barangay = data.get('barangay')
+    municipality = data.get('municipality', 'default')
+    if not barangay:
+        logger.error("No barangay specified in map_update")
+        return
+    rooms = [f"barangay_{barangay}"]
+    rooms.extend([f"{role}_{municipality}" for role in ['bfp', 'cdrrmo', 'pnp']])
+    for room in rooms:
+        emit('map_update', data, room=room)
+    logger.info(f"Map update emitted to rooms {rooms}: {data}")
 
 @socketio.on('response_submitted')
 def handle_response(data):
@@ -643,150 +669,47 @@ def predict_image():
 
 @app.route('/barangay_dashboard')
 def barangay_dashboard():
-    if 'role' not in session or session['role'] != 'barangay':
+    if 'username' not in session:
         return redirect(url_for('login'))
-    stats = get_barangay_stats()
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('''
-        SELECT * FROM users WHERE barangay = ? AND contact_no = ?
-    ''', (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    
-    if not unique_id or not user or user['role'] != 'barangay':
-        logger.warning("Unauthorized access to barangay_dashboard. Session: %s, User: %s", session, user)
-        return redirect(url_for('login'))
-    
-    barangay = user['barangay']
-    assigned_municipality = user['assigned_municipality'] or 'San Pablo City'
-    latest_alert = get_latest_alert()
-    stats = get_barangay_stats()
-    coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
-    
-    try:
-        lat_coord = float(coords.get('lat', 14.5995))
-        lon_coord = float(coords.get('lon', 120.9842))
-    except (ValueError, TypeError):
-        logger.error(f"Invalid coordinates for {barangay} in {assigned_municipality}, using defaults")
-        lat_coord = 14.5995
-        lon_coord = 120.9842
-
-    logger.debug(f"Rendering BarangayDashboard for {barangay} in {assigned_municipality}")
-    return render_template('BarangayDashboard.html', 
-                           latest_alert=latest_alert, 
-                           stats=stats, 
-                           barangay=barangay, 
-                           lat_coord=lat_coord, 
-                           lon_coord=lon_coord, 
-                           google_api_key=GOOGLE_API_KEY)
+    barangay = session.get('barangay', 'Unknown')
+    stats = BarangayDashboard.get_barangay_stats()
+    latest_alert = BarangayDashboard.get_latest_alert()
+    lat_coord = latest_alert.get('lat', 14.0549) if latest_alert else 14.0549
+    lon_coord = latest_alert.get('lon', 121.3013) if latest_alert else 121.3013
+    return render_template('BarangayDashboard.html', barangay=barangay, stats=stats, lat_coord=lat_coord, lon_coord=lon_coord)
 
 @app.route('/cdrrmo_dashboard')
 def cdrrmo_dashboard():
-    if 'role' not in session or session['role'] != 'cdrrmo':
+    if 'username' not in session:
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    stats = get_cdrrmo_stats()
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('''
-        SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-    ''', ('cdrrmo', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    
-    if not unique_id or not user or user['role'] != 'cdrrmo':
-        logger.warning("Unauthorized access to cdrrmo_dashboard. Session: %s, User: %s", session, user)
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    assigned_municipality = user['assigned_municipality'] or "San Pablo City"
-    stats = get_cdrrmo_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
-    
-    try:
-        lat_coord = float(coords.get('lat', 14.5995))
-        lon_coord = float(coords.get('lon', 120.9842))
-    except (ValueError, TypeError):
-        logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-        lat_coord = 14.5995
-        lon_coord = 120.9842
-
-    logger.debug(f"Rendering CDRRMODashboard for {assigned_municipality}")
-    return render_template('CDRRMODashboard.html', 
-                           stats=stats, 
-                           municipality=assigned_municipality, 
-                           lat_coord=lat_coord, 
-                           lon_coord=lon_coord, 
-                           google_api_key=GOOGLE_API_KEY)
+    municipality = session.get('municipality', 'Unknown')
+    stats = CDRRMODashboard.get_cdrrmo_stats()
+    latest_alert = CDRRMODashboard.get_latest_alert()
+    lat_coord = latest_alert.get('lat', 14.0549) if latest_alert else 14.0549
+    lon_coord = latest_alert.get('lon', 121.3013) if latest_alert else 121.3013
+    return render_template('CDRRMODashboard.html', municipality=municipality, stats=stats, lat_coord=lat_coord, lon_coord=lon_coord)
 
 @app.route('/pnp_dashboard')
 def pnp_dashboard():
-    if 'role' not in session or session['role'] != 'pnp':
+    if 'username' not in session:
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    stats = get_pnp_stats()
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('''
-        SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-    ''', ('pnp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    
-    if not unique_id or not user or user['role'] != 'pnp':
-        logger.warning("Unauthorized access to pnp_dashboard. Session: %s, User: %s", session, user)
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    assigned_municipality = user['assigned_municipality'] or "San Pablo City"
-    stats = get_pnp_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
-    
-    try:
-        lat_coord = float(coords.get('lat', 14.5995))
-        lon_coord = float(coords.get('lon', 120.9842))
-    except (ValueError, TypeError):
-        logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-        lat_coord = 14.5995
-        lon_coord = 120.9842
-
-    logger.debug(f"Rendering PNPDashboard for {assigned_municipality}")
-    return render_template('PNPDashboard.html', 
-                           stats=stats, 
-                           municipality=assigned_municipality, 
-                           lat_coord=lat_coord, 
-                           lon_coord=lon_coord, 
-                           google_api_key=GOOGLE_API_KEY)
+    municipality = session.get('municipality', 'Unknown')
+    stats = PNPDashboard.get_pnp_stats()
+    latest_alert = PNPDashboard.get_latest_alert()
+    lat_coord = latest_alert.get('lat', 14.0549) if latest_alert else 14.0549
+    lon_coord = latest_alert.get('lon', 121.3013) if latest_alert else 121.3013
+    return render_template('PNPDashboard.html', municipality=municipality, stats=stats, lat_coord=lat_coord, lon_coord=lon_coord)
 
 @app.route('/bfp_dashboard')
 def bfp_dashboard():
-    if 'role' not in session or session['role'] != 'bfp':
+    if 'username' not in session:
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    stats = get_bfp_stats()
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('''
-        SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-    ''', ('bfp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    
-    if not unique_id or not user or user['role'] != 'bfp':
-        logger.warning("Unauthorized access to bfp_dashboard. Session: %s, User: %s", session, user)
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    assigned_municipality = user['assigned_municipality'] or "San Pablo City"
-    stats = get_bfp_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
-    
-    try:
-        lat_coord = float(coords.get('lat', 14.5995))
-        lon_coord = float(coords.get('lon', 120.9842))
-    except (ValueError, TypeError):
-        logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-        lat_coord = 14.5995
-        lon_coord = 120.9842
-
-    logger.debug(f"Rendering BFPDashboard for {assigned_municipality}")
-    return render_template('BFPDashboard.html', 
-                           stats=stats, 
-                           municipality=assigned_municipality, 
-                           lat_coord=lat_coord,
-                           lon_coord=lon_coord,
-                           google_api_key=GOOGLE_API_KEY)
+    municipality = session.get('municipality', 'Unknown')
+    stats = BFPDashboard.get_bfp_stats()
+    latest_alert = BFPDashboard.get_latest_alert()
+    lat_coord = latest_alert.get('lat', 14.0549) if latest_alert else 14.0549
+    lon_coord = latest_alert.get('lon', 121.3013) if latest_alert else 121.3013
+    return render_template('BFPDashboard.html', municipality=municipality, stats=stats, lat_coord=lat_coord, lon_coord=lon_coord)
 
 @app.route('/barangay/analytics')
 def barangay_analytics():
