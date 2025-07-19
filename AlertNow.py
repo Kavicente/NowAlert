@@ -233,9 +233,9 @@ municipality_coords = {
 }
 
 def get_db_connection():
-    db_path = os.getenv('DB_PATH', os.path.join(os.path.dirname(__file__), 'database', 'users_web.db'))
-    if not os.path.exists(os.path.dirname(db_path)):
-        os.makedirs(os.path.dirname(db_path))
+    db_path = os.path.join('/database', 'users_web.db')
+    if not os.path.exists(db_path):
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -302,6 +302,7 @@ def signup_barangay():
         finally:
             conn.close()
     return render_template('SignUpPage.html')
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
