@@ -8,8 +8,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <style>
-        
-        .alert-item { margin-bottom: 10px; padding: 10px;  border-radius: 5px; color: #333; }
+        .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; bottom: 10px; right: 10px; background-color: #f44336; color: white; padding: 15px; border-radius: 5px; display: none; }
     </style>
 </head>
@@ -31,15 +30,12 @@
         <header>
             <h1>CDRRMO {{ municipality }} Dashboard</h1>
             <div class="filters">
-                
             </div>
         </header>
         <main class="main-content">
-            
-                <h2 class="h2">{{ municipality }} Map</h2>
-                <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span></p>
-                <div id="map"></div>
-            
+            <h2 class="h2">{{ municipality }} Map</h2>
+            <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span></p>
+            <div id="map"></div>
             <section class="stats">
                 <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
                 <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
@@ -80,34 +76,20 @@
             L.control.layers(baseLayers).addTo(cdrrmoMap);
 
             const socket = io('https://alert-858l.onrender.com');
-            const alertElements = new Map(); // Store alert elements by ID
+            const alertElements = new Map();
 
             socket.on('connect', () => {
                 socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}' });
             });
 
             socket.on('forward_alert', (data) => {
-                if (data.alert && data.alert.image) {
-                    const div = document.createElement('div');
-                    div.className = 'alert-item';
-                    const emergencyBarangay = data.alert.emergency_barangay || data.alert.barangay || 'Unknown';
-                    const residentBarangay = data.alert.resident_barangay || data.alert.barangay || 'Unknown';
-                    div.innerHTML = `
-                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong></p>
-                        <p><strong>Type:</strong> ${data.alert.emergency_type || 'Not Specified'}</p>
-                        <p><strong>Location:</strong> ${data.alert.lat}, ${data.alert.lon}</p>
-                        <img src="data:image/jpeg;base64,${data.alert.image}" width="200"/>
-                        <hr>
-                    `;
-                    document.getElementById('alert-container').prepend(div);
-                    updateCharts();
+                if (data.image) {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
                 }
             });
-            socket.on('forward_alert', (data) => {
-                updateUIWithAlert(data);
-                notifyAlert(data);
-            });
-            socket.on('map_update', (data) => {
+
+            socket.on('update_map', (data) => {
                 const lat = data.lat;
                 const lon = data.lon;
                 cdrrmoMap.setView([lat, lon], 16);
@@ -129,38 +111,29 @@
                         displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
                     }
                     const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
+                    const emergencyBarangay = data.barangay || 'Unknown';
+                    const residentBarangay = data.resident_barangay || 'Unknown';
                     alertDiv.innerHTML = `
-                        <p><strong>${address}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
+                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
                         <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
                     `;
-                    if (data.image) {
-                        const sendToCdrmoPnpBtn = document.createElement('button');
-                        sendToCdrmoPnpBtn.textContent = 'Send to CDRRMO and PNP';
-                        sendToCdrmoPnpBtn.onclick = () => socket.emit('forward_alert', { alert: data, targets: ['cdrrmo', 'pnp'] });
-                        alertDiv.appendChild(sendToCdrmoPnpBtn);
-
-                        const sendToBfpPnpBtn = document.createElement('button');
-                        sendToBfpPnpBtn.textContent = 'Send to BFP and PNP';
-                        sendToBfpPnpBtn.onclick = () => socket.emit('forward_alert', { alert: data, targets: ['bfp', 'pnp'] });
-                        alertDiv.appendChild(sendToBfpPnpBtn);
-                    }
                     feed.prepend(alertDiv);
                 }
 
                 if (data.lat && data.lon) {
-                    const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
+                    const marker = L.marker([data.lat, data.lon]).addTo(cdrrmoMap).bindPopup(
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
                     if (feed.children.length === 1) {
-                        barangayMap.setView([data.lat, data.lon], 15);
+                        cdrrmoMap.setView([data.lat, data.lon], 15);
                     }
                 }
 
                 updateStats();
             }
 
-        function notifyAlert(data) {
+            function notifyAlert(data) {
                 if ('Notification' in window && Notification.permission === 'granted') {
                     showBrowserNotification(data);
                 } else {
@@ -168,7 +141,7 @@
                 }
             }
 
-        function showBrowserNotification(data) {
+            function showBrowserNotification(data) {
                 if ('Notification' in window && Notification.permission === 'granted') {
                     new Notification('New Alert', {
                         body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
@@ -203,4 +176,3 @@
     </script>
 </body>
 </html>
-
