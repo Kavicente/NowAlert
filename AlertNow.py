@@ -14,6 +14,10 @@ import pytz
 import pandas as pd
 import uuid
 from models import lr_road, lr_fire  # Updated import
+import BarangayDashboard
+import BFPDashboard
+import CDRRMODashboard
+import PNPDashboard
 # Import dashboard and analytics functions
 from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
