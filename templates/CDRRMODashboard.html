@@ -79,43 +79,40 @@
             };
             L.control.layers(baseLayers).addTo(cdrrmoMap);
 
-            const socket = io('https://nowalert.onrender.com');
-            const alertElements = new Map();
+            const socket = io('https://alert-858l.onrender.com');
+            const alertElements = new Map(); // Store alert elements by ID
 
-            socket.on('connect', () => console.log('Connected to SocketIO server'));
-
-            socket.on('new_alert', (data) => {
-                console.log('Alert received:', data);
-                const dashboardBarangay = "{{ barangay }}";
-                const alertBarangay = data.user_barangay || 'Unknown';
-                const message = `Emergency at ${dashboardBarangay}, Resident from ${alertBarangay}`;
-
-                const feed = document.getElementById('alert-container');
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert-item';
-                alertDiv.dataset.alertId = data.alert_id;
-                alertDiv.innerHTML = `
-                    <p>${message}</p>
-                    ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
-                `;
-                feed.prepend(alertDiv);
-                alertElements.set(data.alert_id, alertDiv);
-
-                if (data.lat && data.lon) {
-                    L.marker([data.lat, data.lon]).addTo(cdrrmoMap)
-                        .bindPopup(message)
-                        .openPopup();
-                }
+            socket.on('connect', () => {
+                socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}' });
             });
 
-            socket.on('alert_removed', (data) => {
-                const alertId = data.alert_id;
-                const alertDiv = alertElements.get(alertId);
-                if (alertDiv) {
-                    alertDiv.remove();
-                    alertElements.delete(alertId);
-                    console.log(`Alert ${alertId} removed from UI`);
+            socket.on('forward_alert', (data) => {
+                if (data.alert && data.alert.image) {
+                    const div = document.createElement('div');
+                    div.className = 'alert-item';
+                    const emergencyBarangay = data.alert.emergency_barangay || data.alert.barangay || 'Unknown';
+                    const residentBarangay = data.alert.resident_barangay || data.alert.barangay || 'Unknown';
+                    div.innerHTML = `
+                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong></p>
+                        <p><strong>Type:</strong> ${data.alert.emergency_type || 'Not Specified'}</p>
+                        <p><strong>Location:</strong> ${data.alert.lat}, ${data.alert.lon}</p>
+                        <img src="data:image/jpeg;base64,${data.alert.image}" width="200"/>
+                        <hr>
+                    `;
+                    document.getElementById('alert-container').prepend(div);
+                    updateCharts();
                 }
+            });
+            socket.on('forward_alert', (data) => {
+                updateUIWithAlert(data);
+                notifyAlert(data);
+            });
+            socket.on('map_update', (data) => {
+                const lat = data.lat;
+                const lon = data.lon;
+                cdrrmoMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(cdrrmoMap);
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             function updateUIWithAlert(data) {
@@ -137,29 +134,46 @@
                         <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
                     `;
+                    if (data.image) {
+                        const sendToCdrmoPnpBtn = document.createElement('button');
+                        sendToCdrmoPnpBtn.textContent = 'Send to CDRRMO and PNP';
+                        sendToCdrmoPnpBtn.onclick = () => socket.emit('forward_alert', { alert: data, targets: ['cdrrmo', 'pnp'] });
+                        alertDiv.appendChild(sendToCdrmoPnpBtn);
+
+                        const sendToBfpPnpBtn = document.createElement('button');
+                        sendToBfpPnpBtn.textContent = 'Send to BFP and PNP';
+                        sendToBfpPnpBtn.onclick = () => socket.emit('forward_alert', { alert: data, targets: ['bfp', 'pnp'] });
+                        alertDiv.appendChild(sendToBfpPnpBtn);
+                    }
                     feed.prepend(alertDiv);
                 }
 
                 if (data.lat && data.lon) {
-                    const marker = L.marker([data.lat, data.lon]).addTo(cdrrmoMap).bindPopup(
+                    const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
                     if (feed.children.length === 1) {
-                        cdrrmoMap.setView([data.lat, data.lon], 15);
+                        barangayMap.setView([data.lat, data.lon], 15);
                     }
                 }
 
                 updateStats();
             }
 
-            function notifyAlert(data) {
+        function notifyAlert(data) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    showBrowserNotification(data);
+                } else {
+                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
+                }
+            }
+
+        function showBrowserNotification(data) {
                 if ('Notification' in window && Notification.permission === 'granted') {
                     new Notification('New Alert', {
                         body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
                         icon: '/static/favicon.ico'
                     });
-                } else {
-                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
                 }
             }
 
@@ -189,3 +203,4 @@
     </script>
 </body>
 </html>
+
