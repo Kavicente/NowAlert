@@ -81,7 +81,7 @@
 
 
             const socket = io('https://alert-858l.onrender.com/');
-            const socket = io(window.location.origin);
+            
             const alertContainer = document.getElementById('alert-container');
 
             socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}' });
