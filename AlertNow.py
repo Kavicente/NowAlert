@@ -314,20 +314,16 @@ def login():
         
         conn = get_db_connection()
         user = conn.execute('''
-            SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?
+            SELECT * FROM users WHERE Barangay = ? AND contact_no = ? AND password = ?
         ''', (barangay, contact_no, password)).fetchone()
         conn.close()
         
         if user:
-            role = user['role']
-            if role == 'barangay':
-                return redirect(url_for('barangay_dashboard', barangay=user['barangay']))
-            elif role == 'bfp':
-                return redirect(url_for('bfp_dashboard', municipality=user['assigned_municipality']))
-            elif role == 'cdrrmo':
-                return redirect(url_for('cdrrmo_dashboard', municipality=user['assigned_municipality']))
-            elif role == 'pnp':
-                return redirect(url_for('pnp_dashboard', municipality=user['assigned_municipality']))
+            session['unique_id'] = unique_id
+            session['role'] = user['role']
+            logger.debug(f"Web login successful for barangay: {unique_id}")
+            return redirect(url_for('barangay_dashboard'))
+        logger.warning(f"Web login failed for unique_id: {unique_id}")
         return "Invalid credentials", 401
     return render_template('LogInPage.html')
 
