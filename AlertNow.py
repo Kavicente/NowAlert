@@ -89,6 +89,12 @@ socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_h
 
 alerts = []
 
+def get_municipality_from_barangay(barangay):
+    for municipality, barangays in barangay_coords.items():
+        if barangay in barangays:
+            return municipality
+    return None
+
 def classify_image(base64_image):
     if dt_classifier is None:
         logger.error("Decision tree classifier not loaded")
@@ -136,6 +142,11 @@ def handle_alert(data):
     if not barangay:
         logger.error("No barangay specified in alert")
         return
+    municipality = get_municipality_from_barangay(barangay)
+    if not municipality:
+        logger.error(f"Could not find municipality for barangay: {barangay}")
+        return
+    data['municipality'] = municipality
     data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
     room = f"barangay_{barangay}"
     emit('new_alert', data, room=room)
@@ -501,6 +512,11 @@ def send_alert():
         image = data.get('image')
         user_role = data.get('user_role', 'unknown')
         image_upload_time = data.get('imageUploadTime', datetime.now().isoformat())
+        barangay = data.get('barangay', 'N/A')
+        municipality = get_municipality_from_barangay(barangay)
+        if not municipality:
+            logger.error(f"Could not find municipality for barangay: {barangay}")
+            return jsonify({'error': 'Invalid barangay'}), 400
 
         if image:
             upload_time = datetime.fromisoformat(image_upload_time)
@@ -516,11 +532,12 @@ def send_alert():
             'role': user_role,
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A'),
-            'barangay': data.get('barangay', 'N/A'),
+            'barangay': barangay,
+            'municipality': municipality,
             'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat(),
             'imageUploadTime': image_upload_time,
             'alert_id': str(uuid.uuid4()),
-            'user_barangay': data.get('barangay', 'Unknown')
+            'user_barangay': barangay
         }
         
         if alert['image']:
