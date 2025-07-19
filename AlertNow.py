@@ -13,34 +13,19 @@ from datetime import datetime
 import pytz
 import pandas as pd
 import uuid
-from models import lr_road, lr_fire  # Updated import
-# Import dashboard and analytics functions
+from models import lr_road, lr_fire
 from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
-from BarangayAnalytics import (
-    get_barangay_trends, get_barangay_distribution, get_barangay_causes,
-    
-)
-from CDRRMOAnalytics import (
-    get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes,
-    
-)
-from PNPAnalytics import (
-    get_pnp_trends, get_pnp_distribution, get_pnp_causes,
-    
-)
-from BFPAnalytics import (
-    get_bfp_trends, get_bfp_distribution, get_bfp_causes,
-    
-)
+from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes
+from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes
+from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes
+from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
 
-# Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Load ML models
 lr_road = None
 lr_fire = None
 try:
@@ -58,7 +43,6 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading lr_fire_incident.pkl: {e}")
 
-# Load datasets
 road_accident_df = pd.DataFrame()
 try:
     road_accident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'road_accident.csv'))
@@ -68,7 +52,6 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading road_accident.csv: {e}")
 
-# Load decision tree model
 model_path = os.path.join(os.path.dirname(__file__), 'training', 'decision_tree_model.pkl')
 try:
     dt_classifier = joblib.load(model_path)
@@ -80,10 +63,8 @@ except Exception as e:
     logger.error(f"Error loading {model_path}: {e}")
     dt_classifier = None
 
-# Load fire incident models
 fire_models_path = os.path.join(os.path.dirname(__file__), 'training', 'Fire Models')
 try:
-    
     rf_fire = joblib.load(os.path.join(fire_models_path, 'rf_fire_incident.pkl'))
     svm_fire = joblib.load(os.path.join(fire_models_path, 'svm_fire_incident.pkl'))
     xgb_fire = joblib.load(os.path.join(fire_models_path, 'xgb_fire_incident.pkl'))
@@ -92,10 +73,8 @@ except Exception as e:
     logger.error(f"Error loading fire incident models: {e}")
     lr_fire = rf_fire = svm_fire = xgb_fire = None
 
-# Load road accident models
 road_models_path = os.path.join(os.path.dirname(__file__), 'training', 'Road Models')
 try:
-    
     rf_road = joblib.load(os.path.join(road_models_path, 'rf_road_accident.pkl'))
     svm_road = joblib.load(os.path.join(road_models_path, 'svm_road_accident.pkl'))
     xgb_road = joblib.load(os.path.join(road_models_path, 'xgb_road_accident.pkl'))
@@ -108,10 +87,8 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_http_buffer_size=10000000)
 
-# Initialize alerts list
 alerts = []
 
-# Function to classify images
 def classify_image(base64_image):
     if dt_classifier is None:
         logger.error("Decision tree classifier not loaded")
@@ -181,17 +158,17 @@ def handle_forward_alert(data):
         else:
             logger.warning(f"Invalid target for forward_alert: {target}")
 
-@socketio.on('map_update')
-def handle_map_update(data):
+@socketio.on('update_map')
+def handle_update_map(data):
     barangay = data.get('barangay')
     municipality = data.get('municipality', 'default')
     if not barangay:
-        logger.error("No barangay specified in map_update")
+        logger.error("No barangay specified in update_map")
         return
     rooms = [f"barangay_{barangay}"]
     rooms.extend([f"{role}_{municipality}" for role in ['bfp', 'cdrrmo', 'pnp']])
     for room in rooms:
-        emit('map_update', data, room=room)
+        emit('update_map', data, room=room)
     logger.info(f"Map update emitted to rooms {rooms}: {data}")
 
 @socketio.on('response_submitted')
@@ -864,7 +841,7 @@ def cdrrmo_analytics():
     conn.close()
     municipality = user['assigned_municipality'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]  # Placeholder, replace with actual query
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('CDRRMOAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
 @app.route('/api/cdrrmo_analytics_data', methods=['GET'])
@@ -907,7 +884,7 @@ def pnp_analytics():
     conn.close()
     municipality = user['assigned_municipality'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]  # Placeholder, replace with actual query
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
 @app.route('/api/pnp_analytics_data', methods=['GET'])
@@ -950,7 +927,7 @@ def bfp_analytics():
     conn.close()
     municipality = user['assigned_municipality'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]  # Placeholder, replace with actual query
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('BFPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
 @app.route('/api/bfp_analytics_data', methods=['GET'])
@@ -1035,4 +1012,3 @@ if __name__ == '__main__':
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
-
