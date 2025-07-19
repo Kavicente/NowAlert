@@ -32,8 +32,8 @@
             <button class="tab" onclick="filterData('yearly')">Yearly</button>
         </div>
 
-        <header class="header2" id="letterR" class="section">Road Accident Reports</header>
         <!-- Road Accident Section -->
+        <header class="header2" id="letterR" class="section">Road Accident Reports</header>
         <div id="roadSection" class="section">
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="roadIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
@@ -49,9 +49,10 @@
             <div class="chart-container"><h2>Fatalities</h2><canvas id="roadFatalitiesChart"></canvas></div>
         </div>
 
-        <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
+        
         <!-- Fire Incident Section -->
         <div id="fireSection" class="section hidden">
+            <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="fireIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Incident Distribution</h2><canvas id="fireIncidentDistributionChart"></canvas></div>
             <div class="chart-container"><h2>Fire Incident Cause Analysis</h2><canvas id="fireCauseAnalysisChart"></canvas></div>
@@ -148,10 +149,10 @@
             charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.causes),
+                    labels: Object.keys(data.causes.road || {}),
                     datasets: [{
-                        label: 'Causes',
-                        data: Object.values(data.causes),
+                        label: 'Road Accident Causes',
+                        data: Object.values(data.causes.road || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -174,9 +175,9 @@
             charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.weather),
+                    labels: Object.keys(data.weather || {}),
                     datasets: [{
-                        data: Object.values(data.weather),
+                        data: Object.values(data.weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -186,10 +187,10 @@
             charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.road_conditions),
+                    labels: Object.keys(data.road_conditions || {}),
                     datasets: [{
                         label: 'Road Conditions',
-                        data: Object.values(data.road_conditions),
+                        data: Object.values(data.road_conditions || {}),
                         backgroundColor: '#4BC0C0'
                     }]
                 },
@@ -199,9 +200,9 @@
             charts.roadVehicleTypesChart = new Chart(document.getElementById('roadVehicleTypesChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.vehicle_types),
+                    labels: Object.keys(data.vehicle_types || {}),
                     datasets: [{
-                        data: Object.values(data.vehicle_types),
+                        data: Object.values(data.vehicle_types || {}),
                         backgroundColor: ['#FF9F40', '#9966FF', '#FFCE56']
                     }]
                 },
@@ -211,10 +212,10 @@
             charts.roadDriverAgeChart = new Chart(document.getElementById('roadDriverAgeChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.driver_age),
+                    labels: Object.keys(data.driver_age || {}),
                     datasets: [{
                         label: 'Driver Age Groups',
-                        data: Object.values(data.driver_age),
+                        data: Object.values(data.driver_age || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -224,9 +225,9 @@
             charts.roadDriverGenderChart = new Chart(document.getElementById('roadDriverGenderChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.driver_gender),
+                    labels: Object.keys(data.driver_gender || {}),
                     datasets: [{
-                        data: Object.values(data.driver_gender),
+                        data: Object.values(data.driver_gender || {}),
                         backgroundColor: ['#FF6384', '#36A2EB']
                     }]
                 },
@@ -236,10 +237,10 @@
             charts.roadAccidentTypeChart = new Chart(document.getElementById('roadAccidentTypeChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.accident_type),
+                    labels: Object.keys(data.accident_type || {}),
                     datasets: [{
                         label: 'Accident Types',
-                        data: Object.values(data.accident_type),
+                        data: Object.values(data.accident_type || {}),
                         backgroundColor: '#FFCE56'
                     }]
                 },
@@ -252,7 +253,7 @@
                     labels: data.trends.labels,
                     datasets: [{
                         label: 'Injuries',
-                        data: data.injuries,
+                        data: data.injuries || data.trends.total.map(() => 0),
                         backgroundColor: '#9966FF'
                     }]
                 },
@@ -265,7 +266,7 @@
                     labels: data.trends.labels,
                     datasets: [{
                         label: 'Fatalities',
-                        data: data.fatalities,
+                        data: data.fatalities || data.trends.total.map(() => 0),
                         backgroundColor: '#FF9F40'
                     }]
                 },
@@ -300,10 +301,10 @@
             charts.fireCauseAnalysisChart = new Chart(document.getElementById('fireCauseAnalysisChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.causes),
+                    labels: Object.keys(data.causes.fire || {}),
                     datasets: [{
-                        label: 'Causes',
-                        data: Object.values(data.causes),
+                        label: 'Fire Incident Causes',
+                        data: Object.values(data.causes.fire || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -326,9 +327,9 @@
             charts.fireWeatherChart = new Chart(document.getElementById('fireWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.weather),
+                    labels: Object.keys(data.weather || {}),
                     datasets: [{
-                        data: Object.values(data.weather),
+                        data: Object.values(data.weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -350,10 +351,10 @@
             charts.fireCauseChart = new Chart(document.getElementById('fireCauseChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.causes),
+                    labels: Object.keys(data.causes.fire || {}),
                     datasets: [{
                         label: 'Fire Causes',
-                        data: Object.values(data.causes),
+                        data: Object.values(data.causes.fire || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
