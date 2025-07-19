@@ -329,7 +329,7 @@ def login():
             elif role == 'pnp':
                 return redirect(url_for('pnp_dashboard', municipality=user['assigned_municipality']))
         return "Invalid credentials", 401
-    return render_template('LoginPage.html')
+    return render_template('LogInPage.html')
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
