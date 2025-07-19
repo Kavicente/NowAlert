@@ -44,9 +44,9 @@
                 <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
                 <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
             </section>
-            <section id="alerts">
+            <section  id="alerts">
                 <h2 class="h2">Live Alerts</h2>
-                <div  id="alert-container"></div>
+                <div id="alert-container"></div>
             </section>
         </main>
         <div id="notification"></div>
@@ -79,16 +79,43 @@
             };
             L.control.layers(baseLayers).addTo(bfpMap);
 
-            const socket = io('https://alert-858l.onrender.com');
-            const alertElements = new Map(); // Store alert elements by ID
+            const socket = io('https://nowalert.onrender.com');
+            const alertElements = new Map();
 
-            socket.on('connect', () => {
-                console.log('Connected to SocketIO server');
-                socket.emit('join_room', 'barangay');
-            });
+            socket.on('connect', () => console.log('Connected to SocketIO server'));
+
             socket.on('new_alert', (data) => {
-                updateUIWithAlert(data);
-                notifyAlert(data);
+                console.log('Alert received:', data);
+                const dashboardBarangay = "{{ barangay }}";
+                const alertBarangay = data.user_barangay || 'Unknown';
+                const message = `Emergency at ${dashboardBarangay}, Resident from ${alertBarangay}`;
+
+                const feed = document.getElementById('alert-container');
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert-item';
+                alertDiv.dataset.alertId = data.alert_id;
+                alertDiv.innerHTML = `
+                    <p>${message}</p>
+                    ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
+                `;
+                feed.prepend(alertDiv);
+                alertElements.set(data.alert_id, alertDiv);
+
+                if (data.lat && data.lon) {
+                    L.marker([data.lat, data.lon]).addTo(bfpMap)
+                        .bindPopup(message)
+                        .openPopup();
+                }
+            });
+
+            socket.on('alert_removed', (data) => {
+                const alertId = data.alert_id;
+                const alertDiv = alertElements.get(alertId);
+                if (alertDiv) {
+                    alertDiv.remove();
+                    alertElements.delete(alertId);
+                    console.log(`Alert ${alertId} removed from UI`);
+                }
             });
 
             function updateUIWithAlert(data) {
@@ -110,46 +137,29 @@
                         <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
                     `;
-                    if (data.image) {
-                        const sendToCdrmoPnpBtn = document.createElement('button');
-                        sendToCdrmoPnpBtn.textContent = 'Send to CDRRMO and PNP';
-                        sendToCdrmoPnpBtn.onclick = () => socket.emit('forward_alert', { alert: data, targets: ['cdrrmo', 'pnp'] });
-                        alertDiv.appendChild(sendToCdrmoPnpBtn);
-
-                        const sendToBfpPnpBtn = document.createElement('button');
-                        sendToBfpPnpBtn.textContent = 'Send to BFP and PNP';
-                        sendToBfpPnpBtn.onclick = () => socket.emit('forward_alert', { alert: data, targets: ['bfp', 'pnp'] });
-                        alertDiv.appendChild(sendToBfpPnpBtn);
-                    }
                     feed.prepend(alertDiv);
                 }
 
                 if (data.lat && data.lon) {
-                    const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
+                    const marker = L.marker([data.lat, data.lon]).addTo(bfpMap).bindPopup(
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
                     if (feed.children.length === 1) {
-                        barangayMap.setView([data.lat, data.lon], 15);
+                        bfpMap.setView([data.lat, data.lon], 15);
                     }
                 }
 
                 updateStats();
             }
 
-        function notifyAlert(data) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    showBrowserNotification(data);
-                } else {
-                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
-                }
-            }
-
-        function showBrowserNotification(data) {
+            function notifyAlert(data) {
                 if ('Notification' in window && Notification.permission === 'granted') {
                     new Notification('New Alert', {
                         body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
                         icon: '/static/favicon.ico'
                     });
+                } else {
+                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
                 }
             }
 
