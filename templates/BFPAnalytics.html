@@ -65,7 +65,7 @@
         }
 
         function filterData(timePeriod) {
-            fetch(`/api/analytics?role=bfp&time=${timePeriod}`)
+            fetch(`/api/bfp_analytics_data?time=${timePeriod}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
