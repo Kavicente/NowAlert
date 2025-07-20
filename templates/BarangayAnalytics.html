@@ -39,17 +39,14 @@
             <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
             <div class="chart-container"><h2>Road Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
             <div class="chart-container"><h2>Responded Alerts</h2><canvas id="roadRespondedAlertsChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Condition</h2><canvas id="roadWeatherChart"></canvas></div>
+            <div class="chart-container"><h2>Weather Impact</h2><canvas id="roadWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Road Condition</h2><canvas id="roadConditionChart"></canvas></div>
             <div class="chart-container"><h2>Vehicle Types</h2><canvas id="roadVehicleTypesChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Gender</h2><canvas id="roadDriverGenderChart"></canvas></div>
             <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
-            <div class="chart-container"><h2>Injuries</h2><canvas id="roadInjuriesChart"></canvas></div>
-            <div class="chart-container"><h2>Fatalities</h2><canvas id="roadFatalitiesChart"></canvas></div>
         </div>
 
-        
         <!-- Fire Incident Section -->
         <div id="fireSection" class="section hidden">
             <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
@@ -96,7 +93,7 @@
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timePeriod}')"]`).classList.add('active');
             
-            fetch(`/api/analytics?role=barangay&time=${timePeriod}`)
+            fetch(`/api/barangay_analytics_data?time=${timePeriod}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
