@@ -43,13 +43,13 @@
             <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Gender</h2><canvas id="roadDriverGenderChart"></canvas></div>
             <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
-            
+            <div class="chart-container"><h2>Injuries</h2><canvas id="roadInjuriesChart"></canvas></div>
+            <div class="chart-container"><h2>Fatalities</h2><canvas id="roadFatalitiesChart"></canvas></div>
         </div>
 
-        
+        <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
         <!-- Fire Incident Section -->
         <div id="fireSection" class="section hidden">
-            <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="fireIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Incident Distribution</h2><canvas id="fireIncidentDistributionChart"></canvas></div>
             <div class="chart-container"><h2>Fire Incident Cause Analysis</h2><canvas id="fireCauseAnalysisChart"></canvas></div>
@@ -57,9 +57,12 @@
             <div class="chart-container"><h2>Weather Impact</h2><canvas id="fireWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Property Type</h2><canvas id="firePropertyTypeChart"></canvas></div>
             <div class="chart-container"><h2>Fire Cause</h2><canvas id="fireCauseChart"></canvas></div>
+            <div class="chart-container"><h2>Fire Severity</h2><canvas id="fireSeverityChart"></canvas></div>
+            <div class="chart-container"><h2>Casualty Count</h2><canvas id="fireCasualtyCountChart"></canvas></div>
+            <div class="chart-container"><h2>Response Time</h2><canvas id="fireResponseTimeChart"></canvas></div>
+            <div class="chart-container"><h2>Fire Duration</h2><canvas id="fireDurationChart"></canvas></div>
         </div>
     </main>
-
     <script>
         let charts = {};
 
@@ -72,8 +75,8 @@
 
         function showSection(type) {
             const roadHeader = document.getElementById('letterR');
-            const roadSection = document.getElementById('roadSection');
             const fireHeader = document.getElementById('letterF');
+            const roadSection = document.getElementById('roadSection');
             const fireSection = document.getElementById('fireSection');
 
             if (type === 'road') {
@@ -82,12 +85,11 @@
                 fireHeader.classList.add('hidden');
                 fireSection.classList.add('hidden');
             } else if (type === 'fire') {
-                roadHeader.classList.add('hidden');
-                roadSection.classList.add('hidden');
                 fireHeader.classList.remove('hidden');
                 fireSection.classList.remove('hidden');
+                roadHeader.classList.add('hidden');
+                roadSection.classList.add('hidden');
             }
-
             filterData(document.querySelector('.tab.active').textContent.toLowerCase());
         }
 
@@ -95,7 +97,7 @@
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timePeriod}')"]`).classList.add('active');
             
-            fetch(`/api/pnp_analytics_data?time=${timePeriod}`)
+            fetch(`/api/barangay_analytics_data?time=${timePeriod}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -144,10 +146,10 @@
             charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.accident_type || {}),
+                    labels: Object.keys(data.causes.road || {}),
                     datasets: [{
                         label: 'Road Accident Causes',
-                        data: Object.values(data.accident_type || {}),
+                        data: Object.values(data.causes.road || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -170,9 +172,9 @@
             charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.road_weather || {}),
+                    labels: Object.keys(data.weather || {}),
                     datasets: [{
-                        data: Object.values(data.road_weather || {}),
+                        data: Object.values(data.weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -182,10 +184,10 @@
             charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.road_condition || {}),
+                    labels: Object.keys(data.road_conditions || {}),
                     datasets: [{
                         label: 'Road Conditions',
-                        data: Object.values(data.road_condition || {}),
+                        data: Object.values(data.road_conditions || {}),
                         backgroundColor: '#4BC0C0'
                     }]
                 },
@@ -242,7 +244,45 @@
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
+            charts.roadInjuriesChart = new Chart(document.getElementById('roadInjuriesChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [{
+                        label: 'Injuries',
+                        data: data.injuries || data.trends.total.map(() => 0),
+                        backgroundColor: '#9966FF'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadFatalitiesChart = new Chart(document.getElementById('roadFatalitiesChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [{
+                        label: 'Fatalities',
+                        data: data.fatalities || data.trends.total.map(() => 0),
+                        backgroundColor: '#FF9F40'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
             // Fire Incident Charts
+            charts.fireIncidentTrendsChart = new Chart(document.getElementById('fireIncidentTrendsChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [
+                        { label: 'Total Incidents', data: data.trends.total, borderColor: '#36A2EB', fill: false },
+                        { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', fill: false }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
             charts.fireIncidentDistributionChart = new Chart(document.getElementById('fireIncidentDistributionChart').getContext('2d'), {
                 type: 'pie',
                 data: {
@@ -317,10 +357,63 @@
                 },
                 options: { responsive: true, maintainAspectRatio: false }
             });
+
+            charts.fireSeverityChart = new Chart(document.getElementById('fireSeverityChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.fire_severity || {}),
+                    datasets: [{
+                        label: 'Fire Severity',
+                        data: Object.values(data.fire_severity || {}),
+                        backgroundColor: '#FFCE56'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.fireCasualtyCountChart = new Chart(document.getElementById('fireCasualtyCountChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [{
+                        label: 'Casualty Count',
+                        data: data.casualty_count || data.trends.total.map(() => 0),
+                        backgroundColor: '#9966FF'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.fireResponseTimeChart = new Chart(document.getElementById('fireResponseTimeChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [{
+                        label: 'Response Time (min)',
+                        data: data.response_time || data.trends.total.map(() => 0),
+                        backgroundColor: '#FF9F40'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.fireDurationChart = new Chart(document.getElementById('fireDurationChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [{
+                        label: 'Fire Duration (min)',
+                        data: data.fire_duration || data.trends.total.map(() => 0),
+                        backgroundColor: '#4BC0C0'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
         }
 
+        // Initialize charts on page load
         document.addEventListener('DOMContentLoaded', () => {
-            filterData('yearly');
+            filterData('weekly');
         });
     </script>
 </body>
