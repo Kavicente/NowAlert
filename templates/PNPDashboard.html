@@ -92,17 +92,9 @@
             socket.on('update_map', (data) => {
                 const lat = data.lat;
                 const lon = data.lon;
-                pnpMap.setView([lat, lon], 16);
+                pnpMap.setView([lat, lonostomy], 16);
                 L.marker([lat, lon]).addTo(pnpMap);
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-            });
-
-            socket.on('alert_responded', (data) => {
-                const alertId = data.alert_id;
-                const alertElement = document.querySelector(`[data-alert-id="${alertId}"]`);
-                if (alertElement) {
-                    alertElement.remove();
-                }
             });
 
             function updateUIWithAlert(data) {
@@ -110,7 +102,6 @@
                 if (feed) {
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
-                    alertDiv.setAttribute('data-alert-id', data.alert_id);
                     let displayTime;
                     try {
                         const serverTime = new Date(data.timestamp || Date.now());
@@ -124,7 +115,7 @@
                     const residentBarangay = "{{ barangay }}";
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}', '${data.alert_id}')">Respond</button>
+                        <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
                     `;
                     feed.prepend(alertDiv);
@@ -168,8 +159,8 @@
                     });
             }
 
-            window.respondAlert = function(timestamp, lat, lon, barangay, type, alertId) {
-                socket.emit('response_submitted', { timestamp, lat, lon, barangay, emergency_type: type, alert_id: alertId });
+            window.respondAlert = function(timestamp, lat, lon, barangay, type) {
+                socket.emit('responded', { timestamp, lat, lon, barangay, emergency_type: type });
                 alert('Response sent for alert at ' + timestamp);
             };
 
