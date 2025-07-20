@@ -821,7 +821,7 @@ def barangay_analytics_data():
     time_filter = request.args.get('time', 'weekly')
     trends = get_barangay_trends(time_filter)
     distribution = get_barangay_distribution(time_filter)
-    causes = get_barangay_causes(time_filter)
+    causes_data = get_barangay_causes(time_filter)
     weather = {'Sunny': 10, 'Rainy': 5, 'Foggy': 2}
     road_conditions = {'Dry': 12, 'Wet': 4, 'Icy': 1}
     vehicle_types = {'Car': 8, 'Motorcycle': 6, 'Truck': 3}
@@ -833,7 +833,7 @@ def barangay_analytics_data():
     return jsonify({
         'trends': trends,
         'distribution': distribution,
-        'causes': causes['road'],
+        'causes': causes_data['road'],
         'weather': weather,
         'road_conditions': road_conditions,
         'vehicle_types': vehicle_types,
