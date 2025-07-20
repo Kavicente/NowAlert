@@ -39,7 +39,7 @@
             <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
             <div class="chart-container"><h2>Road Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
             <div class="chart-container"><h2>Responded Alerts</h2><canvas id="roadRespondedAlertsChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Impact</h2><canvas id="roadWeatherChart"></canvas></div>
+            <div class="chart-container"><h2>Weather Condition</h2><canvas id="roadWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Road Condition</h2><canvas id="roadConditionChart"></canvas></div>
             <div class="chart-container"><h2>Vehicle Types</h2><canvas id="roadVehicleTypesChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
@@ -60,10 +60,6 @@
             <div class="chart-container"><h2>Weather Impact</h2><canvas id="fireWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Property Type</h2><canvas id="firePropertyTypeChart"></canvas></div>
             <div class="chart-container"><h2>Fire Cause</h2><canvas id="fireCauseChart"></canvas></div>
-            <div class="chart-container"><h2>Fire Severity</h2><canvas id="fireSeverityChart"></canvas></div>
-            <div class="chart-container"><h2>Casualty Count</h2><canvas id="fireCasualtyCountChart"></canvas></div>
-            <div class="chart-container"><h2>Response Time</h2><canvas id="fireResponseTimeChart"></canvas></div>
-            <div class="chart-container"><h2>Fire Duration</h2><canvas id="fireDurationChart"></canvas></div>
         </div>
     </main>
     <script>
@@ -100,7 +96,7 @@
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timePeriod}')"]`).classList.add('active');
             
-            fetch(`/api/barangay_analytics_data?time=${timePeriod}`)
+            fetch(`/api/analytics?role=barangay&time=${timePeriod}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -149,10 +145,10 @@
             charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.causes.road || {}),
+                    labels: Object.keys(data.accident_type || {}),
                     datasets: [{
                         label: 'Road Accident Causes',
-                        data: Object.values(data.causes.road || {}),
+                        data: Object.values(data.accident_type || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -175,9 +171,9 @@
             charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.weather || {}),
+                    labels: Object.keys(data.road_weather || {}),
                     datasets: [{
-                        data: Object.values(data.weather || {}),
+                        data: Object.values(data.road_weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -187,10 +183,10 @@
             charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.road_conditions || {}),
+                    labels: Object.keys(data.road_condition || {}),
                     datasets: [{
                         label: 'Road Conditions',
-                        data: Object.values(data.road_conditions || {}),
+                        data: Object.values(data.road_condition || {}),
                         backgroundColor: '#4BC0C0'
                     }]
                 },
@@ -242,32 +238,6 @@
                         label: 'Accident Types',
                         data: Object.values(data.accident_type || {}),
                         backgroundColor: '#FFCE56'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadInjuriesChart = new Chart(document.getElementById('roadInjuriesChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Injuries',
-                        data: data.injuries || data.trends.total.map(() => 0),
-                        backgroundColor: '#9966FF'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadFatalitiesChart = new Chart(document.getElementById('roadFatalitiesChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Fatalities',
-                        data: data.fatalities || data.trends.total.map(() => 0),
-                        backgroundColor: '#FF9F40'
                     }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
@@ -327,9 +297,9 @@
             charts.fireWeatherChart = new Chart(document.getElementById('fireWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.weather || {}),
+                    labels: Object.keys(data.fire_weather || {}),
                     datasets: [{
-                        data: Object.values(data.weather || {}),
+                        data: Object.values(data.fire_weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -356,58 +326,6 @@
                         label: 'Fire Causes',
                         data: Object.values(data.causes.fire || {}),
                         backgroundColor: '#36A2EB'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireSeverityChart = new Chart(document.getElementById('fireSeverityChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.fire_severity || {}),
-                    datasets: [{
-                        label: 'Fire Severity',
-                        data: Object.values(data.fire_severity || {}),
-                        backgroundColor: '#FFCE56'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireCasualtyCountChart = new Chart(document.getElementById('fireCasualtyCountChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Casualty Count',
-                        data: data.casualty_count || data.trends.total.map(() => 0),
-                        backgroundColor: '#9966FF'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireResponseTimeChart = new Chart(document.getElementById('fireResponseTimeChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Response Time (min)',
-                        data: data.response_time || data.trends.total.map(() => 0),
-                        backgroundColor: '#FF9F40'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireDurationChart = new Chart(document.getElementById('fireDurationChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Fire Duration (min)',
-                        data: data.fire_duration || data.trends.total.map(() => 0),
-                        backgroundColor: '#4BC0C0'
                     }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
