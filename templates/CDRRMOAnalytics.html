@@ -33,8 +33,9 @@
         </div>
 
         <!-- Road Accident Section -->
-        <header class="header2" id="letterR" class="section">Road Accident Reports</header>
+        
         <div id="roadSection" class="section">
+            <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="roadIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
             <div class="chart-container"><h2>Road Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
@@ -115,10 +116,10 @@
             charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.causes.road || {}),
+                    labels: Object.keys(data.accident_type || {}),
                     datasets: [{
                         label: 'Road Accident Causes',
-                        data: Object.values(data.causes.road || {}),
+                        data: Object.values(data.accident_type || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -141,9 +142,9 @@
             charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.weather || {}),
+                    labels: Object.keys(data.road_weather || {}),
                     datasets: [{
-                        data: Object.values(data.weather || {}),
+                        data: Object.values(data.road_weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -153,10 +154,10 @@
             charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.road_conditions || {}),
+                    labels: Object.keys(data.road_condition || {}),
                     datasets: [{
                         label: 'Road Conditions',
-                        data: Object.values(data.road_conditions || {}),
+                        data: Object.values(data.road_condition || {}),
                         backgroundColor: '#4BC0C0'
                     }]
                 },
@@ -200,13 +201,22 @@
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
-            
-
+            charts.roadAccidentTypeChart = new Chart(document.getElementById('roadAccidentTypeChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.accident_type || {}),
+                    datasets: [{
+                        label: 'Accident Types',
+                        data: Object.values(data.accident_type || {}),
+                        backgroundColor: '#FFCE56'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
         }
-
         // Initialize charts on page load
         document.addEventListener('DOMContentLoaded', () => {
-            filterData('weekly');
+            filterData('yearly');
         });
     </script>
 </body>
