@@ -152,20 +152,22 @@ def handle_alert(data):
     emit('new_alert', data, room=room)
     logger.info(f"Alert sent to room {room}: {data}")
 
-@socketio.on('response_submitted')
-def handle_response(data):
-    try:
-        alert_id = data.get('alert_id')
-        if alert_id:
-            for alert in alerts:
-                if alert.get('alert_id') == alert_id:
-                    alert['responded'] = True
-                    alert.update(data)  # Add submitted fields to alert
-                    break
-            emit('alert_responded', {'alert_id': alert_id}, broadcast=True)
-            logger.info(f"Alert {alert_id} marked as responded with data: {data}")
-    except Exception as e:
-        logger.error(f"Error handling response: {e}")
+@socketio.on('forward_alert')
+def handle_forward_alert(data):
+    alert = data.get('alert', {})
+    targets = data.get('targets', [])
+    if not alert or not targets:
+        logger.error(f"Invalid forward_alert data: {data}")
+        return
+    alert['resident_barangay'] = alert.get('barangay', 'Unknown')
+    municipality = alert.get('municipality', 'default')
+    for target in targets:
+        if target in ['bfp', 'cdrrmo', 'pnp']:
+            room = f"{target}_{municipality}"
+            emit('forward_alert', alert, room=room)
+            logger.info(f"Alert forwarded to {room}: {alert}")
+        else:
+            logger.warning(f"Invalid target for forward_alert: {target}")
 
 @socketio.on('update_map')
 def handle_update_map(data):
