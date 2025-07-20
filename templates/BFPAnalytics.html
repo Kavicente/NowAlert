@@ -42,6 +42,7 @@
         <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
         <!-- Fire Incident Section -->
         <div id="fireSection" class="section">
+            <div id="fireSection" class="section">
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="fireIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Incident Distribution</h2><canvas id="fireIncidentDistributionChart"></canvas></div>
             <div class="chart-container"><h2>Fire Incident Cause Analysis</h2><canvas id="fireCauseAnalysisChart"></canvas></div>
@@ -49,10 +50,7 @@
             <div class="chart-container"><h2>Weather Impact</h2><canvas id="fireWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Property Type</h2><canvas id="firePropertyTypeChart"></canvas></div>
             <div class="chart-container"><h2>Fire Cause</h2><canvas id="fireCauseChart"></canvas></div>
-            <div class="chart-container"><h2>Fire Severity</h2><canvas id="fireSeverityChart"></canvas></div>
-            <div class="chart-container"><h2>Casualty Count</h2><canvas id="fireCasualtyCountChart"></canvas></div>
-            <div class="chart-container"><h2>Response Time</h2><canvas id="fireResponseTimeChart"></canvas></div>
-            <div class="chart-container"><h2>Fire Duration</h2><canvas id="fireDurationChart"></canvas></div>
+        </div>
         </div>
     </main>
 
@@ -67,7 +65,7 @@
         }
 
         function filterData(timePeriod) {
-            fetch(`/api/bfp_analytics_data?time=${timePeriod}`)
+            fetch(`/api/analytics?role=bfp&time=${timePeriod}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.error) {
@@ -176,62 +174,12 @@
                 options: { responsive: true, maintainAspectRatio: false }
             });
 
-            charts.fireSeverityChart = new Chart(document.getElementById('fireSeverityChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.fire_severity || {}),
-                    datasets: [{
-                        label: 'Fire Severity',
-                        data: Object.values(data.fire_severity || {}),
-                        backgroundColor: '#FFCE56'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireCasualtyCountChart = new Chart(document.getElementById('fireCasualtyCountChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Casualty Count',
-                        data: data.casualty_count || data.trends.total.map(() => 0),
-                        backgroundColor: '#9966FF'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireResponseTimeChart = new Chart(document.getElementById('fireResponseTimeChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Response Time (min)',
-                        data: data.response_time || data.trends.total.map(() => 0),
-                        backgroundColor: '#FF9F40'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireDurationChart = new Chart(document.getElementById('fireDurationChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [{
-                        label: 'Fire Duration (min)',
-                        data: data.fire_duration || data.trends.total.map(() => 0),
-                        backgroundColor: '#4BC0C0'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+            
         }
 
         // Initialize charts on page load
         document.addEventListener('DOMContentLoaded', () => {
-            filterData('weekly');
+            filterData('yearly');
         });
     </script>
 </body>
