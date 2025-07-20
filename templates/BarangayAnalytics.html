@@ -45,8 +45,10 @@
             <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Gender</h2><canvas id="roadDriverGenderChart"></canvas></div>
             <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
+            
         </div>
 
+        
         <!-- Fire Incident Section -->
         <div id="fireSection" class="section hidden">
             <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
@@ -59,6 +61,7 @@
             <div class="chart-container"><h2>Fire Cause</h2><canvas id="fireCauseChart"></canvas></div>
         </div>
     </main>
+
     <script>
         let charts = {};
 
@@ -71,8 +74,8 @@
 
         function showSection(type) {
             const roadHeader = document.getElementById('letterR');
-            const fireHeader = document.getElementById('letterF');
             const roadSection = document.getElementById('roadSection');
+            const fireHeader = document.getElementById('letterF');
             const fireSection = document.getElementById('fireSection');
 
             if (type === 'road') {
@@ -81,11 +84,12 @@
                 fireHeader.classList.add('hidden');
                 fireSection.classList.add('hidden');
             } else if (type === 'fire') {
-                fireHeader.classList.remove('hidden');
-                fireSection.classList.remove('hidden');
                 roadHeader.classList.add('hidden');
                 roadSection.classList.add('hidden');
+                fireHeader.classList.remove('hidden');
+                fireSection.classList.remove('hidden');
             }
+
             filterData(document.querySelector('.tab.active').textContent.toLowerCase());
         }
 
@@ -241,18 +245,6 @@
             });
 
             // Fire Incident Charts
-            charts.fireIncidentTrendsChart = new Chart(document.getElementById('fireIncidentTrendsChart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [
-                        { label: 'Total Incidents', data: data.trends.total, borderColor: '#36A2EB', fill: false },
-                        { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
             charts.fireIncidentDistributionChart = new Chart(document.getElementById('fireIncidentDistributionChart').getContext('2d'), {
                 type: 'pie',
                 data: {
@@ -294,9 +286,9 @@
             charts.fireWeatherChart = new Chart(document.getElementById('fireWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.fire_weather || {}),
+                    labels: Object.keys(data.weather || {}),
                     datasets: [{
-                        data: Object.values(data.fire_weather || {}),
+                        data: Object.values(data.weather || {}),
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
                     }]
                 },
@@ -329,9 +321,8 @@
             });
         }
 
-        // Initialize charts on page load
         document.addEventListener('DOMContentLoaded', () => {
-            filterData('weekly');
+            filterData('yearly');
         });
     </script>
 </body>
