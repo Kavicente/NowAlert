@@ -2,336 +2,185 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PNP Analytics - {{ municipality }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+    <title>PNP Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
+        .notification { position: fixed; bottom: 10px; right: 10px; background-color: #f44336; color: white; padding: 15px; border-radius: 5px; display: none; }
+    </style>
 </head>
 <body>
-    
-    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
-    <header>PNP {{ municipality }} Reports</header>
-    <p id="datetime">{{ current_datetime }}  </p>
-    <div class="sidebar" id="sidebar">
+    <div class="sidebar">
         <nav>
             <ul>
-                <li><a href="{{ url_for('pnp_dashboard') }}">Dashboard</a></li>
-                <li><a href="#" onclick="showSection('road')">Road Accident Reports</a></li>
-                <li><a href="#" onclick="showSection('fire')">Fire Incident Reports</a></li>
+                <li><a href="{{ url_for('pnp_dashboard') }}"><span>🏠</span> Dashboard</a></li>
+                <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
+                <li><a href="#map"><span>📍</span> Map</a></li>
+                <li><a href="{{ url_for('pnp_analytics') }}"><span>📊</span> Manage Reports</a></li>
+                <li><a href="#notifications"><span>📣</span> Notifications</a></li>
+                <li><a href="#settings"><span>⚙️</span> Settings</a></li>
+                <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
             </ul>
         </nav>
     </div>
-    <main class="main-content" id="mainContent">
-        <div class="tabs">
-            <button class="tab active" onclick="filterData('today')">Today</button>
-            <button class="tab" onclick="filterData('daily')">Daily</button>
-            <button class="tab" onclick="filterData('weekly')">Weekly</button>
-            <button class="tab" onclick="filterData('monthly')">Monthly</button>
-            <button class="tab" onclick="filterData('yearly')">Yearly</button>
-        </div>
-
-        <!-- Road Accident Section -->
-        <header class="header2" id="letterR" class="section">Road Accident Reports</header>
-        <div id="roadSection" class="section">
-            <div class="chart-container"><h2>Incident Trends</h2><canvas id="roadIncidentTrendsChart"></canvas></div>
-            <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
-            <div class="chart-container"><h2>Road Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
-            <div class="chart-container"><h2>Responded Alerts</h2><canvas id="roadRespondedAlertsChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Impact</h2><canvas id="roadWeatherChart"></canvas></div>
-            <div class="chart-container"><h2>Road Condition</h2><canvas id="roadConditionChart"></canvas></div>
-            <div class="chart-container"><h2>Vehicle Types</h2><canvas id="roadVehicleTypesChart"></canvas></div>
-            <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
-            <div class="chart-container"><h2>Driver's Gender</h2><canvas id="roadDriverGenderChart"></canvas></div>
-            <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
-            <div class="chart-container"><h2>Injuries</h2><canvas id="roadInjuriesChart"></canvas></div>
-            <div class="chart-container"><h2>Fatalities</h2><canvas id="roadFatalitiesChart"></canvas></div>
-        </div>
-
-        <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
-        <!-- Fire Incident Section -->
-        <div id="fireSection" class="section hidden">
-            <div class="chart-container"><h2>Incident Trends</h2><canvas id="fireIncidentTrendsChart"></canvas></div>
-            <div class="chart-container"><h2>Incident Distribution</h2><canvas id="fireIncidentDistributionChart"></canvas></div>
-            <div class="chart-container"><h2>Fire Incident Cause Analysis</h2><canvas id="fireCauseAnalysisChart"></canvas></div>
-            <div class="chart-container"><h2>Responded Alerts</h2><canvas id="fireRespondedAlertsChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Impact</h2><canvas id="fireWeatherChart"></canvas></div>
-            <div class="chart-container"><h2>Property Type</h2><canvas id="firePropertyTypeChart"></canvas></div>
-            <div class="chart-container"><h2>Fire Cause</h2><canvas id="fireCauseChart"></canvas></div>
-        </div>
-    </main>
-
+    <div class="dashboard">
+        <header>
+            <h1>PNP {{ municipality }} Dashboard</h1>
+            <div class="filters">
+            </div>
+        </header>
+        <main class="main-content">
+            <h2 class="h2">{{ municipality }} Map</h2>
+            <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span></p>
+            <div id="map"></div>
+            <section class="stats">
+                <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
+                <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
+            </section>
+            <section id="alerts">
+                <h2 class="h2">Live Alerts</h2>
+                <div id="alert-container"></div>
+            </section>
+        </main>
+        <div id="notification"></div>
+    </div>
     <script>
-        let charts = {};
+        document.addEventListener('DOMContentLoaded', () => {
+            const lat = {{ lat_coord|default(14.0549) }};
+            const lon = {{ lon_coord|default(121.3013) }};
+            const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
+            const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('mainContent');
-            sidebar.classList.toggle('active');
-            mainContent.classList.toggle('shifted');
-        }
+            const pnpMap = L.map('map').setView([lat, lon], 14);
 
-        function showSection(type) {
-            const roadHeader = document.getElementById('letterR');
-            const roadSection = document.getElementById('roadSection');
-            const fireHeader = document.getElementById('letterF');
-            const fireSection = document.getElementById('fireSection');
+            var satellite = L.tileLayer(tileLayerUrl, {
+                attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+                maxZoom: 18,
+                tileSize: 512,
+                zoomOffset: -1
+            });
 
-            if (type === 'road') {
-                roadHeader.classList.remove('hidden');
-                roadSection.classList.remove('hidden');
-                fireHeader.classList.add('hidden');
-                fireSection.classList.add('hidden');
-            } else if (type === 'fire') {
-                roadHeader.classList.add('hidden');
-                roadSection.classList.add('hidden');
-                fireHeader.classList.remove('hidden');
-                fireSection.classList.remove('hidden');
+            var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            });
+
+            satellite.addTo(pnpMap);
+
+            var baseLayers = {
+                "Satellite with Labels": satellite,
+                "OpenStreetMap": osm
+            };
+            L.control.layers(baseLayers).addTo(pnpMap);
+
+            const socket = io('https://alert-858l.onrender.com');
+            const alertElements = new Map();
+
+            socket.on('connect', () => {
+                socket.emit('register_role', { role: 'pnp', municipality: '{{ municipality }}' });
+            });
+
+            socket.on('forward_alert', (data) => {
+                if (data.image) {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
+                }
+            });
+
+            socket.on('update_map', (data) => {
+                const lat = data.lat;
+                const lon = data.lon;
+                pnpMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(pnpMap);
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+            });
+
+            socket.on('alert_responded', (data) => {
+                const alertId = data.alert_id;
+                const alertElement = document.querySelector(`[data-alert-id="${alertId}"]`);
+                if (alertElement) {
+                    alertElement.remove();
+                }
+            });
+
+            function updateUIWithAlert(data) {
+                const feed = document.getElementById('alert-container');
+                if (feed) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert-item';
+                    alertDiv.setAttribute('data-alert-id', data.alert_id);
+                    let displayTime;
+                    try {
+                        const serverTime = new Date(data.timestamp || Date.now());
+                        displayTime = serverTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
+                    } catch (e) {
+                        console.error('Error parsing timestamp:', e);
+                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
+                    }
+                    const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
+                    const emergencyBarangay = data.barangay || 'Unknown';
+                    const residentBarangay = "{{ barangay }}";
+                    alertDiv.innerHTML = `
+                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
+                        <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}', '${data.alert_id}')">Respond</button>
+                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
+                    `;
+                    feed.prepend(alertDiv);
+                }
+
+                if (data.lat && data.lon) {
+                    const marker = L.marker([data.lat, data.lon]).addTo(pnpMap).bindPopup(
+                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                    ).openPopup();
+                    if (feed.children.length === 1) {
+                        pnpMap.setView([data.lat, data.lon], 15);
+                    }
+                }
+
+                updateStats();
             }
 
-            filterData(document.querySelector('.tab.active').textContent.toLowerCase());
-        }
+            function notifyAlert(data) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    showBrowserNotification(data);
+                } else {
+                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
+                }
+            }
 
-        function filterData(timePeriod) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.tab[onclick="filterData('${timePeriod}')"]`).classList.add('active');
+            function showBrowserNotification(data) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('New Alert', {
+                        body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
+                        icon: '/static/favicon.ico'
+                    });
+                }
+            }
 
-            fetch(`/api/analytics?role=pnp&time=${timePeriod}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        console.error('Error fetching data:', data.error);
-                        alert('Failed to load analytics data');
-                        return;
-                    }
-                    updateCharts(data);
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                    alert('Failed to load analytics data');
-                });
-        }
+            function updateStats() {
+                fetch('/api/stats?role=pnp')
+                    .then(res => res.json())
+                    .then(stats => {
+                        document.getElementById('total-incidents').textContent = stats.total || 0;
+                        document.getElementById('critical-incidents').textContent = stats.critical || 0;
+                    });
+            }
 
-        function updateCharts(data) {
-            Object.values(charts).forEach(chart => chart.destroy());
-            charts = {};
+            window.respondAlert = function(timestamp, lat, lon, barangay, type, alertId) {
+                socket.emit('response_submitted', { timestamp, lat, lon, barangay, emergency_type: type, alert_id: alertId });
+                alert('Response sent for alert at ' + timestamp);
+            };
 
-            // Road Accident Charts
-            charts.roadIncidentTrendsChart = new Chart(document.getElementById('roadIncidentTrendsChart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [
-                        { label: 'Total Incidents', data: data.trends.total, borderColor: '#36A2EB', fill: false },
-                        { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
+            function showNotification(message) {
+                const notification = document.getElementById('notification');
+                notification.textContent = message;
+                notification.style.display = 'block';
+                setTimeout(() => notification.style.display = 'none', 5000);
+            }
 
-            charts.roadAccidentDistributionChart = new Chart(document.getElementById('roadAccidentDistributionChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.distribution),
-                    datasets: [{
-                        data: Object.values(data.distribution).map(d => d.total),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.accident_type || {}),
-                    datasets: [{
-                        label: 'Road Accident Causes',
-                        data: Object.values(data.accident_type || {}),
-                        backgroundColor: '#36A2EB'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadRespondedAlertsChart = new Chart(document.getElementById('roadRespondedAlertsChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.distribution),
-                    datasets: [{
-                        label: 'Responded Alerts',
-                        data: Object.values(data.distribution).map(d => d.responded),
-                        backgroundColor: '#FF6384'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.road_weather || {}),
-                    datasets: [{
-                        data: Object.values(data.road_weather || {}),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.road_condition || {}),
-                    datasets: [{
-                        label: 'Road Conditions',
-                        data: Object.values(data.road_condition || {}),
-                        backgroundColor: '#4BC0C0'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadVehicleTypesChart = new Chart(document.getElementById('roadVehicleTypesChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.vehicle_types || {}),
-                    datasets: [{
-                        data: Object.values(data.vehicle_types || {}),
-                        backgroundColor: ['#FF9F40', '#9966FF', '#FFCE56']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadDriverAgeChart = new Chart(document.getElementById('roadDriverAgeChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.driver_age || {}),
-                    datasets: [{
-                        label: 'Driver Age Groups',
-                        data: Object.values(data.driver_age || {}),
-                        backgroundColor: '#36A2EB'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadDriverGenderChart = new Chart(document.getElementById('roadDriverGenderChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.driver_gender || {}),
-                    datasets: [{
-                        data: Object.values(data.driver_gender || {}),
-                        backgroundColor: ['#FF6384', '#36A2EB']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadAccidentTypeChart = new Chart(document.getElementById('roadAccidentTypeChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.accident_type || {}),
-                    datasets: [{
-                        label: 'Accident Types',
-                        data: Object.values(data.accident_type || {}),
-                        backgroundColor: '#FFCE56'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            // Fire Incident Charts
-            charts.fireIncidentTrendsChart = new Chart(document.getElementById('fireIncidentTrendsChart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [
-                        { label: 'Total Incidents', data: data.trends.total, borderColor: '#36A2EB', fill: false },
-                        { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireIncidentDistributionChart = new Chart(document.getElementById('fireIncidentDistributionChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.distribution),
-                    datasets: [{
-                        data: Object.values(data.distribution).map(d => d.total),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireCauseAnalysisChart = new Chart(document.getElementById('fireCauseAnalysisChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.fire_causes || {}),
-                    datasets: [{
-                        label: 'Fire Causes',
-                        data: Object.values(data.fire_causes || {}),
-                        backgroundColor: '#FF6384'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireRespondedAlertsChart = new Chart(document.getElementById('fireRespondedAlertsChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.distribution),
-                    datasets: [{
-                        label: 'Responded Alerts',
-                        data: Object.values(data.distribution).map(d => d.responded),
-                        backgroundColor: '#FF6384'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireWeatherChart = new Chart(document.getElementById('fireWeatherChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.fire_weather || {}),
-                    datasets: [{
-                        data: Object.values(data.fire_weather || {}),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.firePropertyTypeChart = new Chart(document.getElementById('firePropertyTypeChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.property_types || {}),
-                    datasets: [{
-                        data: Object.values(data.property_types || {}),
-                        backgroundColor: ['#FF9F40', '#9966FF', '#FFCE56']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.fireCauseChart = new Chart(document.getElementById('fireCauseChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.fire_causes || {}),
-                    datasets: [{
-                        label: 'Fire Causes',
-                        data: Object.values(data.fire_causes || {}),
-                        backgroundColor: '#FF6384'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            filterData('weekly');
+            updateStats();
         });
     </script>
 </body>
