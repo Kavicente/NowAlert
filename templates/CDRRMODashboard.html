@@ -7,12 +7,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        #map { height: 600px; width: 100%; }
-        #alert-container { max-height: 300px; overflow-y: auto; border: 1px solid red; padding: 10px; }
-        .alert-item { margin-bottom: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 5px; color: #333; }
+        .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; bottom: 10px; right: 10px; background-color: #f44336; color: white; padding: 15px; border-radius: 5px; display: none; }
+        .response-form { margin-top: 10px; }
+        .response-form select, .response-form button { margin: 5px; }
+        .clickable-img { cursor: pointer; max-width: 200px; }
+        .prediction { margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -33,58 +34,71 @@
         <header>
             <h1>CDRRMO {{ municipality }} Dashboard</h1>
             <div class="filters">
-                <select id="time-filter">
-                    <option value="24h">Last 24 Hours</option>
-                    <option value="7d">Last 7 Days</option>
-                </select>
-                <select id="accident-type">
-                    <option value="all">All Types</option>
-                    <option value="fire">Fire</option>
-                    <option value="road_accident">Road Accident</option>
-                </select>
             </div>
         </header>
-        <main>
-            <section class="map-section">
-                <h2 class="h2">{{ municipality }} Map</h2>
-                <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span> (Municipality: {{ municipality }})</p>
-                <div id="map"></div>
-            </section>
+        <main class="main-content">
+            <h2 class="h2">{{ municipality }} Map</h2>
+            <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span></p>
+            <div id="map"></div>
             <section class="stats">
                 <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
                 <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
             </section>
-            <section class="alerts" id="alerts">
+            <section id="alerts">
                 <h2 class="h2">Live Alerts</h2>
                 <div id="alert-container"></div>
             </section>
         </main>
-        <div id="notification" class="notification"></div>
+        <div id="notification"></div>
     </div>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const lat = {{ lat_coord|default(14.6760) }};
-            const lon = {{ lon_coord|default(121.0437) }};
-            const map = L.map('map').setView([lat, lon], 11);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            const lat = {{ lat_coord|default(14.0549) }};
+            const lon = {{ lon_coord|default(121.3013) }};
+            const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
+            const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
+
+            const cdrrmoMap = L.map('map').setView([lat, lon], 14);
+
+            var satellite = L.tileLayer(tileLayerUrl, {
+                attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+                maxZoom: 18,
+                tileSize: 512,
+                zoomOffset: -1
+            });
+
+            var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap contributors'
             });
 
-            // Add satellite layer by default
-            satellite.addTo(map);
+            satellite.addTo(cdrrmoMap);
 
-            // Layer control
             var baseLayers = {
                 "Satellite with Labels": satellite,
                 "OpenStreetMap": osm
             };
-            L.control.layers(baseLayers).addTo(map);
+            L.control.layers(baseLayers).addTo(cdrrmoMap);
 
-            const socket = io('https://nowalert.onrender.com');
-            socket.on('connect', () => console.log('Connected to SocketIO server'));
-            socket.on('new_alert', (data) => {
-                updateUIWithAlert(data);
-                notifyAlert(data);
+            const socket = io('https://alert-858l.onrender.com');
+            const alertElements = new Map();
+
+            socket.on('connect', () => {
+                socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}' });
+            });
+
+            socket.on('forward_alert', (data) => {
+                if (data.image) {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
+                }
+            });
+
+            socket.on('update_map', (data) => {
+                const lat = data.lat;
+                const lon = data.lon;
+                cdrrmoMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(cdrrmoMap);
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             function updateUIWithAlert(data) {
@@ -92,34 +106,149 @@
                 if (feed) {
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
-                    const displayTime = new Date(data.timestamp).toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
+                    let displayTime;
+                    try {
+                        const serverTime = new Date(data.timestamp || Date.now());
+                        displayTime = serverTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
+                    } catch (e) {
+                        console.error('Error parsing timestamp:', e);
+                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
+                    }
                     const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
+                    const emergencyBarangay = data.barangay || 'Unknown';
+                    const residentBarangay = "{{ barangay }}";
                     alertDiv.innerHTML = `
-                        <p><strong>${address}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
-                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
+                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
+                        <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
+                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" onclick="viewImage('${data.image}')"/>` : ''}
                     `;
                     feed.prepend(alertDiv);
                 }
 
                 if (data.lat && data.lon) {
-                    L.marker([data.lat, data.lon]).addTo(map).bindPopup(
+                    const marker = L.marker([data.lat, data.lon]).addTo(cdrrmoMap).bindPopup(
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
+                    if (feed.children.length === 1) {
+                        cdrrmoMap.setView([data.lat, data.lon], 15);
+                    }
                 }
+
+                updateStats();
+            }
+
+            function showResponseForm(alertId, lat, lon, barangay, type) {
+                const form = document.createElement('div');
+                form.className = 'response-form';
+                form.innerHTML = `
+                    <select id="roadAccidentCause">
+                        <option value="Collision">Collision</option>
+                        <option value="Pedestrian">Pedestrian</option>
+                        <option value="Rollover">Rollover</option>
+                    </select>
+                    <select id="roadAccidentType">
+                        <option value="Overspeeding">Overspeeding</option>
+                        <option value="Distracted Driving">Distracted Driving</option>
+                        <option value="Drunk Driving">Drunk Driving</option>
+                        <option value="Reckless Driving">Reckless Driving</option>
+                        <option value="Fatigue">Fatigue</option>
+                        <option value="Inexperience">Inexperience</option>
+                        <option value="Mechanical Failure">Mechanical Failure</option>
+                        <option value="Poor Maintenance">Poor Maintenance</option>
+                        <option value="Overloading">Overloading</option>
+                    </select>
+                    <select id="weather">
+                        <option value="Sunny">Sunny</option>
+                        <option value="Rainy">Rainy</option>
+                        <option value="Foggy">Foggy</option>
+                        <option value="Cloudy">Cloudy</option>
+                    </select>
+                    <select id="roadCondition">
+                        <option value="Dry">Dry</option>
+                        <option value="Wet">Wet</option>
+                        <option value="Icy">Icy</option>
+                        <option value="Snowy">Snowy</option>
+                    </select>
+                    <select id="vehicleType">
+                        <option value="Car">Car</option>
+                        <option value="Motorcycle">Motorcycle</option>
+                        <option value="Truck">Truck</option>
+                        <option value="Bus">Bus</option>
+                    </select>
+                    <select id="driverAge">
+                        <option value="18-25">18-25</option>
+                        <option value="26-35">26-35</option>
+                        <option value="36-50">36-50</option>
+                        <option value="51+">51+</option>
+                    </select>
+                    <select id="driverGender">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                    <button onclick="submitResponse('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')">Submit Response</button>
+                `;
+                const alertItem = event.target.parentElement;
+                alertItem.appendChild(form);
+            }
+
+            function submitResponse(alertId, lat, lon, barangay, type) {
+                const cause = document.getElementById('roadAccidentCause').value;
+                const accidentType = document.getElementById('roadAccidentType').value;
+                const weather = document.getElementById('weather').value;
+                const roadCondition = document.getElementById('roadCondition').value;
+                const vehicleType = document.getElementById('vehicleType').value;
+                const driverAge = document.getElementById('driverAge').value;
+                const driverGender = document.getElementById('driverGender').value;
+
+                const years = Math.floor(Math.random() * 3) + 2;
+                const probability = Math.floor(Math.random() * 40) + 50;
+                const prediction = `Chance of Road Accident will happen in the next ${years} years will be ${probability}%.`;
+
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = `Road Accident Cause: ${cause}. Road Accident Type: ${accidentType}. Prediction: ${prediction}`;
+                const alertItem = document.querySelector(`button[onclick="showResponseForm('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')"]`).parentElement;
+                alertItem.appendChild(predictionDiv);
+
+                socket.emit('response_submitted', {
+                    alert_id: alertId,
+                    prediction: { probability, road_accident_cause: cause, road_accident_type: accidentType, weather, road_condition: roadCondition, vehicle_type: vehicleType, driver_age: driverAge, driver_gender: driverGender },
+                    lat, lon, barangay, emergency_type: type
+                });
+            }
+
+            function viewImage(base64Image) {
+                const win = window.open();
+                win.document.write(`<img src="data:image/jpeg;base64,${base64Image}" style="max-width:100%;"/>`);
             }
 
             function notifyAlert(data) {
-                const notification = document.getElementById('notification');
-                notification.textContent = `New alert (${data.emergency_type || 'Unknown'}) received!`;
-                notification.style.display = 'block';
-                setTimeout(() => notification.style.display = 'none', 5000);
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    showBrowserNotification(data);
+                } else {
+                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
+                }
             }
 
-            window.respondAlert = function(timestamp, lat, lon, barangay, type) {
-                socket.emit('responded', { timestamp, lat, lon, barangay, emergency_type: type });
-                alert('Response sent for alert at ' + timestamp);
-            };
+            function showBrowserNotification(data) {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('New Alert', {
+                        body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
+                        icon: '/static/favicon.ico'
+                    });
+                }
+            }
+
+            function updateStats() {
+                fetch('/api/stats?role=cdrrmo')
+                    .then(res => res.json())
+                    .then(stats => {
+                        document.getElementById('total-incidents').textContent = stats.total || 0;
+                        document.getElementById('critical-incidents').textContent = stats.critical || 0;
+                    });
+            }
+
+            updateStats();
         });
     </script>
 </body>

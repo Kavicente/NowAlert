@@ -5,3 +5,6 @@ def signup_type():
 
 def login_type():
     return render_template('LoginType.html')
+
+def choose_login_type():
+    return render_template('LoginType.html')

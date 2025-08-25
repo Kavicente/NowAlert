@@ -1,19 +1,18 @@
 body {
     margin: 0;
     font-family: Arial, sans-serif;
-    background-color: #8ec3f5;
+    background-color: #224380;
 }
 
 .sidebar {
     width: 240px;
     position: fixed;
     height: 81%;
-    background: #e8ecef;
+    background: #deeaee;
     color:#000;
     border-radius: 10px;
     margin-top: 0;
     margin-left: 20px;
-    
     padding-top: 20px;
     
 }
@@ -51,7 +50,7 @@ body {
     width: 97%;
     margin-top: 88px;  
     margin-left: 20px;           /* Retain original padding */
-    background-color: #e8ecef; /* Light gray background */
+    background-color: #deeaee; /* Light gray background */
     border: 1px solid #8ec3f5; /* Subtle border */
     border-radius: 10px;       /* Rounded corners */
     box-sizing: border-box;    /* Include padding and border in size */
@@ -106,30 +105,38 @@ header {
     margin-top: 10px;
     font-size: 24px;
     text-align: center;
+    color: #ffffff;
     margin-bottom: 15px;
     
 }
-
-header h1 {
+.header2 {
+    margin-top: 10px;
+    font-size: 24px;
+    text-align: center;
+    color: #000000;
+    margin-bottom: 15px;
+    
+}
+header .h1 {
     
     font-size: 24px;
-    color: #000; /* Ensure title is black */
+    color: #000000; /* Ensure title is black */
 }
 
-header p {
-    margin: 5px 0;
-    color: #000; /* Ensure subtext is black */
+p {
+    margin: 16px 3px;
+    color: #ffffff; /* Ensure subtext is black */
 }
 header h2 {
     
     font-size: 24px;
-    color: #000; /* Ensure title is black */
+    color: #ffffff; /* Ensure title is black */
 }
 
-header .p2 {
+header h3 {
     margin: 5px 0;
     
-    color: #000; /* Ensure subtext is black */
+    color: #fffafa; /* Ensure subtext is black */
 }
 
 .tabs {
@@ -191,4 +198,5 @@ header .p2 {
     height: auto;
     border-radius: 5px;
 }
+
 
