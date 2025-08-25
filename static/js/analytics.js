@@ -10,6 +10,7 @@ function updateCharts() {
   if (path.includes('barangay')) role = 'barangay';
   else if (path.includes('cdrrmo')) role = 'cdrrmo';
   else if (path.includes('pnp')) role = 'pnp';
+  else if (path.includes('bfp')) role = 'bfp';
 
   // Fetch distribution and full analytics
   fetch(`/api/barangay_analytics_data?role=${role}`)

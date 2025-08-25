@@ -6,36 +6,57 @@
 
 body {
     font-family: Arial, sans-serif;
-    background-color: #8ec3f5;
-    color: #ffffff;
+    background-color: #224380;
+    color: #000000;
     line-height: 1.6;
 }
 
 header {
-    background-color: #8ec3f5;
-    color: #000;
+    position: relative;
+    
+    color: #000000;
     text-align: center;
-    padding: 20px 0;
+    background-color: #1F3458;
+
     margin-bottom: 20px;
 }
 .p {
     font-family: Arial, sans-serif;
-    color:#000;
+    color:#000000;
 }
-header h1 {
+.h1 {
     font-size: 2.5em;
+    text-align: center;
+      /* Fix the element to the viewport */
 }
 .h2 {
     font-size: 1.5em;
-    color: #000;
+    color: #000000;
+}
+h3 {
+    font-size: 1.5em;
+    color: #000000;
+    
+    margin-top: 30px;
+    position: fixed;           /* Fix the element to the viewport */
+    top: 0;                    /* Anchor to the top */
+    left: 80px; 
 }
 .sidebar {
-    width: 250px;
+    width: 240px;
     position: fixed;
     height: 100%;
-    background: #8ec3f5;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    padding-top: 20px;
+    background: #224380;
+    color:#ffffff;
+    box-shadow: #000;
+    top: 0;
+    
+    padding-top: 50px;
+    
+}
+
+.sidebar.open {
+    width: 220px;
 }
 
 .sidebar nav ul {
@@ -43,51 +64,123 @@ header h1 {
     padding: 0;
 }
 
+.sidebar nav ul li {
+    margin: 15px 0;
+}
+
 .sidebar nav ul li a {
-    display: block;
-    padding: 10px 20px;
-    color: #333;
+    color: rgb(255, 247, 247);
     text-decoration: none;
+    padding: 10px;
+    display: block;
+    font-weight: bold; /* Emphasize sidebar items */
+    text-transform: uppercase; /* Match all-caps style in mockup */
 }
-
-.sidebar nav ul li a span {
-    margin-right: 10px;
+.sidebar::before
+.sidebar::after {
+    position: fixed;
+    right: 20px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    color: #fffefe;
+    font-weight: bold;
 }
-
-.sidebar nav ul li a:hover {
-    background: #ddd;
-}
-
-.dashboard {
-    margin-left: 260px;
-    padding: 20px;
-}
-
-main {
-    padding: 20px;
-}
-
-
-
-#map {
-    height: 400px;
-    width: 100%;
-    border: 1px solid #ccc;
+.sidebar::before {
     
-    background: #f0f0f0;
+    top: 50px;
 }
 
+.sidebar::after {
+    
+    top: 50px;
+}
+.dashboard {
+    position: static;
+    
+    margin-bottom: 10px;
+}
+
+
+
+.main-content {
+    position: fixed;           /* Fix the element to the viewport */
+    top: 0;                    /* Anchor to the top */
+    left: 0;                   /* Start from the left edge */
+    width: 98%;               /* Full width initially */
+    height: 100%;               /* Match original height */
+    overflow: auto;            /* Enable scrolling for overflow */
+    padding: 20px;
+    width: 100%;
+    display: grid;
+    
+              /* Retain original padding */
+    background-color: #deeaee; /* Light gray background */
+    border: 1px solid #8ec3f5; /* Subtle border */
+    
+    box-sizing: border-box;    /* Include padding and border in size */
+   transition: left 0.3s ease, width 0.3s ease;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+
+.main-content::-webkit-scrollbar {
+    display: none;             /* Chrome, Safari, and Opera */
+}
+
+/* Optional vertical "FIRE" labels */
+
+
+.main-content.shifted {
+    left: 250px;               /* Shift right when sidebar is open */
+    width: calc(100% - 250px); /* Adjust width to fit beside sidebar */
+}
+
+.toggle-btn {
+    font-size: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1001;
+    color: #000; /* Ensure hamburger icon is visible */
+}
+#map { 
+    height: 600px; 
+    width: 50%; 
+    position:"fixed"; 
+    top: 0; 
+    left: 40px; 
+    
+    
+}
+.boxed {
+    width: 100%;
+    height: 150%;
+    background-color: #224380;
+    border-radius: 10px;
+    padding: 20px;
+    box-sizing: border-box;
+    margin-bottom: 20px;
+}
 .alerts {
     margin-bottom: 20px;
 }
 
-.alert-container div {
+.alert-container {
     background-color: #33cccc;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+    
+    height: 100px;
+    max-width: 99%; 
+    overflow-y: auto; 
+    position: relative;
+    left: -20px;
+    top: 20px;
+    background-color: #1F3458;
     padding: 15px;
-    margin-bottom: 10px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    
+   
 }
 
 .alert-container p {
@@ -95,7 +188,7 @@ main {
     margin-left: auto;
     margin-right: auto;
     margin: 5px 0;
-    color: #333;
+    color: #ffffff;
 }
 
 .alert-container img {
@@ -116,15 +209,30 @@ canvas {
     padding: 10px;
     border-radius: 5px;
 }
-
 .filters {
+    background-color: #02CABA;
     margin-top: 10px;
     display: flex;
     gap: 10px;
-    justify-content: center;
+    
+}
+.filters .f1{
+    background-color: #02CABA;
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    
+}
+.filters .f2{
+    background-color: #02CABA;
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    
 }
 
 .filters select {
+    
     padding: 5px;
     border-radius: 4px;
 }
@@ -139,4 +247,5 @@ canvas {
     header h1 {
         font-size: 2em;
     }
+    
 }
