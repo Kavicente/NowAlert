@@ -139,98 +139,157 @@ def admin_delete_user(contact_no):
     conn.close()
     return jsonify({'message': 'User deleted successfully'})
 
-@socketio.on('connect')
-def handle_connect():
-    logger.info(f"Client connected: {request.sid}")
-    if 'role' in session and 'unique_id' in session:
-        role = session['role']
-        identifier = session['unique_id'].split('_')[1] if role != 'admin' else session['unique_id']
-        room = f"{role}_{identifier}"
-        join_room(room)
-        logger.info(f"Client {request.sid} auto-joined room {room}")
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
 
+@socketio.on('connect')
+def handle_connect():
+    logger.debug(f"Client connected: {request.sid}")
+    if 'role' in session:
+        role = session['role']
+        unique_id = session['unique_id']
+        join_room(unique_id)
+        logger.debug(f"Client {request.sid} joined room {unique_id}")
+        if role == 'official':
+            barangay = session.get('barangay')
+            join_room(f"barangay_{barangay}")
+            logger.debug(f"Client {request.sid} joined room barangay_{barangay}")
+        elif role in ['cdrrmo', 'pnp', 'bfp']:
+            municipality = session.get('municipality')
+            join_room(f"{role}_{municipality}")
+            logger.debug(f"Client {request.sid} joined room {role}_{municipality}")
+
 @socketio.on('register_role')
 def handle_register_role(data):
+    logger.debug(f"Register role received: {data}")
     role = data.get('role')
-    identifier = data.get('barangay') or data.get('municipality')
-    if not role or not identifier:
-        logger.error(f"Invalid registration data: {data}")
-        return
-    room = f"{role}_{identifier}"
-    join_room(room)
-    logger.info(f"Client {request.sid} registered as {role} in room {room}")
+    if role == 'barangay':
+        barangay = data.get('barangay')
+        join_room(f"barangay_{barangay}")
+        logger.debug(f"Client {request.sid} joined room barangay_{barangay}")
+    elif role in ['cdrrmo', 'pnp', 'bfp']:
+        municipality = data.get('municipality')
+        join_room(f"{role}_{municipality}")
+        logger.debug(f"Client {request.sid} joined room {role}_{municipality}")
 
-@socketio.on('alert')
-def handle_alert(data):
-    logger.debug(f"Received alert: {data}")
-    barangay = data.get('barangay')
-    if not barangay:
-        logger.error("No barangay specified in alert")
-        return
-    municipality = get_municipality_from_barangay(barangay)
-    if not municipality:
-        logger.error(f"Could not find municipality for barangay: {barangay}")
-        return
-    data['municipality'] = municipality
-    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-    data['alert_id'] = str(uuid.uuid4())
-    alerts.append(data)
-    room = f"barangay_{barangay}"
-    emit('new_alert', data, room=room)
-    logger.info(f"Alert sent to room {room}: {data}")
+@socketio.on('new_alert')
+def handle_new_alert(data):
+    try:
+        logger.debug(f"New alert received: {data}")
+        alert_id = str(uuid.uuid4())
+        data['alert_id'] = alert_id
+        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        barangay = data.get('barangay')
+        emergency_type = data.get('emergency_type', 'unknown')
+        
+        if 'image' in data and data['image']:
+            data['image_classification'] = classify_image(data['image'])
+        else:
+            data['image_classification'] = 'no_image'
+
+        alerts.append(data)
+        logger.debug(f"Alert stored: {alert_id}")
+
+        conn = get_db_connection()
+        conn.execute('INSERT INTO alerts (alert_id, barangay, emergency_type, lat, lon, house_no, street_no, image_classification, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (alert_id, barangay, emergency_type, data.get('lat'), data.get('lon'), data.get('house_no'), data.get('street_no'), data.get('image_classification'), data['timestamp']))
+        conn.commit()
+        conn.close()
+
+        socketio.emit('new_alert', data, room=f"barangay_{barangay}")
+        logger.debug(f"Emitted new_alert to barangay_{barangay}")
+    except Exception as e:
+        logger.error(f"Error handling new alert: {e}")
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
-    alert = data.get('alert', {})
-    targets = data.get('targets', [])
-    if not alert or not targets:
-        logger.error(f"Invalid forward_alert data: {data}")
-        return
-    alert['resident_barangay'] = alert.get('barangay', 'Unknown')
-    municipality = alert.get('municipality', 'default')
-    for target in targets:
-        if target in ['bfp', 'cdrrmo', 'pnp']:
-            room = f"{target}_{municipality}"
-            emit('forward_alert', alert, room=room)
-            logger.info(f"Alert forwarded to {room}: {alert}")
-        else:
-            logger.warning(f"Invalid target for forward_alert: {target}")
+    try:
+        logger.debug(f"Forward alert received: {data}")
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        municipality = get_municipality_from_barangay(barangay)
+        if not municipality:
+            logger.error(f"No municipality found for barangay: {barangay}")
+            return
 
-@socketio.on('update_map')
-def handle_update_map(data):
-    barangay = data.get('barangay')
-    municipality = data.get('municipality', 'default')
-    if not barangay:
-        logger.error("No barangay specified in update_map")
-        return
-    rooms = [f"barangay_{barangay}"]
-    rooms.extend([f"{role}_{municipality}" for role in ['bfp', 'cdrrmo', 'pnp']])
-    for room in rooms:
-        emit('update_map', data, room=room)
-    logger.info(f"Map update emitted to rooms {rooms}: {data}")
+        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        conn = get_db_connection()
+        conn.execute('UPDATE alerts SET forwarded_to = ? WHERE alert_id = ?', ('cdrrmo,pnp', alert_id))
+        conn.commit()
+        conn.close()
+
+        socketio.emit('forward_alert', data, room=f"cdrrmo_{municipality}")
+        socketio.emit('forward_alert', data, room=f"pnp_{municipality}")
+        socketio.emit('update_map', {'lat': data.get('lat'), 'lon': data.get('lon')}, room=f"cdrrmo_{municipality}")
+        socketio.emit('update_map', {'lat': data.get('lat'), 'lon': data.get('lon')}, room=f"pnp_{municipality}")
+        logger.debug(f"Emitted forward_alert and update_map to cdrrmo_{municipality} and pnp_{municipality}")
+    except Exception as e:
+        logger.error(f"Error forwarding alert: {e}")
 
 @socketio.on('response_submitted')
 def handle_response(data):
     try:
+        logger.debug(f"Response submitted: {data}")
         alert_id = data.get('alert_id')
-        prediction = data.get('prediction')
-        if alert_id:
-            global alerts
-            alerts = [a for a in alerts if a.get('alert_id') != alert_id]
-            emit('alert_removed', {'alert_id': alert_id}, broadcast=True)
-            logger.info(f"Alert {alert_id} removed due to response")
-        if prediction:
-            conn = get_db_connection()
-            conn.execute('INSERT INTO responses (alert_id, prediction, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                        (alert_id, prediction.get('probability'), prediction.get('road_accident_cause'), prediction.get('road_accident_type'),
-                         prediction.get('weather'), prediction.get('road_condition'), prediction.get('vehicle_type'),
-                         prediction.get('driver_age'), prediction.get('driver_gender')))
-            conn.commit()
-            conn.close()
+        barangay = data.get('barangay')
+        municipality = get_municipality_from_barangay(barangay)
+        if not municipality:
+            logger.error(f"No municipality found for barangay: {barangay}")
+            return
+
+        response_data = {
+            'alert_id': alert_id,
+            'road_accident_cause': data.get('road_accident_cause'),
+            'road_accident_type': data.get('road_accident_type'),
+            'weather': data.get('weather'),
+            'road_condition': data.get('road_condition'),
+            'vehicle_type': data.get('vehicle_type'),
+            'driver_age': data.get('driver_age'),
+            'driver_gender': data.get('driver_gender'),
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        }
+
+        conn = get_db_connection()
+        conn.execute('INSERT INTO responses (alert_id, barangay, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (alert_id, barangay, response_data['road_accident_cause'], response_data['road_accident_type'],
+                     response_data['weather'], response_data['road_condition'], response_data['vehicle_type'],
+                     response_data['driver_age'], response_data['driver_gender'], response_data['timestamp']))
+        conn.commit()
+        conn.close()
+
+        if road_accident_predictor:
+            try:
+                features = {
+                    'road_accident_cause': [response_data['road_accident_cause']],
+                    'road_accident_type': [response_data['road_accident_type']],
+                    'weather': [response_data['weather']],
+                    'road_condition': [response_data['road_condition']],
+                    'vehicle_type': [response_data['vehicle_type']],
+                    'driver_age': [response_data['driver_age']],
+                    'driver_gender': [response_data['driver_gender']]
+                }
+                features_df = pd.DataFrame(features)
+                for column in features_df.columns:
+                    if features_df[column].dtype == 'object':
+                        features_df[column] = features_df[column].astype('category').cat.codes
+                prediction = road_accident_predictor.predict(features_df)[0]
+                response_data['prediction'] = str(prediction)
+                logger.debug(f"Prediction made: {prediction}")
+            except Exception as e:
+                logger.error(f"Error making prediction: {e}")
+                response_data['prediction'] = 'Error in prediction'
+        else:
+            response_data['prediction'] = 'Predictor not loaded'
+
+        socketio.emit('response_submitted', response_data, room=f"barangay_{barangay}")
+        socketio.emit('response_submitted', response_data, room=f"cdrrmo_{municipality}")
+        socketio.emit('response_submitted', response_data, room=f"pnp_{municipality}")
+        logger.debug(f"Emitted response_submitted to barangay_{barangay}, cdrrmo_{municipality}, pnp_{municipality}")
     except Exception as e:
         logger.error(f"Error handling response: {e}")
 
