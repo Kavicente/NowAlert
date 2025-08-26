@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 road_accident_predictor = None
 try:
-    road_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'road_accident_predictor_lr.pkl'))
+    road_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'road_predictor_lr.pkl'))
     logger.info("road_accident_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("road_accident_predictor_lr.pkl not found.")
