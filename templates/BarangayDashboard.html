@@ -18,7 +18,7 @@
     </style>
 </head>
 <body>
-    <div class="sidebar" id="sidebar">
+    <div class="sidebar">
         <nav>
             <ul>
                 <li><a href="{{ url_for('barangay_dashboard') }}"><span>🏠</span> Dashboard</a></li>
@@ -33,25 +33,23 @@
     </div>
     <div class="dashboard">
         <header>
-            <p id="datetime">{{ current_datetime }}</p>
+            <h1>Barangay {{ barangay }} Dashboard</h1>
             <div class="filters">
             </div>
         </header>
     </div>
-    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
-    <main class="main-content" id="mainContent">
-        <h1 class="h1">Barangay {{ barangay }} Dashboard</h1>
-        <h2 class="h2">Barangay {{ barangay }} Map</h2>
-        <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span> (Barangay: {{ barangay }})</p>
-        <div id="map"></div>
-        <section class="stats">
-            <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
-            <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
-        </section>
-        <section id="alerts">
-            <h2 class="h2">Live Alerts</h2>
-            <div id="alert-container"></div>
-        </section>
+        <main class="main-content">
+            <h2 class="h2">Barangay {{ barangay }} Map</h2>
+            <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span> (Barangay: {{ barangay }})</p>
+            <div id="map"></div>
+            <section class="stats">
+                <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
+                <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
+            </section>
+            <section id="alerts">
+                <h2 class="h2">Live Alerts</h2>
+                <div id="alert-container"></div>
+            </section>
         <div id="notification"></div>
     </main>
     

@@ -7,14 +7,14 @@
 body {
     font-family: Arial, sans-serif;
     background-color: #224380;
-    color: #000000;
+    color: #ffffff;
     line-height: 1.6;
 }
 
 header {
     position: relative;
     
-    color: #000000;
+    color: #ffffff;
     text-align: center;
     background-color: #1F3458;
 
@@ -24,10 +24,9 @@ header {
     font-family: Arial, sans-serif;
     color:#000000;
 }
-.h1 {
+header h1 {
     font-size: 2.5em;
-    text-align: center;
-      /* Fix the element to the viewport */
+    
 }
 .h2 {
     font-size: 1.5em;
@@ -43,20 +42,13 @@ h3 {
     left: 80px; 
 }
 .sidebar {
-    width: 240px;
+    width: 260px;
     position: fixed;
-    height: 100%;
-    background: #224380;
-    color:#ffffff;
-    box-shadow: #000;
-    top: 0;
+    height: 91.8%;
+    background-color: #1E2E4B;
     
-    padding-top: 50px;
-    
-}
-
-.sidebar.open {
-    width: 220px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    top: 75px;
 }
 
 .sidebar nav ul {
@@ -64,59 +56,47 @@ h3 {
     padding: 0;
 }
 
-.sidebar nav ul li {
-    margin: 15px 0;
-}
-
 .sidebar nav ul li a {
-    color: rgb(255, 247, 247);
-    text-decoration: none;
-    padding: 10px;
     display: block;
-    font-weight: bold; /* Emphasize sidebar items */
-    text-transform: uppercase; /* Match all-caps style in mockup */
-}
-.sidebar::before
-.sidebar::after {
-    position: fixed;
-    right: 20px;
-    writing-mode: vertical-rl;
-    text-orientation: upright;
-    color: #fffefe;
-    font-weight: bold;
-}
-.sidebar::before {
-    
-    top: 50px;
+    padding: 10px 20px;
+    color: #ffffff;
+    text-decoration: none;
 }
 
-.sidebar::after {
-    
-    top: 50px;
+.sidebar nav ul li a span {
+    margin-right: 10px;
 }
+
+.sidebar nav ul li a:hover {
+    background: #ddd;
+    color:#000000;   
+}
+
 .dashboard {
     position: static;
     
     margin-bottom: 10px;
 }
 
-
+main {
+    left: 260px;
+    padding: 20px;
+    position: relative;
+}
 
 .main-content {
     position: fixed;           /* Fix the element to the viewport */
     top: 0;                    /* Anchor to the top */
-    left: 0;                   /* Start from the left edge */
-    width: 98%;               /* Full width initially */
-    height: 100%;               /* Match original height */
+    left: 0%;                   /* Start from the left edge */
+              /* Full width initially */
+    height: 92%;               /* Match original height */
     overflow: auto;            /* Enable scrolling for overflow */
     padding: 20px;
-    width: 100%;
-    display: grid;
-    
-              /* Retain original padding */
-    background-color: #deeaee; /* Light gray background */
-    border: 1px solid #8ec3f5; /* Subtle border */
-    
+    width: 87%;
+    margin-top: 76px;  
+    margin-left: 260px;           /* Retain original padding */
+    background-color: #ffffff; /* Light gray background */
+          /* Rounded corners */
     box-sizing: border-box;    /* Include padding and border in size */
    transition: left 0.3s ease, width 0.3s ease;
     -ms-overflow-style: none;  /* IE and Edge */
@@ -127,43 +107,15 @@ h3 {
     display: none;             /* Chrome, Safari, and Opera */
 }
 
-/* Optional vertical "FIRE" labels */
-
-
-.main-content.shifted {
-    left: 250px;               /* Shift right when sidebar is open */
-    width: calc(100% - 250px); /* Adjust width to fit beside sidebar */
-}
-
-.toggle-btn {
-    font-size: 24px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 1001;
-    color: #000; /* Ensure hamburger icon is visible */
-}
 #map { 
     height: 600px; 
-    width: 50%; 
+    width: 88%; 
     position:"fixed"; 
     top: 0; 
-    left: 40px; 
-    
-    
+    left: 70px; 
+    border-radius: 20px; 
 }
-.boxed {
-    width: 100%;
-    height: 150%;
-    background-color: #224380;
-    border-radius: 10px;
-    padding: 20px;
-    box-sizing: border-box;
-    margin-bottom: 20px;
-}
+
 .alerts {
     margin-bottom: 20px;
 }
