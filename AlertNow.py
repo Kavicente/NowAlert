@@ -14,10 +14,10 @@ import pytz
 import pandas as pd
 import uuid
 from models import lr_road, lr_fire
-from BarangayDashboard import get_barangay_stats, get_latest_alert as get_barangay_latest_alert
-from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert as get_cdrrmo_latest_alert
-from PNPDashboard import get_pnp_stats, get_latest_alert as get_pnp_latest_alert
-from BFPDashboard import get_bfp_stats, get_latest_alert as get_bfp_latest_alert
+from BarangayDashboard import get_barangay_stats, get_latest_alert
+from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
+from PNPDashboard import get_pnp_stats, get_latest_alert
+from BFPDashboard import get_bfp_stats, get_latest_alert
 from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes
 from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes
 from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes
@@ -49,30 +49,6 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_http_buffer_size=10000000)
 
 alerts = []
-
-GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
-
-barangay_coords = {}
-try:
-    with open(os.path.join(os.path.dirname(__file__), 'assets', 'coords.txt'), 'r') as f:
-        barangay_coords = ast.literal_eval(f.read())
-except FileNotFoundError:
-    logger.error("coords.txt not found in assets directory. Using fallback.")
-    barangay_coords = {
-        "San Pablo City": ["Barangay 1", "Barangay 2", "Barangay 3"],
-        "Quezon Province": ["Barangay A", "Barangay B", "Barangay C"]
-    }
-except Exception as e:
-    logger.error(f"Error loading coords.txt: {e}. Using fallback.")
-    barangay_coords = {
-        "San Pablo City": ["Barangay 1", "Barangay 2", "Barangay 3"],
-        "Quezon Province": ["Barangay A", "Barangay B", "Barangay C"]
-    }
-
-municipality_coords = {
-    "San Pablo City": {"lat": 14.0642, "lon": 121.3233},
-    "Quezon Province": {"lat": 13.9347, "lon": 121.9473},
-}
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -106,202 +82,14 @@ def classify_image(base64_image):
         logger.error(f"Image classification failed: {e}")
         return 'unknown'
 
-def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
-    if role == 'barangay':
-        if not barangay or not contact_no:
-            raise ValueError("barangay and contact_no are required for barangay role")
-        # Replace underscores in barangay and contact_no to prevent splitting issues
-        barangay = barangay.replace('_', '-')
-        contact_no = contact_no.replace('_', '-')
-        return f"barangay_{barangay}_{contact_no}"
-    if not assigned_municipality or not contact_no:
-        raise ValueError("assigned_municipality and contact_no are required for non-barangay role")
-    assigned_municipality = assigned_municipality.replace('_', '-')
-    contact_no = contact_no.replace('_', '-')
-    return f"{role}_{assigned_municipality}_{contact_no}"
-
-@app.route('/')
-def home():
-    logger.debug("Rendering SignUpType.html")
-    return render_template('SignUpType.html')
-
-@app.route('/signup_barangay', methods=['GET', 'POST'])
-def signup_barangay():
-    if request.method == 'POST':
-        barangay = request.form['barangay']
-        assigned_municipality = request.form['municipality']
-        province = request.form['province']
-        contact_no = request.form['contact_no']
-        password = request.form['password']
-        # Validate inputs to prevent underscores
-        if '_' in barangay or '_' in contact_no:
-            logger.error("Underscores are not allowed in barangay or contact_no")
-            return "Underscores are not allowed in barangay or contact number", 400
-        try:
-            unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
-        except ValueError as e:
-            logger.error(f"Signup failed: {e}")
-            return str(e), 400
-        
-        conn = get_db_connection()
-        try:
-            existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
-            if existing_user:
-                logger.error("Signup failed: Contact number %s already exists", contact_no)
-                return "Contact number already exists", 400
-            
-            conn.execute('''
-                INSERT INTO users (barangay, role, contact_no, assigned_municipality, province, password)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (barangay, 'barangay', contact_no, assigned_municipality, province, password))
-            conn.commit()
-            logger.debug("User signed up successfully: %s", unique_id)
-            return redirect(url_for('login'))
-        except sqlite3.IntegrityError as e:
-            logger.error("IntegrityError during signup: %s", e)
-            return "User already exists", 400
-        except Exception as e:
-            logger.error(f"Signup failed for {unique_id}: {e}")
-            return f"Signup failed: {e}", 500
-        finally:
-            conn.close()
-    return render_template('SignUpPage.html')
-
-@app.route('/signup_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
-def signup_cdrrmo_pnp_bfp():
-    if request.method == 'POST':
-        role = request.form['role'].lower()
-        assigned_municipality = request.form['municipality']
-        contact_no = request.form['contact_no']
-        password = request.form['password']
-        # Validate inputs to prevent underscores
-        if '_' in assigned_municipality or '_' in contact_no:
-            logger.error("Underscores are not allowed in municipality or contact_no")
-            return "Underscores are not allowed in municipality or contact number", 400
-        try:
-            unique_id = construct_unique_id(role, assigned_municipality=assigned_municipality, contact_no=contact_no)
-        except ValueError as e:
-            logger.error(f"Signup failed: {e}")
-            return str(e), 400
-        
-        conn = get_db_connection()
-        try:
-            existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
-            if existing_user:
-                logger.error("Signup failed: Contact number %s already exists", contact_no)
-                return "Contact number already exists", 400
-            
-            conn.execute('''
-                INSERT INTO users (role, contact_no, assigned_municipality, password)
-                VALUES (?, ?, ?, ?)
-            ''', (role, contact_no, assigned_municipality, password))
-            conn.commit()
-            logger.debug("User signed up successfully: %s", unique_id)
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
-        except sqlite3.IntegrityError as e:
-            logger.error("IntegrityError during signup: %s", e)
-            return "User already exists", 400
-        except Exception as e:
-            logger.error(f"Signup failed for {unique_id}: {e}")
-            return f"Signup failed: {e}", 500
-        finally:
-            conn.close()
-    return render_template('CDRRMOPNPBFPUp.html')
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    logger.debug("Accessing /login with method: %s", request.method)
-    if request.method == 'POST':
-        barangay = request.form['barangay']
-        contact_no = request.form['contact_no']
-        password = request.form['password']
-        # Validate inputs to prevent underscores
-        if '_' in barangay or '_' in contact_no:
-            logger.error("Underscores are not allowed in barangay or contact_no")
-            return "Underscores are not allowed in barangay or contact number", 400
-        try:
-            unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
-        except ValueError as e:
-            logger.error(f"Login failed: {e}")
-            return str(e), 400
-        
-        conn = get_db_connection()
-        user = conn.execute('''
-            SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?
-        ''', (barangay, contact_no, password)).fetchone()
-        conn.close()
-        
-        if user:
-            session['unique_id'] = unique_id
-            session['role'] = user['role']
-            session['barangay'] = user['barangay']
-            logger.debug(f"Web login successful for barangay: {unique_id}")
-            return redirect(url_for('barangay_dashboard'))
-        logger.warning(f"Web login failed for unique_id: {unique_id}")
-        return "Invalid credentials", 401
-    return render_template('LogInPage.html')
-
-@app.route('/login_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
-def login_cdrrmo_pnp_bfp():
-    logger.debug("Accessing /login_cdrrmo_pnp_bfp with method: %s", request.method)
-    if request.method == 'POST':
-        role = request.form.get('role', '').lower()
-        if not role:
-            logger.error("Role field is missing in the form data")
-            return "Role is required", 400
-        assigned_municipality = request.form['municipality']
-        contact_no = request.form['contact_no']
-        password = request.form['password']
-        
-        if role not in ['cdrrmo', 'pnp', 'bfp']:
-            logger.error(f"Invalid role provided: {role}")
-            return "Invalid role", 400
-        
-        # Validate inputs to prevent underscores
-        if '_' in assigned_municipality or '_' in contact_no:
-            logger.error("Underscores are not allowed in municipality or contact_no")
-            return "Underscores are not allowed in municipality or contact number", 400
-        
-        logger.debug(f"Login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
-        
-        conn = get_db_connection()
-        user = conn.execute('''
-            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
-        ''', (role, contact_no, password, assigned_municipality)).fetchone()
-        conn.close()
-        
-        if user:
-            try:
-                unique_id = construct_unique_id(user['role'], assigned_municipality=assigned_municipality, contact_no=contact_no)
-            except ValueError as e:
-                logger.error(f"Login failed: {e}")
-                return str(e), 400
-            session['unique_id'] = unique_id
-            session['role'] = user['role']
-            session['municipality'] = user['assigned_municipality']
-            logger.debug(f"Web login successful for user: {unique_id} ({user['role']})")
-            if user['role'] == 'cdrrmo':
-                return redirect(url_for('cdrrmo_dashboard'))
-            elif user['role'] == 'pnp':
-                return redirect(url_for('pnp_dashboard'))
-            elif user['role'] == 'bfp':
-                return redirect(url_for('bfp_dashboard'))
-        logger.warning(f"Web login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
-        return "Invalid credentials", 401
-    return render_template('CDRRMOPNPBFPIn.html')
-
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        # Validate username to prevent underscores
-        if '_' in username:
-            logger.error("Underscores are not allowed in username")
-            return "Underscores are not allowed in username", 400
         conn = get_db_connection()
         admin = conn.execute('SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ?',
-                            ('admin', username, password)).fetchone()
+                           ('admin', username, password)).fetchone()
         conn.close()
         if admin:
             session['role'] = 'admin'
@@ -330,10 +118,6 @@ def admin_create_user():
     password = data.get('password')
     barangay = data.get('barangay') if role == 'barangay' else None
     municipality = data.get('municipality') if role in ['pnp', 'cdrrmo', 'bfp'] else None
-    # Validate inputs to prevent underscores
-    if (barangay and '_' in barangay) or '_' in contact_no or (municipality and '_' in municipality):
-        logger.error("Underscores are not allowed in barangay, contact_no, or municipality")
-        return jsonify({'error': 'Underscores are not allowed in barangay, contact number, or municipality'}), 400
     conn = get_db_connection()
     try:
         conn.execute('INSERT INTO users (role, contact_no, password, barangay, assigned_municipality) VALUES (?, ?, ?, ?, ?)',
@@ -355,6 +139,194 @@ def admin_delete_user(contact_no):
     conn.close()
     return jsonify({'message': 'User deleted successfully'})
 
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"Client disconnected: {request.sid}")
+
+@socketio.on('connect')
+def handle_connect():
+    logger.info(f"Client connected: {request.sid}")
+
+@socketio.on('register_role')
+def handle_register_role(data):
+    role = data.get('role')
+    if role == 'barangay':
+        barangay = data.get('barangay')
+        if barangay:
+            join_room(f"barangay_{barangay}")
+            logger.info(f"Client {request.sid} joined room barangay_{barangay}")
+    elif role == 'cdrrmo':
+        municipality = data.get('municipality')
+        if municipality:
+            join_room(f"cdrrmo_{municipality}")
+            logger.info(f"Client {request.sid} joined room cdrrmo_{municipality}")
+    elif role == 'pnp':
+        municipality = data.get('municipality')
+        if municipality:
+            join_room(f"pnp_{municipality}")
+            logger.info(f"Client {request.sid} joined room pnp_{municipality}")
+    elif role == 'bfp':
+        municipality = data.get('municipality')
+        if municipality:
+            join_room(f"bfp_{municipality}")
+            logger.info(f"Client {request.sid} joined room bfp_{municipality}")
+
+@socketio.on('alert')
+def handle_new_alert(data):
+    logger.info(f"New alert received: {data}")
+    alert_id = str(uuid.uuid4())
+    data['alert_id'] = alert_id
+    data['timestamp'] = datetime.utcnow().isoformat()
+    data['resident_barangay'] = data.get('barangay', 'Unknown')
+    
+    # Classify image if present
+    image_classification = 'no_image'
+    if 'image' in data:
+        try:
+            image_classification = classify_image(data['image'])
+        except Exception as e:
+            logger.error(f"Image classification failed: {e}")
+            image_classification = 'classification_error'
+    data['image_classification'] = image_classification
+
+    # Store alert in database
+    conn = sqlite3.connect('alertnow.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO alerts (alert_id, lat, lon, house_no, street_no, barangay, emergency_type, image, image_classification, timestamp, resident_barangay, municipality)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        alert_id,
+        data.get('lat'),
+        data.get('lon'),
+        data.get('house_no'),
+        data.get('street_no'),
+        data.get('barangay'),
+        data.get('emergency_type'),
+        data.get('image'),
+        image_classification,
+        data.get('timestamp'),
+        data.get('resident_barangay'),
+        get_municipality_from_barangay(data.get('barangay'))
+    ))
+    conn.commit()
+    conn.close()
+
+    # Emit to relevant rooms
+    barangay_room = f"barangay_{data.get('barangay')}"
+    municipality = get_municipality_from_barangay(data.get('barangay'))
+    cdrrmo_room = f"cdrrmo_{municipality}"
+    pnp_room = f"pnp_{municipality}"
+    
+    emit('new_alert', data, room=barangay_room)
+    logger.info(f"Alert emitted to room {barangay_room}")
+    emit('new_alert', data, room=cdrrmo_room)
+    logger.info(f"Alert emitted to room {cdrrmo_room}")
+    emit('new_alert', data, room=pnp_room)
+    logger.info(f"Alert emitted to room {pnp_room}")
+
+    # Emit update_map to relevant rooms
+    map_data = {
+        'lat': data.get('lat'),
+        'lon': data.get('lon'),
+        'barangay': data.get('barangay'),
+        'emergency_type': data.get('emergency_type')
+    }
+    emit('update_map', map_data, room=barangay_room)
+    emit('update_map', map_data, room=cdrrmo_room)
+    emit('update_map', map_data, room=pnp_room)
+
+@socketio.on('forward_alert')
+def handle_forward_alert(data):
+    logger.info(f"Forward alert received: {data}")
+    municipality = get_municipality_from_barangay(data.get('barangay'))
+    cdrrmo_room = f"cdrrmo_{municipality}"
+    pnp_room = f"pnp_{municipality}"
+    bfp_room = f"bfp_{municipality}"
+    
+    emit('new_alert', data, room=cdrrmo_room)
+    logger.info(f"Alert forwarded to room {cdrrmo_room}")
+    emit('new_alert', data, room=pnp_room)
+    logger.info(f"Alert forwarded to room {pnp_room}")
+    emit('new_alert', data, room=bfp_room)
+    logger.info(f"Alert forwarded to room {bfp_room}")
+
+    map_data = {
+        'lat': data.get('lat'),
+        'lon': data.get('lon'),
+        'barangay': data.get('barangay'),
+        'emergency_type': data.get('emergency_type')
+    }
+    emit('update_map', map_data, room=cdrrmo_room)
+    emit('update_map', map_data, room=pnp_room)
+    emit('update_map', map_data, room=bfp_room)
+
+@socketio.on('response_submitted')
+def handle_response_submitted(data):
+    logger.info(f"Response received: {data}")
+    conn = sqlite3.connect('alertnow.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO responses (
+            alert_id, road_accident_cause, road_accident_type, weather, 
+            road_condition, vehicle_type, driver_age, driver_gender, 
+            lat, lon, barangay, emergency_type, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        data.get('alert_id'),
+        data.get('road_accident_cause'),
+        data.get('road_accident_type'),
+        data.get('weather'),
+        data.get('road_condition'),
+        data.get('vehicle_type'),
+        data.get('driver_age'),
+        data.get('driver_gender'),
+        data.get('lat'),
+        data.get('lon'),
+        data.get('barangay'),
+        data.get('emergency_type'),
+        datetime.utcnow().isoformat()
+    ))
+    conn.commit()
+    conn.close()
+
+    # Emit response to relevant rooms
+    barangay_room = f"barangay_{data.get('barangay')}"
+    municipality = get_municipality_from_barangay(data.get('barangay'))
+    cdrrmo_room = f"cdrrmo_{municipality}"
+    pnp_room = f"pnp_{municipality}"
+    bfp_room = f"bfp_{municipality}"
+    
+    emit('response_submitted', data, room=barangay_room)
+    emit('response_submitted', data, room=cdrrmo_room)
+    emit('response_submitted', data, room=pnp_room)
+    emit('response_submitted', data, room=bfp_room)
+
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
+barangay_coords = {}
+try:
+    with open(os.path.join(os.path.dirname(__file__), 'assets', 'coords.txt'), 'r') as f:
+        barangay_coords = ast.literal_eval(f.read())
+except FileNotFoundError:
+    logger.error("coords.txt not found in assets directory. Using empty dict.")
+except Exception as e:
+    logger.error(f"Error loading coords.txt: {e}. Using empty dict.")
+
+municipality_coords = {
+    "San Pablo City": {"lat": 14.0642, "lon": 121.3233},
+    "Quezon Province": {"lat": 13.9347, "lon": 121.9473},
+}
+
+def get_db_connection():
+    db_path = os.path.join('/database', 'users_web.db')
+    if not os.path.exists(db_path):
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 @app.route('/export_users', methods=['GET'])
 def export_users():
     if session.get('role') != 'admin':
@@ -366,11 +338,224 @@ def export_users():
 
 @app.route('/download_db', methods=['GET'])
 def download_db():
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+    db_path = os.path.join('/database', 'users_web.db')
+    if not os.path.exists(db_path):
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     if not os.path.exists(db_path):
         return "Database file not found", 404
     logger.debug(f"Serving database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='users_web.db')
+
+def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
+    if role == 'barangay':
+        return f"{barangay}_{contact_no}"
+    return f"{role}_{assigned_municipality}_{contact_no}"
+
+@app.route('/')
+def home():
+    logger.debug("Rendering SignUpType.html")
+    return render_template('SignUpType.html')
+
+@app.route('/signup_barangay', methods=['GET', 'POST'])
+def signup_barangay():
+    if request.method == 'POST':
+        barangay = request.form['barangay']
+        assigned_municipality = request.form['municipality']
+        province = request.form['province']
+        contact_no = request.form['contact_no']
+        password = request.form['password']
+        unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
+        
+        conn = get_db_connection()
+        try:
+            existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
+            if existing_user:
+                logger.error("Signup failed: Contact number %s already exists", contact_no)
+                return "Contact number already exists", 400
+            
+            conn.execute('''
+                INSERT INTO users (barangay, role, contact_no, assigned_municipality, province, password)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (barangay, 'barangay', contact_no, assigned_municipality, province, password))
+            conn.commit()
+            logger.debug("User signed up successfully: %s", unique_id)
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError as e:
+            logger.error("IntegrityError during signup: %s", e)
+            return "User already exists", 400
+        except Exception as e:
+            logger.error(f"Signup failed for {unique_id}: {e}")
+            return f"Signup failed: {e}", 500
+        finally:
+            conn.close()
+    return render_template('SignUpPage.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    logger.debug("Accessing /login with method: %s", request.method)
+    if request.method == 'POST':
+        barangay = request.form['barangay']
+        contact_no = request.form['contact_no']
+        password = request.form['password']
+        unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
+        
+        conn = get_db_connection()
+        user = conn.execute('''
+            SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?
+        ''', (barangay, contact_no, password)).fetchone()
+        conn.close()
+        
+        if user:
+            session['unique_id'] = unique_id
+            session['role'] = user['role']
+            logger.debug(f"Web login successful for barangay: {unique_id}")
+            return redirect(url_for('barangay_dashboard'))
+        logger.warning(f"Web login failed for unique_id: {unique_id}")
+        return "Invalid credentials", 401
+    return render_template('LogInPage.html')
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json()
+    barangay = data.get('barangay')
+    contact_no = data.get('contact_no')
+    password = data.get('password')
+    unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
+    
+    conn = get_db_connection()
+    user = conn.execute('''
+        SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?
+    ''', (barangay, contact_no, password)).fetchone()
+    conn.close()
+    
+    if user:
+        logger.debug(f"API login successful for user: {unique_id} with role: {user['role']}")
+        return jsonify({'status': 'success', 'role': user['role']})
+    logger.warning(f"API login failed for unique_id: {unique_id}")
+    return jsonify({'error': 'Invalid credentials'}), 401
+
+@app.route('/signup_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
+def signup_cdrrmo_pnp_bfp():
+    if request.method == 'POST':
+        role = request.form['role'].lower()
+        assigned_municipality = request.form['municipality']
+        contact_no = request.form['contact_no']
+        password = request.form['password']
+        unique_id = construct_unique_id(role, assigned_municipality=assigned_municipality, contact_no=contact_no)
+        
+        conn = get_db_connection()
+        try:
+            existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
+            if existing_user:
+                logger.error("Signup failed: Contact number %s already exists", contact_no)
+                return "Contact number already exists", 400
+            
+            conn.execute('''
+                INSERT INTO users (role, contact_no, assigned_municipality, password)
+                VALUES (?, ?, ?, ?)
+            ''', (role, contact_no, assigned_municipality, password))
+            conn.commit()
+            logger.debug("User signed up successfully: %s", unique_id)
+            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+        except sqlite3.IntegrityError as e:
+            logger.error("IntegrityError during signup: %s", e)
+            return "User already exists", 400
+        except Exception as e:
+            logger.error(f"Signup failed for {unique_id}: {e}")
+            return f"Signup failed: {e}", 500
+        finally:
+            conn.close()
+    return render_template('CDRRMOPNPBFPUp.html')
+
+@app.route('/login_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
+def login_cdrrmo_pnp_bfp():
+    logger.debug("Accessing /login_cdrrmo_pnp_bfp with method: %s", request.method)
+    if request.method == 'POST':
+        role = request.form['role'].lower()
+        if 'role' not in request.form:
+            logger.error("Role field is missing in the form data")
+            return "Role is required", 400
+        assigned_municipality = request.form['municipality']
+        contact_no = request.form['contact_no']
+        password = request.form['password']
+        
+        if role not in ['cdrrmo', 'pnp', 'bfp']:
+            logger.error(f"Invalid role provided: {role}")
+            return "Invalid role", 400
+        
+        logger.debug(f"Login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
+        
+        conn = get_db_connection()
+        user = conn.execute('''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
+        ''', (role, contact_no, password, assigned_municipality)).fetchone()
+        conn.close()
+        
+        if user:
+            unique_id = construct_unique_id(user['role'], assigned_municipality=assigned_municipality, contact_no=contact_no)
+            session['unique_id'] = unique_id
+            session['role'] = user['role']
+            logger.debug(f"Web login successful for user: {unique_id} ({user['role']})")
+            if user['role'] == 'cdrrmo':
+                return redirect(url_for('cdrrmo_dashboard'))
+            elif user['role'] == 'pnp':
+                return redirect(url_for('pnp_dashboard'))
+            elif user['role'] == 'bfp':
+                return redirect(url_for('bfp_dashboard'))
+        logger.warning(f"Web login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
+        return "Invalid credentials", 401
+    return render_template('CDRRMOPNPBFPIn.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def log():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
+        conn.close()
+        if user:
+            session['username'] = username
+            session['role'] = user['role']
+            session['barangay'] = user['barangay']
+            if user['role'] == 'official':
+                return redirect(url_for('barangay_dashboard'))
+            elif user['role'] == 'cdrrmo':
+                return redirect(url_for('cdrrmo_dashboard'))
+            elif user['role'] == 'pnp':
+                return redirect(url_for('pnp_dashboard'))
+            elif user['role'] == 'bfp':
+                return redirect(url_for('bfp_dashboard'))
+        return "Invalid credentials", 401
+    return render_template('LoginPage.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def sign():
+    if request.method == 'POST':
+        barangay = request.form['barangay']
+        username = request.form['username']
+        password = request.form['password']
+        conn = get_db_connection()
+        try:
+            conn.execute('INSERT INTO users (username, barangay, role, password) VALUES (?, ?, ?, ?)',
+                         (username, barangay, 'official', password))
+            conn.commit()
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            return "Username already exists", 400
+        finally:
+            conn.close()
+    return render_template('SignUpPage.html')
+
+@app.route('/go_to_login_page', methods=['GET'])
+def go_to_login_page():
+    logger.debug("Redirecting to /login")
+    return redirect(url_for('login'))
+
+@app.route('/go_to_signup_type', methods=['GET'])
+def go_to_signup_type():
+    logger.debug("Redirecting to /")
+    return redirect(url_for('home'))
 
 @app.route('/choose_login_type', methods=['GET'])
 def choose_login_type():
@@ -402,159 +587,27 @@ def logout():
     else:
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
 
-@socketio.on('connect')
-def handle_connect():
-    logger.debug(f"Client connected: {request.sid}")
-    if 'role' in session and 'unique_id' in session:
-        role = session['role']
-        unique_id = session['unique_id']
-        join_room(unique_id)
-        logger.debug(f"Client {request.sid} joined room {unique_id}")
-        if role == 'barangay':
-            barangay = session.get('barangay')
-            if barangay:
-                join_room(f"barangay_{barangay}")
-                logger.debug(f"Client {request.sid} joined room barangay_{barangay}")
-        elif role in ['cdrrmo', 'pnp', 'bfp']:
-            municipality = session.get('municipality')
-            if municipality:
-                join_room(f"{role}_{municipality}")
-                logger.debug(f"Client {request.sid} joined room {role}_{municipality}")
-
-@socketio.on('register_role')
-def handle_register_role(data):
-    logger.debug(f"Register role received: {data}")
-    role = data.get('role')
-    if role == 'barangay':
-        barangay = data.get('barangay')
-        if barangay:
-            join_room(f"barangay_{barangay}")
-            logger.debug(f"Client {request.sid} joined room barangay_{barangay}")
-    elif role in ['cdrrmo', 'pnp', 'bfp']:
-        municipality = data.get('municipality')
-        if municipality:
-            join_room(f"{role}_{municipality}")
-            logger.debug(f"Client {request.sid} joined room {role}_{municipality}")
-
-@socketio.on('new_alert')
-def handle_new_alert(data):
+def load_coords():
+    coords_path = os.path.join(app.root_path, 'assets', 'coords.txt')
+    alerts_data = []
     try:
-        logger.debug(f"New alert received: {data}")
-        alert_id = str(uuid.uuid4())
-        data['alert_id'] = alert_id
-        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        barangay = data.get('barangay')
-        emergency_type = data.get('emergency_type', 'unknown')
-        
-        if 'image' in data and data['image']:
-            data['image_classification'] = classify_image(data['image'])
-        else:
-            data['image_classification'] = 'no_image'
-
-        alerts.append(data)
-        logger.debug(f"Alert stored: {alert_id}")
-
-        conn = get_db_connection()
-        conn.execute('INSERT INTO alerts (alert_id, barangay, emergency_type, lat, lon, house_no, street_no, image_classification, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (alert_id, barangay, emergency_type, data.get('lat'), data.get('lon'), data.get('house_no'), data.get('street_no'), data.get('image_classification'), data['timestamp']))
-        conn.commit()
-        conn.close()
-
-        if barangay:
-            socketio.emit('new_alert', data, room=f"barangay_{barangay}")
-            logger.debug(f"Emitted new_alert to barangay_{barangay}")
+        with open(coords_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    parts = line.strip().split(',')
+                    if len(parts) == 4:
+                        barangay, municipality, message, timestamp = parts
+                        alerts_data.append({
+                            "barangay": barangay.strip(),
+                            "municipality": municipality.strip(),
+                            "message": message.strip(),
+                            "timestamp": timestamp.strip()
+                        })
+    except FileNotFoundError:
+        logger.warning("coords.txt not found, using empty alerts.")
     except Exception as e:
-        logger.error(f"Error handling new alert: {e}")
-
-@socketio.on('forward_alert')
-def handle_forward_alert(data):
-    try:
-        logger.debug(f"Forward alert received: {data}")
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        municipality = get_municipality_from_barangay(barangay)
-        if not municipality:
-            logger.error(f"No municipality found for barangay: {barangay}")
-            return
-
-        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        conn = get_db_connection()
-        conn.execute('UPDATE alerts SET forwarded_to = ? WHERE alert_id = ?', ('cdrrmo,pnp,bfp', alert_id))
-        conn.commit()
-        conn.close()
-
-        for role in ['cdrrmo', 'pnp', 'bfp']:
-            socketio.emit('forward_alert', data, room=f"{role}_{municipality}")
-            socketio.emit('update_map', {'lat': data.get('lat'), 'lon': data.get('lon'), 'emergency_type': data.get('emergency_type'), 'barangay': barangay}, room=f"{role}_{municipality}")
-            logger.debug(f"Emitted forward_alert and update_map to {role}_{municipality}")
-    except Exception as e:
-        logger.error(f"Error forwarding alert: {e}")
-
-@socketio.on('response_submitted')
-def handle_response(data):
-    try:
-        logger.debug(f"Response submitted: {data}")
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        municipality = get_municipality_from_barangay(barangay)
-        if not municipality:
-            logger.error(f"No municipality found for barangay: {barangay}")
-            return
-
-        response_data = {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'road_accident_cause': data.get('road_accident_cause'),
-            'road_accident_type': data.get('road_accident_type'),
-            'weather': data.get('weather'),
-            'road_condition': data.get('road_condition'),
-            'vehicle_type': data.get('vehicle_type'),
-            'driver_age': data.get('driver_age'),
-            'driver_gender': data.get('driver_gender'),
-            'lat': data.get('lat'),
-            'lon': data.get('lon'),
-            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        }
-
-        conn = get_db_connection()
-        conn.execute('INSERT INTO responses (alert_id, barangay, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (alert_id, barangay, response_data['road_accident_cause'], response_data['road_accident_type'],
-                     response_data['weather'], response_data['road_condition'], response_data['vehicle_type'],
-                     response_data['driver_age'], response_data['driver_gender'], response_data['lat'], response_data['lon'], response_data['timestamp']))
-        conn.commit()
-        conn.close()
-
-        if road_accident_predictor:
-            try:
-                features = {
-                    'road_accident_cause': [response_data['road_accident_cause']],
-                    'road_accident_type': [response_data['road_accident_type']],
-                    'weather': [response_data['weather']],
-                    'road_condition': [response_data['road_condition']],
-                    'vehicle_type': [response_data['vehicle_type']],
-                    'driver_age': [response_data['driver_age']],
-                    'driver_gender': [response_data['driver_gender']]
-                }
-                features_df = pd.DataFrame(features)
-                for column in features_df.columns:
-                    if features_df[column].dtype == 'object':
-                        features_df[column] = features_df[column].astype('category').cat.codes
-                prediction = road_accident_predictor.predict(features_df)[0]
-                response_data['prediction'] = str(prediction)
-                logger.debug(f"Prediction made: {prediction}")
-            except Exception as e:
-                logger.error(f"Error making prediction: {e}")
-                response_data['prediction'] = 'Error in prediction'
-        else:
-            response_data['prediction'] = 'Predictor not loaded'
-
-        if barangay:
-            socketio.emit('response_submitted', response_data, room=f"barangay_{barangay}")
-        for role in ['cdrrmo', 'pnp', 'bfp']:
-            socketio.emit('response_submitted', response_data, room=f"{role}_{municipality}")
-            logger.debug(f"Emitted response_submitted to {role}_{municipality}")
-    except Exception as e:
-        logger.error(f"Error handling response: {e}")
+        logger.error(f"Error loading coords.txt: {e}")
+    return alerts_data
 
 @app.route('/send_alert', methods=['POST'])
 def send_alert():
@@ -599,17 +652,11 @@ def send_alert():
         
         if alert['image']:
             prediction = classify_image(alert['image'])
-            alert['image_classification'] = prediction if prediction in ['road_accident', 'fire_incident'] else 'unknown'
+            if prediction not in ['road_accident', 'fire_incident']:
+                alert['image'] = None
 
         alerts.append(alert)
-        conn = get_db_connection()
-        conn.execute('INSERT INTO alerts (alert_id, barangay, emergency_type, lat, lon, house_no, street_no, image_classification, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (alert['alert_id'], barangay, emergency_type, alert['lat'], alert['lon'], alert['house_no'], alert['street_no'], alert['image_classification'], alert['timestamp']))
-        conn.commit()
-        conn.close()
-
-        if barangay and barangay != 'N/A':
-            socketio.emit('new_alert', alert, room=f"barangay_{barangay}")
+        socketio.emit('new_alert', alert)
         return jsonify({'status': 'success', 'message': 'Alert sent'}), 200
     except Exception as e:
         logger.error(f"Error processing send_alert: {e}")
@@ -648,27 +695,13 @@ def get_distribution():
 @app.route('/add_alert', methods=['POST'])
 def add_alert():
     data = request.form
-    barangay = data.get('barangay')
-    municipality = data.get('municipality')
-    # Validate inputs to prevent underscores
-    if (barangay and '_' in barangay) or (municipality and '_' in municipality):
-        logger.error("Underscores are not allowed in barangay or municipality")
-        return jsonify({'error': 'Underscores are not allowed in barangay or municipality'}), 400
     new_alert = {
-        "barangay": barangay,
-        "municipality": municipality,
-        "message": data.get('message'),
-        "timestamp": data.get('timestamp'),
-        "alert_id": str(uuid.uuid4())
+        "barangay": data['barangay'],
+        "municipality": data['municipality'],
+        "message": data['message'],
+        "timestamp": data['timestamp']
     }
     alerts.append(new_alert)
-    conn = get_db_connection()
-    conn.execute('INSERT INTO alerts (alert_id, barangay, emergency_type, timestamp) VALUES (?, ?, ?, ?)',
-                (new_alert['alert_id'], new_alert['barangay'], 'General', new_alert['timestamp']))
-    conn.commit()
-    conn.close()
-    if new_alert['barangay']:
-        socketio.emit('new_alert', new_alert, room=f"barangay_{new_alert['barangay']}")
     return jsonify({"status": "success", "alert": new_alert})
 
 @app.route('/export_alerts')
@@ -704,50 +737,37 @@ def get_analytics():
         logger.error(f"Error in get_analytics: {e}")
         return jsonify({'error': 'Failed to retrieve analytics'}), 500
 
+
+
 @app.route('/barangay_dashboard')
 def barangay_dashboard():
     if 'role' not in session or session['role'] != 'barangay':
-        logger.warning("Unauthorized access to barangay_dashboard")
         return redirect(url_for('login'))
+    stats = get_barangay_stats()
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for barangay_dashboard")
-        return redirect(url_for('login'))
-    
-    # Validate unique_id format
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'barangay':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login'))
-    
-    barangay = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('''
         SELECT * FROM users WHERE barangay = ? AND contact_no = ?
-    ''', (barangay, contact_no)).fetchone()
+    ''', (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
     conn.close()
     
-    if not user or user['role'] != 'barangay':
+    if not unique_id or not user or user['role'] != 'barangay':
         logger.warning("Unauthorized access to barangay_dashboard. Session: %s, User: %s", session, user)
-        session.clear()
         return redirect(url_for('login'))
     
+    barangay = user['barangay']
     assigned_municipality = user['assigned_municipality'] or 'San Pablo City'
-    latest_alert = get_barangay_latest_alert()
+    latest_alert = get_latest_alert()
     stats = get_barangay_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.0642, 'lon': 121.3233})
+    coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
     
     try:
-        lat_coord = float(latest_alert.get('lat', coords['lat']) if latest_alert else coords['lat'])
-        lon_coord = float(latest_alert.get('lon', coords['lon']) if latest_alert else coords['lon'])
+        lat_coord = float(coords.get('lat', 14.5995))
+        lon_coord = float(coords.get('lon', 120.9842))
     except (ValueError, TypeError):
         logger.error(f"Invalid coordinates for {barangay} in {assigned_municipality}, using defaults")
-        lat_coord = 14.0642
-        lon_coord = 121.3233
+        lat_coord = 14.5995
+        lon_coord = 120.9842
 
     logger.debug(f"Rendering BarangayDashboard for {barangay} in {assigned_municipality}")
     return render_template('BarangayDashboard.html', 
@@ -761,49 +781,33 @@ def barangay_dashboard():
 @app.route('/cdrrmo_dashboard')
 def cdrrmo_dashboard():
     if 'role' not in session or session['role'] != 'cdrrmo':
-        logger.warning("Unauthorized access to cdrrmo_dashboard")
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
+    stats = get_cdrrmo_stats()
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for cdrrmo_dashboard")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'cdrrmo':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    assigned_municipality = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('''
         SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-    ''', ('cdrrmo', contact_no, assigned_municipality)).fetchone()
+    ''', ('cdrrmo', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
     conn.close()
     
-    if not user or user['role'] != 'cdrrmo':
+    if not unique_id or not user or user['role'] != 'cdrrmo':
         logger.warning("Unauthorized access to cdrrmo_dashboard. Session: %s, User: %s", session, user)
-        session.clear()
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
     
-    latest_alert = get_cdrrmo_latest_alert()
+    assigned_municipality = user['assigned_municipality'] or "San Pablo City"
     stats = get_cdrrmo_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.0642, 'lon': 121.3233})
+    coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
     
     try:
-        lat_coord = float(latest_alert.get('lat', coords['lat']) if latest_alert else coords['lat'])
-        lon_coord = float(latest_alert.get('lon', coords['lon']) if latest_alert else coords['lon'])
+        lat_coord = float(coords.get('lat', 14.5995))
+        lon_coord = float(coords.get('lon', 120.9842))
     except (ValueError, TypeError):
         logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-        lat_coord = 14.0642
-        lon_coord = 121.3233
+        lat_coord = 14.5995
+        lon_coord = 120.9842
 
     logger.debug(f"Rendering CDRRMODashboard for {assigned_municipality}")
     return render_template('CDRRMODashboard.html', 
-                           latest_alert=latest_alert,
                            stats=stats, 
                            municipality=assigned_municipality, 
                            lat_coord=lat_coord, 
@@ -813,49 +817,33 @@ def cdrrmo_dashboard():
 @app.route('/pnp_dashboard')
 def pnp_dashboard():
     if 'role' not in session or session['role'] != 'pnp':
-        logger.warning("Unauthorized access to pnp_dashboard")
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
+    stats = get_pnp_stats()
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for pnp_dashboard")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'pnp':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    assigned_municipality = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('''
         SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-    ''', ('pnp', contact_no, assigned_municipality)).fetchone()
+    ''', ('pnp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
     conn.close()
     
-    if not user or user['role'] != 'pnp':
+    if not unique_id or not user or user['role'] != 'pnp':
         logger.warning("Unauthorized access to pnp_dashboard. Session: %s, User: %s", session, user)
-        session.clear()
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
     
-    latest_alert = get_pnp_latest_alert()
+    assigned_municipality = user['assigned_municipality'] or "San Pablo City"
     stats = get_pnp_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.0642, 'lon': 121.3233})
+    coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
     
     try:
-        lat_coord = float(latest_alert.get('lat', coords['lat']) if latest_alert else coords['lat'])
-        lon_coord = float(latest_alert.get('lon', coords['lon']) if latest_alert else coords['lon'])
+        lat_coord = float(coords.get('lat', 14.5995))
+        lon_coord = float(coords.get('lon', 120.9842))
     except (ValueError, TypeError):
         logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-        lat_coord = 14.0642
-        lon_coord = 121.3233
+        lat_coord = 14.5995
+        lon_coord = 120.9842
 
     logger.debug(f"Rendering PNPDashboard for {assigned_municipality}")
     return render_template('PNPDashboard.html', 
-                           latest_alert=latest_alert,
                            stats=stats, 
                            municipality=assigned_municipality, 
                            lat_coord=lat_coord, 
@@ -865,53 +853,37 @@ def pnp_dashboard():
 @app.route('/bfp_dashboard')
 def bfp_dashboard():
     if 'role' not in session or session['role'] != 'bfp':
-        logger.warning("Unauthorized access to bfp_dashboard")
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
+    stats = get_bfp_stats()
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for bfp_dashboard")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'bfp':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    assigned_municipality = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('''
         SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-    ''', ('bfp', contact_no, assigned_municipality)).fetchone()
+    ''', ('bfp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
     conn.close()
     
-    if not user or user['role'] != 'bfp':
+    if not unique_id or not user or user['role'] != 'bfp':
         logger.warning("Unauthorized access to bfp_dashboard. Session: %s, User: %s", session, user)
-        session.clear()
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
     
-    latest_alert = get_bfp_latest_alert()
+    assigned_municipality = user['assigned_municipality'] or "San Pablo City"
     stats = get_bfp_stats()
-    coords = municipality_coords.get(assigned_municipality, {'lat': 14.0642, 'lon': 121.3233})
+    coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
     
     try:
-        lat_coord = float(latest_alert.get('lat', coords['lat']) if latest_alert else coords['lat'])
-        lon_coord = float(latest_alert.get('lon', coords['lon']) if latest_alert else coords['lon'])
+        lat_coord = float(coords.get('lat', 14.5995))
+        lon_coord = float(coords.get('lon', 120.9842))
     except (ValueError, TypeError):
         logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-        lat_coord = 14.0642
-        lon_coord = 121.3233
+        lat_coord = 14.5995
+        lon_coord = 120.9842
 
     logger.debug(f"Rendering BFPDashboard for {assigned_municipality}")
     return render_template('BFPDashboard.html', 
-                           latest_alert=latest_alert,
                            stats=stats, 
                            municipality=assigned_municipality, 
-                           lat_coord=lat_coord, 
-                           lon_coord=lon_coord, 
+                           lat_coord=lat_coord,
+                           lon_coord=lon_coord,
                            google_api_key=GOOGLE_API_KEY)
 
 @app.route('/barangay/analytics')
@@ -920,36 +892,15 @@ def barangay_analytics():
         logger.warning("Unauthorized access to barangay_analytics")
         return redirect(url_for('login'))
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for barangay_analytics")
-        return redirect(url_for('login'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'barangay':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login'))
-    
-    barangay = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
-    user = conn.execute('SELECT barangay, assigned_municipality FROM users WHERE barangay = ? AND contact_no = ?',
-                        (barangay, contact_no)).fetchone()
+    user = conn.execute('SELECT barangay FROM users WHERE barangay = ? AND contact_no = ?',
+                        (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
     conn.close()
-    
-    if not user or user['role'] != 'barangay':
-        logger.warning("Unauthorized access to barangay_analytics. Session: %s, User: %s", session, user)
-        session.clear()
-        return redirect(url_for('login'))
-    
-    municipality = user['assigned_municipality'] if user else "San Pablo City"
+    barangay = user['barangay'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = barangay_coords.get(municipality, [])
-    return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime, barangays=barangays)
+    return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
 
-@app.route('/api/barangay_analytics_data', methods=['GET'])
+@app.route('/api/barangay_analytics_data')
 def barangay_analytics_data():
     time_filter = request.args.get('time', 'weekly')
     trends = get_barangay_trends(time_filter)
@@ -983,40 +934,21 @@ def cdrrmo_analytics():
         logger.warning("Unauthorized access to cdrrmo_analytics")
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for cdrrmo_analytics")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'cdrrmo':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    municipality = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
-                        ('cdrrmo', contact_no, municipality)).fetchone()
+                        ('cdrrmo', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
     conn.close()
-    
-    if not user:
-        logger.warning("Unauthorized access to cdrrmo_analytics. Session: %s, User: %s", session, user)
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
+    municipality = user['assigned_municipality'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = barangay_coords.get(municipality, [])
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('CDRRMOAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
 @app.route('/api/cdrrmo_analytics_data', methods=['GET'])
 def get_cdrrmo_analytics_data():
     time_filter = request.args.get('time', 'weekly')
-    trends = get_cdrrmo_trends(time_filter)
-    distribution = get_cdrrmo_distribution(time_filter)
-    causes_data = get_cdrrmo_causes(time_filter)
+    trends = get_barangay_trends(time_filter)
+    distribution = get_barangay_distribution(time_filter)
+    causes_data = get_barangay_causes(time_filter)
     weather = {'Sunny': 10, 'Rainy': 5, 'Foggy': 2}
     road_conditions = {'Dry': 12, 'Wet': 4, 'Icy': 1}
     vehicle_types = {'Car': 8, 'Motorcycle': 6, 'Truck': 3}
@@ -1045,40 +977,21 @@ def pnp_analytics():
         logger.warning("Unauthorized access to pnp_analytics")
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for pnp_analytics")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'pnp':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    municipality = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
-                        ('pnp', contact_no, municipality)).fetchone()
+                        ('pnp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
     conn.close()
-    
-    if not user:
-        logger.warning("Unauthorized access to pnp_analytics. Session: %s, User: %s", session, user)
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
+    municipality = user['assigned_municipality'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = barangay_coords.get(municipality, [])
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
 @app.route('/api/pnp_analytics_data', methods=['GET'])
 def get_pnp_analytics_data():
     time_filter = request.args.get('time', 'weekly')
-    trends = get_pnp_trends(time_filter)
-    distribution = get_pnp_distribution(time_filter)
-    causes_data = get_pnp_causes(time_filter)
+    trends = get_barangay_trends(time_filter)
+    distribution = get_barangay_distribution(time_filter)
+    causes_data = get_barangay_causes(time_filter)
     weather = {'Sunny': 10, 'Rainy': 5, 'Foggy': 2}
     road_conditions = {'Dry': 12, 'Wet': 4, 'Icy': 1}
     vehicle_types = {'Car': 8, 'Motorcycle': 6, 'Truck': 3}
@@ -1107,32 +1020,13 @@ def bfp_analytics():
         logger.warning("Unauthorized access to bfp_analytics")
         return redirect(url_for('login_cdrrmo_pnp_bfp'))
     unique_id = session.get('unique_id')
-    if not unique_id:
-        logger.warning("No unique_id in session for bfp_analytics")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    unique_id_parts = unique_id.split('_')
-    logger.debug(f"unique_id: {unique_id}, parts: {unique_id_parts}")
-    if len(unique_id_parts) != 3 or unique_id_parts[0] != 'bfp':
-        logger.warning(f"Invalid unique_id format: {unique_id}")
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
-    municipality = unique_id_parts[1]
-    contact_no = unique_id_parts[2]
-    
     conn = get_db_connection()
     user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
-                        ('bfp', contact_no, municipality)).fetchone()
+                        ('bfp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
     conn.close()
-    
-    if not user:
-        logger.warning("Unauthorized access to bfp_analytics. Session: %s, User: %s", session, user)
-        session.clear()
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    
+    municipality = user['assigned_municipality'] if user else "Unknown"
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = barangay_coords.get(municipality, [])
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('BFPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
 @app.route('/api/bfp_analytics_data', methods=['GET'])
@@ -1153,6 +1047,47 @@ def get_bfp_analytics_data():
         logger.error(f"Error in get_bfp_analytics_data: {e}")
         return jsonify({'error': 'Failed to retrieve analytics data'}), 500
 
+def get_latest_alert():
+    try:
+        if alerts:
+            return alerts[-1]
+        return None
+    except Exception as e:
+        logger.error(f"Error in get_latest_alert: {e}")
+        return None
+
+def get_barangay_stats():
+    try:
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'barangay' or a.get('barangay')]
+        return Counter(types)
+    except Exception as e:
+        logger.error(f"Error in get_barangay_stats: {e}")
+        return Counter()
+
+def get_cdrrmo_stats():
+    try:
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'cdrrmo' or a.get('assigned_municipality')]
+        return Counter(types)
+    except Exception as e:
+        logger.error(f"Error in get_cdrrmo_stats: {e}")
+        return Counter()
+
+def get_pnp_stats():
+    try:
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'pnp' or a.get('assigned_municipality')]
+        return Counter(types)
+    except Exception as e:
+        logger.error(f"Error in get_pnp_stats: {e}")
+        return Counter()
+
+def get_bfp_stats():
+    try:
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'bfp' or a.get('assigned_municipality')]
+        return Counter(types)
+    except Exception as e:
+        logger.error(f"Error in get_bfp_stats: {e}")
+        return Counter()
+
 if __name__ == '__main__':
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     try:
@@ -1166,36 +1101,6 @@ if __name__ == '__main__':
                 assigned_municipality TEXT,
                 province TEXT,
                 password TEXT NOT NULL
-            )
-        ''')
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS alerts (
-                alert_id TEXT PRIMARY KEY,
-                barangay TEXT,
-                emergency_type TEXT,
-                lat REAL,
-                lon REAL,
-                house_no TEXT,
-                street_no TEXT,
-                image_classification TEXT,
-                timestamp TEXT,
-                forwarded_to TEXT
-            )
-        ''')
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS responses (
-                alert_id TEXT,
-                barangay TEXT,
-                road_accident_cause TEXT,
-                road_accident_type TEXT,
-                weather TEXT,
-                road_condition TEXT,
-                vehicle_type TEXT,
-                driver_age TEXT,
-                driver_gender TEXT,
-                lat REAL,
-                lon REAL,
-                timestamp TEXT
             )
         ''')
         conn.commit()
