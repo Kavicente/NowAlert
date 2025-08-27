@@ -57,8 +57,11 @@ def get_db_connection():
     return conn
 
 def get_municipality_from_barangay(barangay):
+    if barangay is None:
+        return None
+    barangay = barangay.lower()
     for municipality, barangays in barangay_coords.items():
-        if barangay in barangays:
+        if barangay in [b.lower() for b in barangays]:
             return municipality
     return None
 
@@ -89,7 +92,7 @@ def admin_login():
         password = request.form.get('password')
         conn = get_db_connection()
         admin = conn.execute('SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ?',
-                           ('admin', username, password)).fetchone()
+                             ('admin', username, password)).fetchone()
         conn.close()
         if admin:
             session['role'] = 'admin'
@@ -140,7 +143,6 @@ def admin_delete_user(contact_no):
     return jsonify({'message': 'User deleted successfully'})
 
 
-
 @socketio.on('connect')
 def handle_connect():
     logger.info(f"Client connected: {request.sid}")
@@ -161,22 +163,26 @@ def handle_register_role(data):
         barangay = data.get('barangay')
         # allow empty string only if explicitly provided (but generally barangay should be non-empty)
         if barangay is not None:
+            barangay = barangay.lower()
             join_room(f"barangay_{barangay}")
             logger.info(f"Client {request.sid} joined room barangay_{barangay}")
     elif role == 'cdrrmo':
         municipality = data.get('municipality')
         # join even if municipality == '' (clients may send empty string), so check "is not None"
         if municipality is not None:
+            municipality = municipality.lower()
             join_room(f"cdrrmo_{municipality}")
             logger.info(f"Client {request.sid} joined room cdrrmo_{municipality}")
     elif role == 'pnp':
         municipality = data.get('municipality')
         if municipality is not None:
+            municipality = municipality.lower()
             join_room(f"pnp_{municipality}")
             logger.info(f"Client {request.sid} joined room pnp_{municipality}")
     elif role == 'bfp':
         municipality = data.get('municipality')
         if municipality is not None:
+            municipality = municipality.lower()
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
     else:
@@ -189,8 +195,8 @@ def handle_new_alert(data):
     data['alert_id'] = alert_id
     data['timestamp'] = datetime.utcnow().isoformat()
     data['resident_barangay'] = data.get('barangay', 'Unknown')
-
-    # classify image if present
+    
+    # Classify image if present
     image_classification = 'no_image'
     if 'image' in data:
         try:
@@ -200,53 +206,51 @@ def handle_new_alert(data):
             image_classification = 'classification_error'
     data['image_classification'] = image_classification
 
-    # store alert in db as before
-    try:
-        conn = sqlite3.connect('alertnow.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO alerts (alert_id, lat, lon, house_no, street_no, barangay, emergency_type, image, image_classification, timestamp, resident_barangay, municipality)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            alert_id,
-            data.get('lat'),
-            data.get('lon'),
-            data.get('house_no'),
-            data.get('street_no'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            data.get('image'),
-            image_classification,
-            data.get('timestamp'),
-            data.get('resident_barangay'),
-            get_municipality_from_barangay(data.get('barangay'))
-        ))
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Failed to insert alert to DB: {e}")
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
+    # Store alert in database
+    conn = sqlite3.connect('alertnow.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO alerts (alert_id, lat, lon, house_no, street_no, barangay, emergency_type, image, image_classification, timestamp, resident_barangay, municipality)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        alert_id,
+        data.get('lat'),
+        data.get('lon'),
+        data.get('house_no'),
+        data.get('street_no'),
+        data.get('barangay'),
+        data.get('emergency_type'),
+        data.get('image'),
+        image_classification,
+        data.get('timestamp'),
+        data.get('resident_barangay'),
+        get_municipality_from_barangay(data.get('barangay'))
+    ))
+    conn.commit()
+    conn.close()
 
-    # compute rooms robustly: ensure municipality is a string (may be None -> convert to empty string)
+    # Emit to relevant rooms
+    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
     municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality is None:
-        municipality = ''  # normalize None -> empty string so clients using '' will match
-    barangay_room = f"barangay_{data.get('barangay')}"
-    cdrrmo_room = f"cdrrmo_{municipality}"
-    pnp_room = f"pnp_{municipality}"
-
-    logger.info(f"Emitting new_alert to rooms: {barangay_room}, {cdrrmo_room}, {pnp_room}")
+    if municipality:
+        municipality = municipality.lower()
+        cdrrmo_room = f"cdrrmo_{municipality}"
+        pnp_room = f"pnp_{municipality}"
+    else:
+        logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
+        cdrrmo_room = None
+        pnp_room = None
+    
     emit('new_alert', data, room=barangay_room)
     logger.info(f"Alert emitted to room {barangay_room}")
-    emit('new_alert', data, room=cdrrmo_room)
-    logger.info(f"Alert emitted to room {cdrrmo_room}")
-    emit('new_alert', data, room=pnp_room)
-    logger.info(f"Alert emitted to room {pnp_room}")
+    if cdrrmo_room:
+        emit('new_alert', data, room=cdrrmo_room)
+        logger.info(f"Alert emitted to room {cdrrmo_room}")
+    if pnp_room:
+        emit('new_alert', data, room=pnp_room)
+        logger.info(f"Alert emitted to room {pnp_room}")
 
-    # Emit update_map as originally done
+    # Emit update_map to relevant rooms
     map_data = {
         'lat': data.get('lat'),
         'lon': data.get('lon'),
@@ -254,19 +258,25 @@ def handle_new_alert(data):
         'emergency_type': data.get('emergency_type')
     }
     emit('update_map', map_data, room=barangay_room)
-    emit('update_map', map_data, room=cdrrmo_room)
-    emit('update_map', map_data, room=pnp_room)
+    if cdrrmo_room:
+        emit('update_map', map_data, room=cdrrmo_room)
+    if pnp_room:
+        emit('update_map', map_data, room=pnp_room)
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
     logger.info(f"Forward alert received: {data}")
     municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality is None:
-        municipality = ''
+    if municipality:
+        municipality = municipality.lower()
+    else:
+        logger.warning(f"Municipality not found for barangay in forward: {data.get('barangay')}")
+        return  # Skip if no municipality
+    
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
-
+    
     emit('new_alert', data, room=cdrrmo_room)
     logger.info(f"Alert forwarded to room {cdrrmo_room}")
     emit('new_alert', data, room=pnp_room)
@@ -287,51 +297,60 @@ def handle_forward_alert(data):
 @socketio.on('response_submitted')
 def handle_response_submitted(data):
     logger.info(f"Response received: {data}")
-    try:
-        conn = sqlite3.connect('alertnow.db')
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO responses (
-                alert_id, road_accident_cause, road_accident_type, weather,
-                road_condition, vehicle_type, driver_age, driver_gender,
-                lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'),
-            data.get('road_accident_cause'),
-            data.get('road_accident_type'),
-            data.get('weather'),
-            data.get('road_condition'),
-            data.get('vehicle_type'),
-            data.get('driver_age'),
-            data.get('driver_gender'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            datetime.utcnow().isoformat()
-        ))
-        conn.commit()
-    except Exception as e:
-        logger.error(f"Failed to insert response: {e}")
-    finally:
-        try:
-            conn.close()
-        except:
-            pass
+    conn = sqlite3.connect('alertnow.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO responses (
+            alert_id, road_accident_cause, road_accident_type, weather, 
+            road_condition, vehicle_type, driver_age, driver_gender, 
+            lat, lon, barangay, emergency_type, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        data.get('alert_id'),
+        data.get('road_accident_cause'),
+        data.get('road_accident_type'),
+        data.get('weather'),
+        data.get('road_condition'),
+        data.get('vehicle_type'),
+        data.get('driver_age'),
+        data.get('driver_gender'),
+        data.get('lat'),
+        data.get('lon'),
+        data.get('barangay'),
+        data.get('emergency_type'),
+        datetime.utcnow().isoformat()
+    ))
+    conn.commit()
 
-    barangay_room = f"barangay_{data.get('barangay')}"
+    # Lookup prediction as image_classification from alerts (using ML model result)
+    cursor.execute('SELECT image_classification FROM alerts WHERE alert_id = ?', (data.get('alert_id'),))
+    row = cursor.fetchone()
+    if row:
+        data['prediction'] = row[0]
+    else:
+        data['prediction'] = 'N/A'
+    conn.close()
+
+    # Emit response to relevant rooms
+    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
     municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality is None:
-        municipality = ''
-    cdrrmo_room = f"cdrrmo_{municipality}"
-    pnp_room = f"pnp_{municipality}"
-    bfp_room = f"bfp_{municipality}"
-
+    if municipality:
+        municipality = municipality.lower()
+        cdrrmo_room = f"cdrrmo_{municipality}"
+        pnp_room = f"pnp_{municipality}"
+        bfp_room = f"bfp_{municipality}"
+    else:
+        cdrrmo_room = None
+        pnp_room = None
+        bfp_room = None
+    
     emit('response_submitted', data, room=barangay_room)
-    emit('response_submitted', data, room=cdrrmo_room)
-    emit('response_submitted', data, room=pnp_room)
-    emit('response_submitted', data, room=bfp_room)
+    if cdrrmo_room:
+        emit('response_submitted', data, room=cdrrmo_room)
+    if pnp_room:
+        emit('response_submitted', data, room=pnp_room)
+    if bfp_room:
+        emit('response_submitted', data, room=bfp_room)
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}
@@ -915,6 +934,7 @@ def bfp_dashboard():
                            lon_coord=lon_coord,
                            google_api_key=GOOGLE_API_KEY)
 
+
 @app.route('/barangay/analytics')
 def barangay_analytics():
     if 'role' not in session or session['role'] != 'barangay':
@@ -1137,6 +1157,50 @@ if __name__ == '__main__':
         logger.info("Database 'users_web.db' initialized successfully or already exists.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+
+    # Add initialization for alertnow.db
+    db_path = 'users_web.db'
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS alerts (
+                alert_id TEXT PRIMARY KEY,
+                lat REAL,
+                lon REAL,
+                house_no TEXT,
+                street_no TEXT,
+                barangay TEXT,
+                emergency_type TEXT,
+                image TEXT,
+                image_classification TEXT,
+                timestamp TEXT,
+                resident_barangay TEXT,
+                municipality TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS responses (
+                alert_id TEXT,
+                road_accident_cause TEXT,
+                road_accident_type TEXT,
+                weather TEXT,
+                road_condition TEXT,
+                vehicle_type TEXT,
+                driver_age TEXT,
+                driver_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Database 'users_web.db' initialized successfully or already exists.")
+    except Exception as e:
+        logger.error(f"Failed to initialize alertnow.db: {e}")
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
