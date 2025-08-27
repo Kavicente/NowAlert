@@ -141,37 +141,46 @@ def admin_delete_user(contact_no):
 
 
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    logger.info(f"Client disconnected: {request.sid}")
-
 @socketio.on('connect')
 def handle_connect():
     logger.info(f"Client connected: {request.sid}")
 
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"Client disconnected: {request.sid}")
+
 @socketio.on('register_role')
 def handle_register_role(data):
+    """
+    Make registration robust to empty string vs None.
+    Clients frequently send municipality = '' (empty string) as default; treat '' as valid join key.
+    """
     role = data.get('role')
+    logger.info(f"register_role called by {request.sid} with data: {data}")
     if role == 'barangay':
         barangay = data.get('barangay')
-        if barangay:
+        # allow empty string only if explicitly provided (but generally barangay should be non-empty)
+        if barangay is not None:
             join_room(f"barangay_{barangay}")
             logger.info(f"Client {request.sid} joined room barangay_{barangay}")
     elif role == 'cdrrmo':
         municipality = data.get('municipality')
-        if municipality:
+        # join even if municipality == '' (clients may send empty string), so check "is not None"
+        if municipality is not None:
             join_room(f"cdrrmo_{municipality}")
             logger.info(f"Client {request.sid} joined room cdrrmo_{municipality}")
     elif role == 'pnp':
         municipality = data.get('municipality')
-        if municipality:
+        if municipality is not None:
             join_room(f"pnp_{municipality}")
             logger.info(f"Client {request.sid} joined room pnp_{municipality}")
     elif role == 'bfp':
         municipality = data.get('municipality')
-        if municipality:
+        if municipality is not None:
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
+    else:
+        logger.warning(f"Unknown role registration attempt: {role}")
 
 @socketio.on('alert')
 def handle_new_alert(data):
@@ -180,8 +189,8 @@ def handle_new_alert(data):
     data['alert_id'] = alert_id
     data['timestamp'] = datetime.utcnow().isoformat()
     data['resident_barangay'] = data.get('barangay', 'Unknown')
-    
-    # Classify image if present
+
+    # classify image if present
     image_classification = 'no_image'
     if 'image' in data:
         try:
@@ -191,35 +200,45 @@ def handle_new_alert(data):
             image_classification = 'classification_error'
     data['image_classification'] = image_classification
 
-    # Store alert in database
-    conn = sqlite3.connect('alertnow.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO alerts (alert_id, lat, lon, house_no, street_no, barangay, emergency_type, image, image_classification, timestamp, resident_barangay, municipality)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        alert_id,
-        data.get('lat'),
-        data.get('lon'),
-        data.get('house_no'),
-        data.get('street_no'),
-        data.get('barangay'),
-        data.get('emergency_type'),
-        data.get('image'),
-        image_classification,
-        data.get('timestamp'),
-        data.get('resident_barangay'),
-        get_municipality_from_barangay(data.get('barangay'))
-    ))
-    conn.commit()
-    conn.close()
+    # store alert in db as before
+    try:
+        conn = sqlite3.connect('alertnow.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO alerts (alert_id, lat, lon, house_no, street_no, barangay, emergency_type, image, image_classification, timestamp, resident_barangay, municipality)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            alert_id,
+            data.get('lat'),
+            data.get('lon'),
+            data.get('house_no'),
+            data.get('street_no'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            data.get('image'),
+            image_classification,
+            data.get('timestamp'),
+            data.get('resident_barangay'),
+            get_municipality_from_barangay(data.get('barangay'))
+        ))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to insert alert to DB: {e}")
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
-    # Emit to relevant rooms
-    barangay_room = f"barangay_{data.get('barangay')}"
+    # compute rooms robustly: ensure municipality is a string (may be None -> convert to empty string)
     municipality = get_municipality_from_barangay(data.get('barangay'))
+    if municipality is None:
+        municipality = ''  # normalize None -> empty string so clients using '' will match
+    barangay_room = f"barangay_{data.get('barangay')}"
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
-    
+
+    logger.info(f"Emitting new_alert to rooms: {barangay_room}, {cdrrmo_room}, {pnp_room}")
     emit('new_alert', data, room=barangay_room)
     logger.info(f"Alert emitted to room {barangay_room}")
     emit('new_alert', data, room=cdrrmo_room)
@@ -227,7 +246,7 @@ def handle_new_alert(data):
     emit('new_alert', data, room=pnp_room)
     logger.info(f"Alert emitted to room {pnp_room}")
 
-    # Emit update_map to relevant rooms
+    # Emit update_map as originally done
     map_data = {
         'lat': data.get('lat'),
         'lon': data.get('lon'),
@@ -242,10 +261,12 @@ def handle_new_alert(data):
 def handle_forward_alert(data):
     logger.info(f"Forward alert received: {data}")
     municipality = get_municipality_from_barangay(data.get('barangay'))
+    if municipality is None:
+        municipality = ''
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
-    
+
     emit('new_alert', data, room=cdrrmo_room)
     logger.info(f"Alert forwarded to room {cdrrmo_room}")
     emit('new_alert', data, room=pnp_room)
@@ -266,39 +287,47 @@ def handle_forward_alert(data):
 @socketio.on('response_submitted')
 def handle_response_submitted(data):
     logger.info(f"Response received: {data}")
-    conn = sqlite3.connect('alertnow.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO responses (
-            alert_id, road_accident_cause, road_accident_type, weather, 
-            road_condition, vehicle_type, driver_age, driver_gender, 
-            lat, lon, barangay, emergency_type, timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        data.get('alert_id'),
-        data.get('road_accident_cause'),
-        data.get('road_accident_type'),
-        data.get('weather'),
-        data.get('road_condition'),
-        data.get('vehicle_type'),
-        data.get('driver_age'),
-        data.get('driver_gender'),
-        data.get('lat'),
-        data.get('lon'),
-        data.get('barangay'),
-        data.get('emergency_type'),
-        datetime.utcnow().isoformat()
-    ))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('alertnow.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO responses (
+                alert_id, road_accident_cause, road_accident_type, weather,
+                road_condition, vehicle_type, driver_age, driver_gender,
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('road_accident_cause'),
+            data.get('road_accident_type'),
+            data.get('weather'),
+            data.get('road_condition'),
+            data.get('vehicle_type'),
+            data.get('driver_age'),
+            data.get('driver_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            datetime.utcnow().isoformat()
+        ))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to insert response: {e}")
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
 
-    # Emit response to relevant rooms
     barangay_room = f"barangay_{data.get('barangay')}"
     municipality = get_municipality_from_barangay(data.get('barangay'))
+    if municipality is None:
+        municipality = ''
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
-    
+
     emit('response_submitted', data, room=barangay_room)
     emit('response_submitted', data, room=cdrrmo_room)
     emit('response_submitted', data, room=pnp_room)

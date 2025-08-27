@@ -13,11 +13,15 @@ def get_pnp_stats():
         logger.error(f"Error in get_pnp_stats: {e}")
         return Counter()
 
-def get_latest_alert():
+def get_latest_alert(alerts_list=None, municipality=None):
     try:
-        from AlertNow import alerts
-        if alerts:
-            return alerts[-1]
+        if alerts_list is None:
+            try:
+                from AlertNow import alerts as alerts_list
+            except Exception:
+                alerts_list = []
+        if alerts_list:
+            return alerts_list[-1]
         return None
     except Exception as e:
         logger.error(f"Error in get_latest_alert: {e}")
