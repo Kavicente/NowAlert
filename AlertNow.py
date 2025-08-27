@@ -57,11 +57,8 @@ def get_db_connection():
     return conn
 
 def get_municipality_from_barangay(barangay):
-    if barangay is None:
-        return None
-    barangay = barangay.lower()
     for municipality, barangays in barangay_coords.items():
-        if barangay in [b.lower() for b in barangays]:
+        if barangay in barangays:
             return municipality
     return None
 
@@ -142,7 +139,6 @@ def admin_delete_user(contact_no):
     conn.close()
     return jsonify({'message': 'User deleted successfully'})
 
-
 @socketio.on('connect')
 def handle_connect():
     logger.info(f"Client connected: {request.sid}")
@@ -163,26 +159,22 @@ def handle_register_role(data):
         barangay = data.get('barangay')
         # allow empty string only if explicitly provided (but generally barangay should be non-empty)
         if barangay is not None:
-            barangay = barangay.lower()
             join_room(f"barangay_{barangay}")
             logger.info(f"Client {request.sid} joined room barangay_{barangay}")
     elif role == 'cdrrmo':
         municipality = data.get('municipality')
         # join even if municipality == '' (clients may send empty string), so check "is not None"
         if municipality is not None:
-            municipality = municipality.lower()
             join_room(f"cdrrmo_{municipality}")
             logger.info(f"Client {request.sid} joined room cdrrmo_{municipality}")
     elif role == 'pnp':
         municipality = data.get('municipality')
         if municipality is not None:
-            municipality = municipality.lower()
             join_room(f"pnp_{municipality}")
             logger.info(f"Client {request.sid} joined room pnp_{municipality}")
     elif role == 'bfp':
         municipality = data.get('municipality')
         if municipality is not None:
-            municipality = municipality.lower()
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
     else:
@@ -206,28 +198,8 @@ def handle_new_alert(data):
             image_classification = 'classification_error'
     data['image_classification'] = image_classification
 
-    # Store alert in database
-    conn = sqlite3.connect('alertnow.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO alerts (alert_id, lat, lon, house_no, street_no, barangay, emergency_type, image, image_classification, timestamp, resident_barangay, municipality)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        alert_id,
-        data.get('lat'),
-        data.get('lon'),
-        data.get('house_no'),
-        data.get('street_no'),
-        data.get('barangay'),
-        data.get('emergency_type'),
-        data.get('image'),
-        image_classification,
-        data.get('timestamp'),
-        data.get('resident_barangay'),
-        get_municipality_from_barangay(data.get('barangay'))
-    ))
-    conn.commit()
-    conn.close()
+    # Store alert in memory
+    alerts.append(data)
 
     # Emit to relevant rooms
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
@@ -321,14 +293,6 @@ def handle_response_submitted(data):
         datetime.utcnow().isoformat()
     ))
     conn.commit()
-
-    # Lookup prediction as image_classification from alerts (using ML model result)
-    cursor.execute('SELECT image_classification FROM alerts WHERE alert_id = ?', (data.get('alert_id'),))
-    row = cursor.fetchone()
-    if row:
-        data['prediction'] = row[0]
-    else:
-        data['prediction'] = 'N/A'
     conn.close()
 
     # Emit response to relevant rooms
@@ -1157,50 +1121,6 @@ if __name__ == '__main__':
         logger.info("Database 'users_web.db' initialized successfully or already exists.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
-
-    # Add initialization for alertnow.db
-    db_path = 'users_web.db'
-    try:
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS alerts (
-                alert_id TEXT PRIMARY KEY,
-                lat REAL,
-                lon REAL,
-                house_no TEXT,
-                street_no TEXT,
-                barangay TEXT,
-                emergency_type TEXT,
-                image TEXT,
-                image_classification TEXT,
-                timestamp TEXT,
-                resident_barangay TEXT,
-                municipality TEXT
-            )
-        ''')
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS responses (
-                alert_id TEXT,
-                road_accident_cause TEXT,
-                road_accident_type TEXT,
-                weather TEXT,
-                road_condition TEXT,
-                vehicle_type TEXT,
-                driver_age TEXT,
-                driver_gender TEXT,
-                lat REAL,
-                lon REAL,
-                barangay TEXT,
-                emergency_type TEXT,
-                timestamp TEXT
-            )
-        ''')
-        conn.commit()
-        conn.close()
-        logger.info("Database 'users_web.db' initialized successfully or already exists.")
-    except Exception as e:
-        logger.error(f"Failed to initialize alertnow.db: {e}")
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
