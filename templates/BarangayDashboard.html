@@ -93,70 +93,51 @@
         socket.emit('register_role', { role: 'barangay', barangay: ('{{ barangay }}' || '').trim().toLowerCase() });
       });
 
-       socket.on('new_alert', (data) => {
-                console.log('New alert received:', data);
-                updateUIWithAlert(data);
-                notifyAlert(data);
-            });
+      socket.on('new_alert', (data) => {
+        console.log('New alert received:', data);
+        updateUIWithAlert(data);
+        notifyAlert(data);
+      });
 
-            socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.0642) }};
-                const lon = data.lon || {{ lon_coord|default(121.3233) }};
-                cdrrmoMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-            });
+      socket.on('update_map', (data) => {
+        console.log('Update map received:', data);
+        const lat = data.lat || {{ lat_coord|default(14.0549) }};
+        const lon = data.lon || {{ lon_coord|default(121.3013) }};
+        map.setView([lat, lon], 16);
+        L.marker([lat, lon]).addTo(map).bindPopup(`${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`).openPopup();
+        document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+      });
 
-            socket.on('response_submitted', (data) => {
-                console.log('Response submitted:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const predictionDiv = document.createElement('div');
-                    predictionDiv.className = 'prediction';
-                    predictionDiv.textContent = `Prediction: ${data.prediction || 'N/A'}`;
-                    alertItem.appendChild(predictionDiv);
-                }
-            });
+      socket.on('response_submitted', (data) => {
+        console.log('Response submitted:', data);
+        const alertItem = alertElements.get(data.alert_id);
+        if (alertItem) {
+          const predictionDiv = document.createElement('div');
+          predictionDiv.className = 'prediction';
+          predictionDiv.textContent = `Prediction: ${data.prediction || 'N/A'}`;
+          alertItem.appendChild(predictionDiv);
+        }
+      });
 
-            function updateUIWithAlert(data) {
-                const feed = document.getElementById('alert-container');
-                if (feed) {
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert-item';
-                    alertElements.set(data.alert_id, alertDiv);
-                    let displayTime;
-                    try {
-                        const serverTime = new Date(data.timestamp || Date.now());
-                        displayTime = serverTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
-                    } catch (e) {
-                        console.error('Error parsing timestamp:', e);
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
-                    }
-                    const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
-                    const emergencyBarangay = data.barangay || 'Unknown';
-                    const residentBarangay = data.resident_barangay || emergencyBarangay;
-                    alertDiv.innerHTML = `
-                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
-                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" onclick="viewImage('${data.image}')"/>` : ''}
-                        ${data.image_classification !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification}</p>` : ''}
-                    `;
-                    feed.prepend(alertDiv);
-                }
-
-                if (data.lat && data.lon) {
-                    const marker = L.marker([data.lat, data.lon]).addTo(cdrrmoMap).bindPopup(
-                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                    ).openPopup();
-                    if (feed.children.length === 1) {
-                        cdrrmoMap.setView([data.lat, data.lon], 15);
-                    }
-                }
-
-                
+      function updateUIWithAlert(data) {
+        const feed = document.getElementById('alert-container');
+        if (!feed) return;
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert-item';
+        alertDiv.dataset.alertId = data.alert_id;
+        alertElements.set(data.alert_id, data);
+        const serverTime = new Date(data.timestamp || Date.now());
+        alertDiv.innerHTML = `<strong>${data.emergency_type || 'Alert'}</strong> — ${data.barangay || 'Unknown'} <br/> ${serverTime.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`;
+        if (data.image) {
+          const img = document.createElement('img');
+          img.className = 'clickable-img';
+          img.src = 'data:image/jpeg;base64,' + data.image;
+          img.onclick = () => {
+            const w = window.open('');
+            w.document.write(`<img src="${img.src}" style="max-width:100%;">`);
+          };
+          alertDiv.appendChild(img);
+        }
         // Add a forward & respond button (same pattern you had)
         const forwardBtn = document.createElement('button');
         forwardBtn.innerText = 'Forward to CDRRMO';
@@ -172,8 +153,7 @@
 
         feed.prepend(alertDiv);
       }
-          updateStats();
-        }
+
       function showResponseForm(container, data) {
         if (!container) return;
         const form = document.createElement('div');
