@@ -82,7 +82,7 @@
             };
             L.control.layers(baseLayers).addTo(pnpMap);
 
-            const socket = io('https://alert-858l.onrender.com');
+            const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
@@ -90,8 +90,12 @@
                 socket.emit('register_role', { role: 'pnp', municipality: '{{ municipality }}' });
             });
 
-            socket.on('forward_alert', (data) => {
-                console.log('Forwarded alert received:', data);
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+            });
+
+            socket.on('new_alert', (data) => {
+                console.log('New alert received:', data);
                 updateUIWithAlert(data);
                 notifyAlert(data);
             });
@@ -134,9 +138,9 @@
                     }
                     const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
                     const emergencyBarangay = data.barangay || 'Unknown';
-                    const residentMunicipality = "{{ municipality }}";
+                    const residentBarangay = data.resident_barangay || emergencyBarangay;
                     alertDiv.innerHTML = `
-                        <p><strong>Emergency at ${emergencyBarangay} (Municipality: ${residentMunicipality})</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
+                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
                         <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" onclick="viewImage('${data.image}')"/>` : ''}
                         ${data.image_classification !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification}</p>` : ''}
@@ -149,7 +153,7 @@
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
                     if (feed.children.length === 1) {
-                        pnpMap.setView([data.lat, lon], 15);
+                        pnpMap.setView([data.lat, data.lon], 15);
                     }
                 }
 
@@ -195,9 +199,9 @@
                     </select>
                     <select id="driverAge">
                         <option value="18-25">18-25</option>
-                        <option value="26-40">26-40</option>
-                        <option value="41-60">41-60</option>
-                        <option value="60+">60+</option>
+                        <option value="26-35">26-35</option>
+                        <option value="36-50">36-50</option>
+                        <option value="51+">51+</option>
                     </select>
                     <select id="driverGender">
                         <option value="Male">Male</option>
@@ -205,80 +209,58 @@
                     </select>
                     <button onclick="submitResponse('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')">Submit Response</button>
                 `;
-                const alertItem = alertElements.get(alertId) || document.querySelector(`button[onclick="showResponseForm('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')"]`).parentElement;
-                alertItem.appendChild(form);
+                const alertItem = alertElements.get(alertId);
+                if (alertItem) {
+                    alertItem.appendChild(form);
+                }
             }
 
             function submitResponse(alertId, lat, lon, barangay, type) {
-                const cause = document.getElementById('roadAccidentCause').value;
-                const accidentType = document.getElementById('roadAccidentType').value;
-                const weather = document.getElementById('weather').value;
-                const roadCondition = document.getElementById('roadCondition').value;
-                const vehicleType = document.getElementById('vehicleType').value;
-                const driverAge = document.getElementById('driverAge').value;
-                const driverGender = document.getElementById('driverGender').value;
-
-                socket.emit('response_submitted', {
+                const response = {
                     alert_id: alertId,
-                    road_accident_cause: cause,
-                    road_accident_type: accidentType,
-                    weather: weather,
-                    road_condition: roadCondition,
-                    vehicle_type: vehicleType,
-                    driver_age: driverAge,
-                    driver_gender: driverGender,
+                    road_accident_cause: document.getElementById('roadAccidentCause').value,
+                    road_accident_type: document.getElementById('roadAccidentType').value,
+                    weather: document.getElementById('weather').value,
+                    road_condition: document.getElementById('roadCondition').value,
+                    vehicle_type: document.getElementById('vehicleType').value,
+                    driver_age: document.getElementById('driverAge').value,
+                    driver_gender: document.getElementById('driverGender').value,
                     lat: lat,
                     lon: lon,
                     barangay: barangay,
                     emergency_type: type
-                });
+                };
+                socket.emit('response_submitted', response);
+                console.log('Response submitted:', response);
+                const form = document.querySelector('.response-form');
+                if (form) form.remove();
             }
 
-            function viewImage(base64Image) {
-                const win = window.open();
-                win.document.write(`<img src="data:image/jpeg;base64,${base64Image}" style="max-width:100%;"/>`);
+            function viewImage(base64) {
+                const imgWindow = window.open('');
+                imgWindow.document.write(`<img src="data:image/jpeg;base64,${base64}" style="max-width:100%;"/>`);
             }
 
             function notifyAlert(data) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    showBrowserNotification(data);
-                } else if ('Notification' in window) {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === 'granted') {
-                            showBrowserNotification(data);
-                        } else {
-                            showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
-                        }
-                    });
-                } else {
-                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
-                }
-            }
-
-            function showBrowserNotification(data) {
-                new Notification('New Alert', {
-                    body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
-                    icon: '/static/favicon.ico'
-                });
-            }
-
-            function showNotification(message) {
-                const notificationDiv = document.getElementById('notification');
-                notificationDiv.textContent = message;
-                setTimeout(() => notificationDiv.textContent = '', 5000);
+                const notification = document.getElementById('notification');
+                const alertSound = new Audio('/static/audio/alert.mp3');
+                alertSound.play().catch(e => console.error('Error playing sound:', e));
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'notification';
+                alertDiv.innerHTML = `New ${data.emergency_type || 'Alert'} in ${data.barangay || 'Unknown'}`;
+                notification.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 5000);
             }
 
             function updateStats() {
-                fetch('/api/stats?role=pnp')
-                    .then(res => res.json())
-                    .then(stats => {
-                        document.getElementById('total-incidents').textContent = stats.total || 0;
-                        document.getElementById('critical-incidents').textContent = stats.critical || 0;
+                fetch('/get_pnp_stats')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('total-incidents').textContent = data.total_incidents || 0;
+                        document.getElementById('critical-incidents').textContent = data.critical_incidents || 0;
                     })
-                    .catch(err => console.error('Error fetching stats:', err));
+                    .catch(error => console.error('Error fetching stats:', error));
             }
-
-            updateStats();
         });
     </script>
 </body>

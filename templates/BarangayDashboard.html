@@ -82,7 +82,7 @@
             };
             L.control.layers(baseLayers).addTo(barangayMap);
 
-            const socket = io('https://alert-858l.onrender.com');
+            const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
@@ -90,7 +90,12 @@
                 socket.emit('register_role', { role: 'barangay', barangay: '{{ barangay }}' });
             });
 
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+            });
+
             socket.on('new_alert', (data) => {
+                console.log('New alert received:', data);
                 updateUIWithAlert(data);
                 notifyAlert(data);
             });
@@ -202,93 +207,67 @@
                         <option value="Truck">Truck</option>
                         <option value="Motorcycle">Motorcycle</option>
                         <option value="Bus">Bus</option>
-                    </select>
+                    
                     <select id="driverAge">
                         <option value="18-25">18-25</option>
-                        <option value="26-40">26-40</option>
-                        <option value="41-60">41-60</option>
-                        <option value="60+">60+</option>
+                        <option value="26-35">26-35</option>
+                        <option value="36-50">36-50</option>
+                        <option value="51+">51+</option>
                     </select>
                     <select id="driverGender">
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                     </select>
-                    <button onclick="submitResponse('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')">Submit Response</button>
+                    <button onclick="submitResponse(&#x27;${alertId}&#x27;, ${lat}, ${lon}, &#x27;${barangay}&#x27;, &#x27;${type}&#x27;)">Submit Response</button>
                 `;
-                const alertItem = alertElements.get(alertId) || document.querySelector(`button[onclick="showResponseForm('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')"]`).parentElement;
-                alertItem.appendChild(form);
-            }
-
-            function submitResponse(alertId, lat, lon, barangay, type) {
-                const cause = document.getElementById('roadAccidentCause').value;
-                const accidentType = document.getElementById('roadAccidentType').value;
-                const weather = document.getElementById('weather').value;
-                const roadCondition = document.getElementById('roadCondition').value;
-                const vehicleType = document.getElementById('vehicleType').value;
-                const driverAge = document.getElementById('driverAge').value;
-                const driverGender = document.getElementById('driverGender').value;
-
-                socket.emit('response_submitted', {
-                    alert_id: alertId,
-                    road_accident_cause: cause,
-                    road_accident_type: accidentType,
-                    weather: weather,
-                    road_condition: roadCondition,
-                    vehicle_type: vehicleType,
-                    driver_age: driverAge,
-                    driver_gender: driverGender,
-                    lat: lat,
-                    lon: lon,
-                    barangay: barangay,
-                    emergency_type: type
-                });
-            }
-
-            function viewImage(base64Image) {
-                const win = window.open();
-                win.document.write(`<img src="data:image/jpeg;base64,${base64Image}" style="max-width:100%;"/>`);
-            }
-
-            function notifyAlert(data) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    showBrowserNotification(data);
-                } else if ('Notification' in window) {
-                    Notification.requestPermission().then(permission => {
-                        if (permission === 'granted') {
-                            showBrowserNotification(data);
-                        } else {
-                            showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
-                        }
-                    });
-                } else {
-                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
+                const alertItem = alertElements.get(alertId);
+                if (alertItem) {
+                    alertItem.appendChild(form);
                 }
             }
-
-            function showBrowserNotification(data) {
-                new Notification('New Alert', {
-                    body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
-                    icon: '/static/favicon.ico'
-                });
+            function submitResponse(alertId, lat, lon, barangay, type) {
+            const response = {
+                alert_id: alertId,
+                road_accident_cause: document.getElementById('roadAccidentCause').value,
+                road_accident_type: document.getElementById('roadAccidentType').value,
+                weather: document.getElementById('weather').value,
+                road_condition: document.getElementById('roadCondition').value,
+                vehicle_type: document.getElementById('vehicleType').value,
+                driver_age: document.getElementById('driverAge').value,
+                driver_gender: document.getElementById('driverGender').value,
+                lat: lat,
+                lon: lon,
+                barangay: barangay,
+                emergency_type: type
+            };
+            socket.emit('response_submitted', response);
+            console.log('Response submitted:', response);
+            const form = document.querySelector('.response-form');
+            if (form) form.remove();
+        }
+            function viewImage(base64) {
+                const imgWindow = window.open('');
+                imgWindow.document.write(<img src="data:image/jpeg;base64,${base64}" style="max-width:100%;"/>);
             }
-
-            function showNotification(message) {
-                const notificationDiv = document.getElementById('notification');
-                notificationDiv.textContent = message;
-                setTimeout(() => notificationDiv.textContent = '', 5000);
+            function notifyAlert(data) {
+                const notification = document.getElementById('notification');
+                const alertSound = new Audio('/static/audio/alert.mp3');
+                alertSound.play().catch(e => console.error('Error playing sound:', e));
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'notification';
+                alertDiv.innerHTML = New ${data.emergency_type || 'Alert'} in ${data.barangay || 'Unknown'};
+                notification.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 5000);
             }
-
             function updateStats() {
-                fetch('/api/stats?role=barangay')
-                    .then(res => res.json())
-                    .then(stats => {
-                        document.getElementById('total-incidents').textContent = stats.total || 0;
-                        document.getElementById('critical-incidents').textContent = stats.critical || 0;
-                    })
-                    .catch(err => console.error('Error fetching stats:', err));
+                fetch('/get_barangay_stats')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('total-incidents').textContent = data.total_incidents || 0;
+                        document.getElementById('critical-incidents').textContent = data.critical_incidents || 0;
+                })
+                .catch(error => console.error('Error fetching stats:', error));
             }
-
-            updateStats();
         });
     </script>
 </body>
