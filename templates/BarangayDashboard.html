@@ -82,7 +82,7 @@
             };
             L.control.layers(baseLayers).addTo(barangayMap);
 
-            const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
+            const socket = io('https://alert-858l.onrender.com');
             const alertElements = new Map();
 
             socket.on('connect', () => {
@@ -90,12 +90,7 @@
                 socket.emit('register_role', { role: 'barangay', barangay: '{{ barangay }}' });
             });
 
-            socket.on('connect_error', (error) => {
-                console.error('Connection error:', error);
-            });
-
             socket.on('new_alert', (data) => {
-                console.log('New alert received:', data);
                 updateUIWithAlert(data);
                 notifyAlert(data);
             });
