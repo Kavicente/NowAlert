@@ -265,25 +265,60 @@ def handle_response_submitted(data):
     
     # Compute prediction using ML model on form data
     try:
-        # Assume model expects these columns; map categorical to dummies if needed
-        df = pd.DataFrame([{
-            'road_accident_cause': data.get('road_accident_cause'),
-            'road_accident_type': data.get('road_accident_type'),
-            'weather': data.get('weather'),
-            'road_condition': data.get('road_condition'),
-            'vehicle_type': data.get('vehicle_type'),
-            'driver_age': data.get('driver_age'),
-            'driver_gender': data.get('driver_gender')
-        }])
-        df = pd.get_dummies(df, columns=list(df.columns))  # One-hot encode all categoricals
+        # Default values for expected model features
+        default_values = {
+            'Year': str(datetime.now().year),  # Default to current year
+            'Barangay': data.get('barangay', 'Unknown'),  # Use barangay from data or default
+            'Accident_Type': 'unknown',
+            'Accident_Cause': 'unknown'
+        }
+        
+        # Validate and clean input data
+        cleaned_data = {}
+        for key in default_values:
+            if key == 'Year':
+                # Ensure Year is a valid integer string
+                value = data.get('Year', default_values[key])
+                try:
+                    cleaned_data[key] = str(int(value))  # Convert to int then back to string
+                except (ValueError, TypeError):
+                    cleaned_data[key] = default_values[key]
+            else:
+                # Handle categorical fields
+                value = data.get(key.lower(), default_values[key])
+                cleaned_data[key] = value if value and value != '' else default_values[key]
+        
+        logger.debug(f"Cleaned data: {cleaned_data}")
+        
+        # Create DataFrame with cleaned data
+        df = pd.DataFrame([cleaned_data])
+        
+        # Log the DataFrame before encoding
+        logger.debug(f"DataFrame before get_dummies: {df}")
+        
+        # One-hot encode categorical columns (exclude Year if it's numeric)
+        categorical_columns = ['Barangay', 'Accident_Type', 'Accident_Cause']
+        df = pd.get_dummies(df, columns=categorical_columns)
+        
+        # Log the DataFrame after encoding
+        logger.debug(f"DataFrame after get_dummies: {df}")
+        
+        # Select the model
         model = road_accident_predictor
         if isinstance(road_accident_predictor, dict):
             model = road_accident_predictor.get('model', road_accident_predictor)
+        
+        # Align DataFrame with model's expected features
         if hasattr(model, 'feature_names_in_'):
             for col in model.feature_names_in_:
                 if col not in df.columns:
                     df[col] = 0
             df = df[model.feature_names_in_]
+        
+        # Log the final DataFrame
+        logger.debug(f"DataFrame after alignment: {df}")
+        
+        # Make prediction
         prediction = model.predict(df)[0]
         if hasattr(model, 'predict_proba'):
             chance = model.predict_proba(df)[0][1] * 100

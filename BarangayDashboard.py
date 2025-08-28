@@ -2,7 +2,10 @@ from alert_data import alerts
 from collections import Counter
 import logging
 
+
 logger = logging.getLogger(__name__)
+
+
 
 def get_barangay_stats():
     try:
