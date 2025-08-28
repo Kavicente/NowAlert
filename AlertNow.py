@@ -49,6 +49,7 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
 socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_http_buffer_size=10000000)
 
 alerts = []
+responses = []
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -57,8 +58,9 @@ def get_db_connection():
     return conn
 
 def get_municipality_from_barangay(barangay):
+    barangay = barangay.lower() if barangay else ''
     for municipality, barangays in barangay_coords.items():
-        if barangay in barangays:
+        if barangay in [b.lower() for b in barangays]:
             return municipality
     return None
 
@@ -139,46 +141,37 @@ def admin_delete_user(contact_no):
     conn.close()
     return jsonify({'message': 'User deleted successfully'})
 
-@socketio.on('connect')
-def handle_connect():
-    logger.info(f"Client connected: {request.sid}")
-
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
 
+@socketio.on('connect')
+def handle_connect():
+    logger.info(f"Client connected: {request.sid}")
+
 @socketio.on('register_role')
 def handle_register_role(data):
-    """
-    Make registration robust to empty string vs None.
-    Clients frequently send municipality = '' (empty string) as default; treat '' as valid join key.
-    """
     role = data.get('role')
-    logger.info(f"register_role called by {request.sid} with data: {data}")
     if role == 'barangay':
-        barangay = data.get('barangay')
-        # allow empty string only if explicitly provided (but generally barangay should be non-empty)
-        if barangay is not None:
+        barangay = data.get('barangay').lower() if data.get('barangay') else None
+        if barangay:
             join_room(f"barangay_{barangay}")
             logger.info(f"Client {request.sid} joined room barangay_{barangay}")
     elif role == 'cdrrmo':
-        municipality = data.get('municipality')
-        # join even if municipality == '' (clients may send empty string), so check "is not None"
-        if municipality is not None:
+        municipality = data.get('municipality').lower() if data.get('municipality') else None
+        if municipality:
             join_room(f"cdrrmo_{municipality}")
             logger.info(f"Client {request.sid} joined room cdrrmo_{municipality}")
     elif role == 'pnp':
-        municipality = data.get('municipality')
-        if municipality is not None:
+        municipality = data.get('municipality').lower() if data.get('municipality') else None
+        if municipality:
             join_room(f"pnp_{municipality}")
             logger.info(f"Client {request.sid} joined room pnp_{municipality}")
     elif role == 'bfp':
-        municipality = data.get('municipality')
-        if municipality is not None:
+        municipality = data.get('municipality').lower() if data.get('municipality') else None
+        if municipality:
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
-    else:
-        logger.warning(f"Unknown role registration attempt: {role}")
 
 @socketio.on('alert')
 def handle_new_alert(data):
@@ -198,7 +191,6 @@ def handle_new_alert(data):
             image_classification = 'classification_error'
     data['image_classification'] = image_classification
 
-    # Store alert in memory
     alerts.append(data)
 
     # Emit to relevant rooms
@@ -269,31 +261,28 @@ def handle_forward_alert(data):
 @socketio.on('response_submitted')
 def handle_response_submitted(data):
     logger.info(f"Response received: {data}")
-    conn = sqlite3.connect('alertnow.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO responses (
-            alert_id, road_accident_cause, road_accident_type, weather, 
-            road_condition, vehicle_type, driver_age, driver_gender, 
-            lat, lon, barangay, emergency_type, timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        data.get('alert_id'),
-        data.get('road_accident_cause'),
-        data.get('road_accident_type'),
-        data.get('weather'),
-        data.get('road_condition'),
-        data.get('vehicle_type'),
-        data.get('driver_age'),
-        data.get('driver_gender'),
-        data.get('lat'),
-        data.get('lon'),
-        data.get('barangay'),
-        data.get('emergency_type'),
-        datetime.utcnow().isoformat()
-    ))
-    conn.commit()
-    conn.close()
+    data['timestamp'] = datetime.utcnow().isoformat()
+    
+    # Compute prediction using ML model on form data
+    try:
+        # Assume model expects these columns; map categorical to dummies if needed
+        df = pd.DataFrame([{
+            'road_accident_cause': data.get('road_accident_cause'),
+            'road_accident_type': data.get('road_accident_type'),
+            'weather': data.get('weather'),
+            'road_condition': data.get('road_condition'),
+            'vehicle_type': data.get('vehicle_type'),
+            'driver_age': data.get('driver_age'),
+            'driver_gender': data.get('driver_gender')
+        }])
+        # If model needs one-hot, but assume it's fitted with that; or predict directly if LR on encoded
+        prediction = road_accident_predictor.predict(df)[0]
+        data['prediction'] = prediction
+    except Exception as e:
+        logger.error(f"Prediction failed: {e}")
+        data['prediction'] = 'prediction_error'
+
+    responses.append(data)
 
     # Emit response to relevant rooms
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
@@ -758,32 +747,28 @@ def barangay_dashboard():
     stats = get_barangay_stats()
     unique_id = session.get('unique_id')
     conn = get_db_connection()
-    user = conn.execute('''
-        SELECT * FROM users WHERE barangay = ? AND contact_no = ?
-    ''', (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ?',
+                        (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
     conn.close()
     
     if not unique_id or not user or user['role'] != 'barangay':
         logger.warning("Unauthorized access to barangay_dashboard. Session: %s, User: %s", session, user)
         return redirect(url_for('login'))
     
-    barangay = user['barangay']
-    assigned_municipality = user['assigned_municipality'] or 'San Pablo City'
-    latest_alert = get_latest_alert()
+    barangay = user['barangay'] or "San Pablo City"
     stats = get_barangay_stats()
-    coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
+    coords = barangay_coords.get(barangay, {'lat': 14.5995, 'lon': 120.9842})
     
     try:
         lat_coord = float(coords.get('lat', 14.5995))
         lon_coord = float(coords.get('lon', 120.9842))
     except (ValueError, TypeError):
-        logger.error(f"Invalid coordinates for {barangay} in {assigned_municipality}, using defaults")
+        logger.error(f"Invalid coordinates for {barangay}, using defaults")
         lat_coord = 14.5995
         lon_coord = 120.9842
 
-    logger.debug(f"Rendering BarangayDashboard for {barangay} in {assigned_municipality}")
+    logger.debug(f"Rendering BarangayDashboard for {barangay}")
     return render_template('BarangayDashboard.html', 
-                           latest_alert=latest_alert, 
                            stats=stats, 
                            barangay=barangay, 
                            lat_coord=lat_coord, 
@@ -898,20 +883,6 @@ def bfp_dashboard():
                            lon_coord=lon_coord,
                            google_api_key=GOOGLE_API_KEY)
 
-
-@app.route('/barangay/analytics')
-def barangay_analytics():
-    if 'role' not in session or session['role'] != 'barangay':
-        logger.warning("Unauthorized access to barangay_analytics")
-        return redirect(url_for('login'))
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('SELECT barangay FROM users WHERE barangay = ? AND contact_no = ?',
-                        (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    barangay = user['barangay'] if user else "Unknown"
-    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
 
 @app.route('/api/barangay_analytics_data')
 def barangay_analytics_data():
