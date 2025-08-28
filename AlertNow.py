@@ -459,6 +459,7 @@ def signup_barangay():
             conn.close()
     return render_template('SignUpPage.html')
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     logger.debug("Accessing /login with method: %s", request.method)
@@ -816,36 +817,42 @@ def barangay_dashboard():
         stats = get_barangay_stats()
         unique_id = session.get('unique_id')
         conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ?',
-                            (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
+        user = conn.execute('''
+            SELECT * FROM users WHERE barangay = ? AND contact_no = ?
+        ''', (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
         conn.close()
         
         if not unique_id or not user or user['role'] != 'barangay':
             logger.warning("Unauthorized access to barangay_dashboard. Session: %s, User: %s", session, user)
-            return jsonify({"error": "Unauthorized"}), 401
+            return redirect(url_for('login'))
         
-        barangay = user['barangay'] or "San Pablo City"
+        barangay = user['barangay']
+        assigned_municipality = user['assigned_municipality'] or 'San Pablo City'
+        latest_alert = get_latest_alert()
         stats = get_barangay_stats()
-        coords = barangay_coords.get(barangay, {'lat': 14.5995, 'lon': 120.9842})
+        coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
         
         try:
             lat_coord = float(coords.get('lat', 14.5995))
             lon_coord = float(coords.get('lon', 120.9842))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {barangay}, using defaults")
+            logger.error(f"Invalid coordinates for {barangay} in {assigned_municipality}, using defaults")
             lat_coord = 14.5995
             lon_coord = 120.9842
 
-        logger.debug(f"Rendering BarangayDashboard for {barangay}")
+        logger.debug(f"Rendering BarangayDashboard for {barangay} in {assigned_municipality}")
         return render_template('BarangayDashboard.html', 
-                               stats=stats, 
-                               barangay=barangay, 
-                               lat_coord=lat_coord, 
-                               lon_coord=lon_coord, 
-                               google_api_key=GOOGLE_API_KEY)
+                            latest_alert=latest_alert, 
+                            stats=stats, 
+                            barangay=barangay, 
+                            lat_coord=lat_coord, 
+                            lon_coord=lon_coord, 
+                            google_api_key=GOOGLE_API_KEY)
+
     except Exception as e:
         logger.error(f"Error in barangay_dashboard: {e}")
-        return jsonify({"error": "Internal Server Error"}), 500
+        return "Internal Server Error", 500
+
 
 @app.route('/cdrrmo_dashboard')
 def cdrrmo_dashboard():
