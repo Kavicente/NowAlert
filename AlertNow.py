@@ -267,7 +267,7 @@ def handle_response_submitted(data):
     try:
         # Default values for expected model features
         default_values = {
-            'Year': str(datetime.now().year),  # Default to current year
+            'Year': datetime.now().year,  # Default to current year as integer
             'Barangay': data.get('barangay', 'Unknown'),  # Use barangay from data or default
             'Accident_Type': 'unknown',
             'Accident_Cause': 'unknown'
@@ -277,10 +277,10 @@ def handle_response_submitted(data):
         cleaned_data = {}
         for key in default_values:
             if key == 'Year':
-                # Ensure Year is a valid integer string
+                # Ensure Year is a valid integer
                 value = data.get('Year', default_values[key])
                 try:
-                    cleaned_data[key] = str(int(value))  # Convert to int then back to string
+                    cleaned_data[key] = int(value)  # Convert to integer
                 except (ValueError, TypeError):
                     cleaned_data[key] = default_values[key]
             else:
@@ -296,9 +296,9 @@ def handle_response_submitted(data):
         # Log the DataFrame before encoding
         logger.debug(f"DataFrame before get_dummies: {df}")
         
-        # One-hot encode categorical columns (exclude Year if it's numeric)
+        # One-hot encode categorical columns
         categorical_columns = ['Barangay', 'Accident_Type', 'Accident_Cause']
-        df = pd.get_dummies(df, columns=categorical_columns)
+        df = pd.get_dummies(df, columns=categorical_columns, dtype=int)  # Use int for one-hot encoding
         
         # Log the DataFrame after encoding
         logger.debug(f"DataFrame after get_dummies: {df}")
@@ -308,15 +308,25 @@ def handle_response_submitted(data):
         if isinstance(road_accident_predictor, dict):
             model = road_accident_predictor.get('model', road_accident_predictor)
         
+        # Log model feature names
+        if hasattr(model, 'feature_names_in_'):
+            logger.debug(f"Model expected features: {model.feature_names_in_}")
+        
         # Align DataFrame with model's expected features
         if hasattr(model, 'feature_names_in_'):
             for col in model.feature_names_in_:
                 if col not in df.columns:
                     df[col] = 0
             df = df[model.feature_names_in_]
+        else:
+            logger.warning("Model does not have feature_names_in_, skipping alignment")
         
         # Log the final DataFrame
         logger.debug(f"DataFrame after alignment: {df}")
+        
+        # Ensure DataFrame has correct dtypes and no NaN
+        df = df.fillna(0).astype(float)  # Fill NaN with 0 and convert to float
+        logger.debug(f"DataFrame dtypes: {df.dtypes}")
         
         # Make prediction
         prediction = model.predict(df)[0]
