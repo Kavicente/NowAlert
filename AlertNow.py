@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_file
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_file, make_response
 from flask_socketio import SocketIO, emit, join_room
 import logging
 import ast
@@ -269,8 +269,30 @@ def handle_response_submitted(data):
         default_values = {
             'Year': datetime.now().year,  # Default to current year as integer
             'Barangay': data.get('barangay', 'Unknown'),  # Use barangay from data or default
-            'Accident_Type': 'unknown',
-            'Accident_Cause': 'unknown'
+            'Road_Accident_Type': 'Overspeeding',  # Default to a valid category
+            'Accident_Cause': 'Head-on collision'  # Default to a valid category
+        }
+        
+        # Map input values to dataset categories
+        type_mapping = {
+            'collision': 'Head-on collision',  # Map 'collision' to a valid Accident_Cause
+            'head-on collision': 'Head-on collision',
+            'rear-end collision': 'Rear-end collision',
+            'side-impact collision': 'Side-impact collision',
+            'single vehicle accident': 'Single vehicle accident',
+            'pedestrian accident': 'Pedestrian accident'
+        }
+        cause_mapping = {
+            'speeding': 'Overspeeding',  # Map 'speeding' to a valid Road_Accident_Type
+            'overspeeding': 'Overspeeding',
+            'drunk driving': 'Drunk Driving',
+            'reckless driving': 'Reckless Driving',
+            'overloading': 'Overloading',
+            'fatigue': 'Fatigue',
+            'distracted driving': 'Distracted Driving',
+            'poor maintenance': 'Poor Maintenance',
+            'mechanical failure': 'Mechanical Failure',
+            'inexperience': 'Inexperience'
         }
         
         # Validate and clean input data
@@ -278,15 +300,24 @@ def handle_response_submitted(data):
         for key in default_values:
             if key == 'Year':
                 # Ensure Year is a valid integer
-                value = data.get('Year', default_values[key])
+                value = data.get(key, data.get(key.lower(), default_values[key]))
                 try:
                     cleaned_data[key] = int(value)  # Convert to integer
                 except (ValueError, TypeError):
                     cleaned_data[key] = default_values[key]
             else:
-                # Handle categorical fields
-                value = data.get(key.lower(), default_values[key])
-                cleaned_data[key] = value if value and value != '' else default_values[key]
+                # Handle categorical fields, check both case-sensitive and lowercase keys
+                value = data.get(key, data.get(key.lower(), default_values[key]))
+                # Normalize value to lowercase and map to dataset category
+                if isinstance(value, str):
+                    value = value.lower()
+                    if key == 'Road_Accident_Type':
+                        value = cause_mapping.get(value, default_values[key])
+                    elif key == 'Accident_Cause':
+                        value = type_mapping.get(value, default_values[key])
+                else:
+                    value = default_values[key]
+                cleaned_data[key] = value
         
         logger.debug(f"Cleaned data: {cleaned_data}")
         
@@ -297,7 +328,7 @@ def handle_response_submitted(data):
         logger.debug(f"DataFrame before get_dummies: {df}")
         
         # One-hot encode categorical columns
-        categorical_columns = ['Barangay', 'Accident_Type', 'Accident_Cause']
+        categorical_columns = ['Barangay', 'Road_Accident_Type', 'Accident_Cause']
         df = pd.get_dummies(df, columns=categorical_columns, dtype=int)  # Use int for one-hot encoding
         
         # Log the DataFrame after encoding

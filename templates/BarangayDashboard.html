@@ -167,20 +167,22 @@
                 form.className = 'response-form';
                 form.innerHTML = `
                     <select id="roadAccidentCause">
-                        <option value="Collision">Collision</option>
-                        <option value="Pedestrian">Pedestrian</option>
-                        <option value="Rollover">Rollover</option>
+                        <option value="Head-on collision">Head-on collision</option>
+                        <option value="Rear-end collision">Rear-end collision</option>
+                        <option value="Side-impact collision">Side-impact collision</option>
+                        <option value="Single vehicle accident">Single vehicle accident</option>
+                        <option value="Pedestrian accident">Pedestrian accident</option>
                     </select>
-                    <select id="roadAccidentType">
+                    <select id="road_accident_type" name="Road_Accident_Type">
                         <option value="Overspeeding">Overspeeding</option>
-                        <option value="Distracted Driving">Distracted Driving</option>
                         <option value="Drunk Driving">Drunk Driving</option>
                         <option value="Reckless Driving">Reckless Driving</option>
-                        <option value="Fatigue">Fatigue</option>
-                        <option value="Inexperience">Inexperience</option>
-                        <option value="Mechanical Failure">Mechanical Failure</option>
-                        <option value="Poor Maintenance">Poor Maintenance</option>
                         <option value="Overloading">Overloading</option>
+                        <option value="Fatigue">Fatigue</option>
+                        <option value="Distracted Driving">Distracted Driving</option>
+                        <option value="Poor Maintenance">Poor Maintenance</option>
+                        <option value="Mechanical Failure">Mechanical Failure</option>
+                        <option value="Inexperience">Inexperience</option>
                     </select>
                     <select id="weather">
                         <option value="Sunny">Sunny</option>

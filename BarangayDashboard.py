@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 
+
 def get_barangay_stats():
     try:
         types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'barangay' or a.get('barangay')]
