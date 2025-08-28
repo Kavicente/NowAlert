@@ -87,7 +87,7 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('register_role', { role: 'cdrrmo', municipality: ('{{ municipality }}' || '').trim().toLowerCase() });
+                socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
             socket.on('connect_error', (error) => {
@@ -127,6 +127,7 @@
                 if (feed) {
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
+                    alertDiv.dataset.alertId = data.alert_id;
                     alertElements.set(data.alert_id, alertDiv);
                     let displayTime;
                     try {
