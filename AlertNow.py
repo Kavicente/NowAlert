@@ -884,6 +884,20 @@ def bfp_dashboard():
                            google_api_key=GOOGLE_API_KEY)
 
 
+@app.route('/barangay/analytics')
+def barangay_analytics():
+    if 'role' not in session or session['role'] != 'barangay':
+        logger.warning("Unauthorized access to barangay_analytics")
+        return redirect(url_for('login'))
+    unique_id = session.get('unique_id')
+    conn = get_db_connection()
+    user = conn.execute('SELECT barangay FROM users WHERE barangay = ? AND contact_no = ?',
+                        (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
+    conn.close()
+    barangay = user['barangay'] if user else "Unknown"
+    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
+    return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
+
 @app.route('/api/barangay_analytics_data')
 def barangay_analytics_data():
     time_filter = request.args.get('time', 'weekly')
