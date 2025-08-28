@@ -261,7 +261,7 @@ def handle_forward_alert(data):
 @socketio.on('response_submitted')
 def handle_response_submitted(data):
     logger.info(f"Response received: {data}")
-    data['timestamp'] = datetime.utcnow().isoformat()
+    data['timestamp'] = datetime.now(pytz.UTC).isoformat()  # Fix DeprecationWarning
     
     # Compute prediction using ML model on form data
     try:
@@ -275,7 +275,7 @@ def handle_response_submitted(data):
         
         # Map input values to dataset categories
         type_mapping = {
-            'collision': 'Head-on collision',  # Map 'collision' to a valid Accident_Cause
+            'collision': 'Head-on collision',
             'head-on collision': 'Head-on collision',
             'rear-end collision': 'Rear-end collision',
             'side-impact collision': 'Side-impact collision',
@@ -283,7 +283,7 @@ def handle_response_submitted(data):
             'pedestrian accident': 'Pedestrian accident'
         }
         cause_mapping = {
-            'speeding': 'Overspeeding',  # Map 'speeding' to a valid Road_Accident_Type
+            'speeding': 'Overspeeding',
             'overspeeding': 'Overspeeding',
             'drunk driving': 'Drunk Driving',
             'reckless driving': 'Reckless Driving',
@@ -299,16 +299,13 @@ def handle_response_submitted(data):
         cleaned_data = {}
         for key in default_values:
             if key == 'Year':
-                # Ensure Year is a valid integer
                 value = data.get(key, data.get(key.lower(), default_values[key]))
                 try:
                     cleaned_data[key] = int(value)  # Convert to integer
                 except (ValueError, TypeError):
                     cleaned_data[key] = default_values[key]
             else:
-                # Handle categorical fields, check both case-sensitive and lowercase keys
                 value = data.get(key, data.get(key.lower(), default_values[key]))
-                # Normalize value to lowercase and map to dataset category
                 if isinstance(value, str):
                     value = value.lower()
                     if key == 'Road_Accident_Type':
@@ -327,36 +324,16 @@ def handle_response_submitted(data):
         # Log the DataFrame before encoding
         logger.debug(f"DataFrame before get_dummies: {df}")
         
-        # One-hot encode categorical columns
-        categorical_columns = ['Barangay', 'Road_Accident_Type', 'Accident_Cause']
-        df = pd.get_dummies(df, columns=categorical_columns, dtype=int)  # Use int for one-hot encoding
-        
-        # Log the DataFrame after encoding
-        logger.debug(f"DataFrame after get_dummies: {df}")
-        
         # Select the model
         model = road_accident_predictor
         if isinstance(road_accident_predictor, dict):
             model = road_accident_predictor.get('model', road_accident_predictor)
         
-        # Log model feature names
-        if hasattr(model, 'feature_names_in_'):
-            logger.debug(f"Model expected features: {model.feature_names_in_}")
-        
-        # Align DataFrame with model's expected features
-        if hasattr(model, 'feature_names_in_'):
-            for col in model.feature_names_in_:
-                if col not in df.columns:
-                    df[col] = 0
-            df = df[model.feature_names_in_]
-        else:
-            logger.warning("Model does not have feature_names_in_, skipping alignment")
-        
-        # Log the final DataFrame
-        logger.debug(f"DataFrame after alignment: {df}")
+        # Let the Pipeline handle transformations
+        logger.debug(f"Model pipeline steps: {model.steps}")
         
         # Ensure DataFrame has correct dtypes and no NaN
-        df = df.fillna(0).astype(float)  # Fill NaN with 0 and convert to float
+        df = df.fillna(0)  # Fill NaN with 0
         logger.debug(f"DataFrame dtypes: {df.dtypes}")
         
         # Make prediction
@@ -422,7 +399,7 @@ def get_db_connection():
 @app.route('/export_users', methods=['GET'])
 def export_users():
     if session.get('role') != 'admin':
-        return "Unauthorized", 403
+        return jsonify({"error": "Unauthorized"}), 403
     conn = get_db_connection()
     users = conn.execute('SELECT * FROM users').fetchall()
     conn.close()
@@ -434,7 +411,7 @@ def download_db():
     if not os.path.exists(db_path):
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     if not os.path.exists(db_path):
-        return "Database file not found", 404
+        return jsonify({"error": "Database file not found"}), 404
     logger.debug(f"Serving database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='users_web.db')
 
@@ -463,7 +440,7 @@ def signup_barangay():
             existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
             if existing_user:
                 logger.error("Signup failed: Contact number %s already exists", contact_no)
-                return "Contact number already exists", 400
+                return jsonify({"error": "Contact number already exists"}), 400
             
             conn.execute('''
                 INSERT INTO users (barangay, role, contact_no, assigned_municipality, province, password)
@@ -474,10 +451,10 @@ def signup_barangay():
             return redirect(url_for('login'))
         except sqlite3.IntegrityError as e:
             logger.error("IntegrityError during signup: %s", e)
-            return "User already exists", 400
+            return jsonify({"error": "User already exists"}), 400
         except Exception as e:
             logger.error(f"Signup failed for {unique_id}: {e}")
-            return f"Signup failed: {e}", 500
+            return jsonify({"error": f"Signup failed: {e}"}), 500
         finally:
             conn.close()
     return render_template('SignUpPage.html')
@@ -839,41 +816,36 @@ def barangay_dashboard():
         stats = get_barangay_stats()
         unique_id = session.get('unique_id')
         conn = get_db_connection()
-        user = conn.execute('''
-            SELECT * FROM users WHERE barangay = ? AND contact_no = ?
-        ''', (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
+        user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ?',
+                            (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
         conn.close()
         
         if not unique_id or not user or user['role'] != 'barangay':
             logger.warning("Unauthorized access to barangay_dashboard. Session: %s, User: %s", session, user)
-            return redirect(url_for('login'))
+            return jsonify({"error": "Unauthorized"}), 401
         
-        barangay = user['barangay']
-        assigned_municipality = user['assigned_municipality'] or 'San Pablo City'
-        latest_alert = get_latest_alert()
+        barangay = user['barangay'] or "San Pablo City"
         stats = get_barangay_stats()
-        coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
+        coords = barangay_coords.get(barangay, {'lat': 14.5995, 'lon': 120.9842})
         
         try:
             lat_coord = float(coords.get('lat', 14.5995))
             lon_coord = float(coords.get('lon', 120.9842))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {barangay} in {assigned_municipality}, using defaults")
+            logger.error(f"Invalid coordinates for {barangay}, using defaults")
             lat_coord = 14.5995
             lon_coord = 120.9842
 
-        logger.debug(f"Rendering BarangayDashboard for {barangay} in {assigned_municipality}")
+        logger.debug(f"Rendering BarangayDashboard for {barangay}")
         return render_template('BarangayDashboard.html', 
-                            latest_alert=latest_alert, 
-                            stats=stats, 
-                            barangay=barangay, 
-                            lat_coord=lat_coord, 
-                            lon_coord=lon_coord, 
-                            google_api_key=GOOGLE_API_KEY)
-
+                               stats=stats, 
+                               barangay=barangay, 
+                               lat_coord=lat_coord, 
+                               lon_coord=lon_coord, 
+                               google_api_key=GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error in barangay_dashboard: {e}")
-        return "Internal Server Error", 500
+        return jsonify({"error": "Internal Server Error"}), 500
 
 @app.route('/cdrrmo_dashboard')
 def cdrrmo_dashboard():

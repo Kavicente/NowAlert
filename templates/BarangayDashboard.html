@@ -54,7 +54,33 @@
         </section>
         <div id="notification"></div>
     </main>
-
+        <form id="accidentForm" class="response-form">
+            <label for="year">Year:</label>
+            <input type="number" id="year" name="Year" value="2025"><br>
+            <label for="barangay">Barangay:</label>
+            <input type="text" id="barangay" name="barangay" value="{{ barangay }}"><br>
+            <label for="road_accident_type">Cause:</label>
+            <select id="road_accident_type" name="Road_Accident_Type">
+                <option value="Overspeeding">Overspeeding</option>
+                <option value="Drunk Driving">Drunk Driving</option>
+                <option value="Reckless Driving">Reckless Driving</option>
+                <option value="Overloading">Overloading</option>
+                <option value="Fatigue">Fatigue</option>
+                <option value="Distracted Driving">Distracted Driving</option>
+                <option value="Poor Maintenance">Poor Maintenance</option>
+                <option value="Mechanical Failure">Mechanical Failure</option>
+                <option value="Inexperience">Inexperience</option>
+            </select><br>
+            <label for="accident_cause">Type:</label>
+            <select id="accident_cause" name="Accident_Cause">
+                <option value="Head-on collision">Head-on collision</option>
+                <option value="Rear-end collision">Rear-end collision</option>
+                <option value="Side-impact collision">Side-impact collision</option>
+                <option value="Single vehicle accident">Single vehicle accident</option>
+                <option value="Pedestrian accident">Pedestrian accident</option>
+            </select><br>
+            <button type="submit">Submit</button>
+        </form>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
@@ -123,6 +149,25 @@
                 }
             });
 
+            const socket = io();
+            document.getElementById('accidentForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const data = {
+                    Year: parseInt(document.getElementById('year').value),
+                    Barangay: document.getElementById('barangay').value,
+                    Road_Accident_Type: document.getElementById('road_accident_type').value,
+                    Accident_Cause: document.getElementById('accident_cause').value,
+                    barangay: document.getElementById('barangay').value
+                };
+                socket.emit('response_submitted', data);
+            });
+
+            socket.on('response_submitted', function(data) {
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = `Prediction: ${data.prediction}`;
+                document.getElementById('alert-container').appendChild(predictionDiv);
+            });
             function updateUIWithAlert(data) {
                 const feed = document.getElementById('alert-container');
                 if (feed) {
