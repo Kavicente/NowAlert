@@ -146,20 +146,17 @@
                 if (alertItem) {
                     const predictionDiv = document.createElement('div');
                     predictionDiv.className = 'prediction';
-                    // Parse the prediction string (e.g., "38.77% chance in year 2025")
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                        // Extract percentage using regex
                         const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
                         if (match) {
-                            const percentage = match[1]; // e.g., "38.77"
-                            // Randomly select a year range
+                            const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
                             formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
                         } else {
-                            formattedPrediction = predictionText; // Fallback if parsing fails
+                            formattedPrediction = predictionText;
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
@@ -188,18 +185,29 @@
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
                         <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
-                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" onclick="viewImage('${data.image}')"/>` : ''}
+                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
                         ${data.image_classification !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification}</p>` : ''}
                     `;
                     feed.prepend(alertDiv);
+
+                    // Added click event for images
+                    if (data.image) {
+                        const img = alertDiv.querySelector('.clickable-img');
+                        img.addEventListener('click', () => {
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modalImg.src = `data:image/jpeg;base64,${data.image}`;
+                            modal.style.display = 'flex';
+                        });
+                    }
                 }
 
                 if (data.lat && data.lon) {
-                    const marker = L.marker([data.lat, data.lon]).addTo(cdrrmoMap).bindPopup(
+                    const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
                     if (feed.children.length === 1) {
-                        cdrrmoMap.setView([data.lat, data.lon], 15);
+                        barangayMap.setView([data.lat, data.lon], 15);
                     }
                 }
 
@@ -267,7 +275,7 @@
                 const response = {
                     alert_id: alertId,
                     road_accident_cause: document.getElementById('roadAccidentCause').value,
-                    road_accident_type: document.getElementById('roadAccidentType').value,
+                    road_accident_type: document.getElementById('road_accident_type').value,
                     weather: document.getElementById('weather').value,
                     road_condition: document.getElementById('roadCondition').value,
                     vehicle_type: document.getElementById('vehicleType').value,
@@ -284,6 +292,7 @@
                 if (form) form.remove();
             }
 
+            // Modified to use modal instead of new window
             function viewImage(base64) {
                 const modal = document.getElementById('image-modal');
                 const modalImg = document.getElementById('modal-image');
@@ -315,7 +324,7 @@
             }
 
             function updateStats() {
-                fetch('/get_cdrrmo_stats')
+                fetch('/get_barangay_stats')
                     .then(response => response.json())
                     .then(data => {
                         document.getElementById('total-incidents').textContent = data.total_incidents || 0;
