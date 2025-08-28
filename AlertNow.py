@@ -399,7 +399,7 @@ def get_db_connection():
 @app.route('/export_users', methods=['GET'])
 def export_users():
     if session.get('role') != 'admin':
-        return jsonify({"error": "Unauthorized"}), 403
+        return "Unauthorized", 403
     conn = get_db_connection()
     users = conn.execute('SELECT * FROM users').fetchall()
     conn.close()
@@ -411,7 +411,7 @@ def download_db():
     if not os.path.exists(db_path):
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     if not os.path.exists(db_path):
-        return jsonify({"error": "Database file not found"}), 404
+        return "Database file not found", 404
     logger.debug(f"Serving database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='users_web.db')
 
@@ -440,7 +440,7 @@ def signup_barangay():
             existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
             if existing_user:
                 logger.error("Signup failed: Contact number %s already exists", contact_no)
-                return jsonify({"error": "Contact number already exists"}), 400
+                return "Contact number already exists", 400
             
             conn.execute('''
                 INSERT INTO users (barangay, role, contact_no, assigned_municipality, province, password)
@@ -451,10 +451,10 @@ def signup_barangay():
             return redirect(url_for('login'))
         except sqlite3.IntegrityError as e:
             logger.error("IntegrityError during signup: %s", e)
-            return jsonify({"error": "User already exists"}), 400
+            return "User already exists", 400
         except Exception as e:
             logger.error(f"Signup failed for {unique_id}: {e}")
-            return jsonify({"error": f"Signup failed: {e}"}), 500
+            return f"Signup failed: {e}", 500
         finally:
             conn.close()
     return render_template('SignUpPage.html')
