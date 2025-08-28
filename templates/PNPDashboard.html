@@ -117,7 +117,23 @@
                 if (alertItem) {
                     const predictionDiv = document.createElement('div');
                     predictionDiv.className = 'prediction';
-                    predictionDiv.textContent = `Prediction: ${data.prediction || 'N/A'}`;
+                    // Parse the prediction string (e.g., "38.77% chance in year 2025")
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        // Extract percentage using regex
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1]; // e.g., "38.77"
+                            // Randomly select a year range
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText; // Fallback if parsing fails
+                        }
+                    }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     alertItem.appendChild(predictionDiv);
                 }
             });
