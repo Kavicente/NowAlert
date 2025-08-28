@@ -276,14 +276,20 @@ def handle_response_submitted(data):
             'driver_gender': data.get('driver_gender')
         }])
         df = pd.get_dummies(df, columns=list(df.columns))  # One-hot encode all categoricals
-        # Align columns with model (pad missing with 0)
-        for col in road_accident_predictor.feature_names_in_:
-            if col not in df.columns:
-                df[col] = 0
-        df = df[road_accident_predictor.feature_names_in_]
-        prediction = road_accident_predictor.predict(df)[0]
+        model = road_accident_predictor
+        if isinstance(road_accident_predictor, dict):
+            model = road_accident_predictor.get('model', road_accident_predictor)
+        if hasattr(model, 'feature_names_in_'):
+            for col in model.feature_names_in_:
+                if col not in df.columns:
+                    df[col] = 0
+            df = df[model.feature_names_in_]
+        prediction = model.predict(df)[0]
+        if hasattr(model, 'predict_proba'):
+            chance = model.predict_proba(df)[0][1] * 100
+            prediction = f"{chance:.2f}% chance"
         random_year = random.randint(2025, 2030)
-        data['prediction'] = f"{prediction} chance in year {random_year}"
+        data['prediction'] = f"{prediction} in year {random_year}"
     except Exception as e:
         logger.error(f"Prediction failed: {e}")
         data['prediction'] = 'prediction_error'
@@ -310,6 +316,9 @@ def handle_response_submitted(data):
         emit('response_submitted', data, room=pnp_room)
     if bfp_room:
         emit('response_submitted', data, room=bfp_room)
+    if 'role' in data:
+        role_room = f"{data['role']}_{municipality or data.get('barangay').lower()}"
+        emit('response_submitted', data, room=role_room)
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}
