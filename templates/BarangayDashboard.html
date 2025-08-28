@@ -16,6 +16,33 @@
         .response-form select, .response-form button { margin: 5px; }
         .clickable-img { cursor: pointer; max-width: 200px; }
         .prediction { margin-top: 10px; font-weight: bold; }
+
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 5px;
+        }
+        .image-modal .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            font-size: 30px;
+            cursor: pointer;
+        }
+
     </style>
 </head>
 <body>
@@ -53,6 +80,11 @@
             <div id="alert-container"></div>
         </section>
         <div id="notification"></div>
+
+        <div id="image-modal" class="image-modal">
+            <span class="close-btn">&times;</span>
+            <img id="modal-image" src="">
+        </div>
     </main>
 
     <script>
@@ -164,6 +196,17 @@
                         ${data.image_classification !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification}</p>` : ''}
                     `;
                     feed.prepend(alertDiv);
+
+                    if (data.image) {
+                        const img = alertDiv.querySelector('.clickable-img');
+                        img.addEventListener('click', () => {
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modalImg.src = `data:image/jpeg;base64,${data.image}`;
+                            modal.style.display = 'flex';
+                        });
+                    }
+                }
                 }
 
                 if (data.lat && data.lon) {
