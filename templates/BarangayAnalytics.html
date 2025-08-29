@@ -6,11 +6,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/analytics.js') }}"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 </head>
 <body>
     <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
     <header class="h1">Barangay {{ barangay }} Reports</header>
-        <p id="datetime">{{ current_datetime }}</p>
+    <p id="datetime">{{ current_datetime }}</p>
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <nav>
@@ -37,18 +38,16 @@
         <div id="roadSection" class="section">
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="roadIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
-            <div class="chart-container"><h2>Road Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
+            <div class="chart-container"><h2>Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
             <div class="chart-container"><h2>Responded Alerts</h2><canvas id="roadRespondedAlertsChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Impact</h2><canvas id="roadWeatherChart"></canvas></div>
+            <div class="chart-container"><h2>Weather Condition</h2><canvas id="roadWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Road Condition</h2><canvas id="roadConditionChart"></canvas></div>
             <div class="chart-container"><h2>Vehicle Types</h2><canvas id="roadVehicleTypesChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Gender</h2><canvas id="roadDriverGenderChart"></canvas></div>
             <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
-            
         </div>
 
-        
         <!-- Fire Incident Section -->
         <div id="fireSection" class="section hidden">
             <header class="header2" id="letterF" class="section hidden">Fire Incident Reports</header>
@@ -64,6 +63,33 @@
 
     <script>
         let charts = {};
+        const socket = io('https://alert-858l.onrender.com');
+
+        socket.on('connect', () => {
+            socket.emit('register_role', {
+                role: 'barangay',
+                barangay: '{{ barangay | lower }}'
+            });
+        });
+
+        socket.on('update_analytics', (data) => {
+            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today') {
+                fetch(`/api/barangay_analytics_data?time=today`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            console.error('Error fetching data:', data.error);
+                            alert('Failed to load analytics data');
+                            return;
+                        }
+                        updateCharts(data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                        alert('Failed to load analytics data');
+                    });
+            }
+        });
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -146,10 +172,10 @@
             charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.accident_type || {}),
+                    labels: Object.keys(data.accident_cause || {}),
                     datasets: [{
-                        label: 'Road Accident Causes',
-                        data: Object.values(data.accident_type || {}),
+                        label: 'Accident Causes',
+                        data: Object.values(data.accident_cause || {}),
                         backgroundColor: '#36A2EB'
                     }]
                 },
@@ -172,10 +198,10 @@
             charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
                 type: 'pie',
                 data: {
-                    labels: Object.keys(data.road_weather || {}),
+                    labels: Object.keys(data.weather || {}),
                     datasets: [{
-                        data: Object.values(data.road_weather || {}),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+                        data: Object.values(data.weather || {}),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']
                     }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
@@ -184,10 +210,10 @@
             charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: Object.keys(data.road_condition || {}),
+                    labels: Object.keys(data.road_conditions || {}),
                     datasets: [{
                         label: 'Road Conditions',
-                        data: Object.values(data.road_condition || {}),
+                        data: Object.values(data.road_conditions || {}),
                         backgroundColor: '#4BC0C0'
                     }]
                 },
@@ -200,7 +226,7 @@
                     labels: Object.keys(data.vehicle_types || {}),
                     datasets: [{
                         data: Object.values(data.vehicle_types || {}),
-                        backgroundColor: ['#FF9F40', '#9966FF', '#FFCE56']
+                        backgroundColor: ['#FF9F40', '#9966FF', '#FFCE56', '#4BC0C0']
                     }]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
