@@ -520,6 +520,33 @@ def download_android_db():
     logger.debug(f"Serving Android database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='AlertNowLocal.db')
 
+@app.route('/api/get_credentials', methods=['GET'])
+def get_credentials():
+    try:
+        conn = get_db_connection()
+        users = conn.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role != "admin"').fetchall()
+        conn.close()
+        credentials = []
+        for user in users:
+            if user['role'] == 'barangay':
+                credentials.append({
+                    'role': user['role'],
+                    'display': user['barangay'] or 'Unknown Barangay',
+                    'contact_no': user['contact_no'],
+                    'password': user['password']
+                })
+            elif user['role'] in ['cdrrmo', 'pnp', 'bfp']:
+                credentials.append({
+                    'role': user['role'],
+                    'display': f"{user['role'].upper()} {user['assigned_municipality'] or 'Unknown Municipality'}",
+                    'contact_no': user['contact_no'],
+                    'password': user['password']
+                })
+        return jsonify(credentials)
+    except Exception as e:
+        logger.error(f"Error fetching credentials: {e}")
+        return jsonify({'error': str(e)}), 500
+
 def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
     if role == 'barangay':
         return f"{barangay}_{contact_no}"

@@ -21,5 +21,22 @@
         <button class="button4" onclick="window.location.href='/signup_muna'">Sign Up</button>
         <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
     </form>
+    <div class="form3" style="background-color: #deeaee; margin-top: 20px; display: block; margin-left: auto; margin-right: auto; color: #000000; text-align: center; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 400px;">
+        <h2>Saved Credentials</h2>
+        {% for cred in credentials %}
+            {% if cred.role in ['cdrrmo', 'pnp', 'bfp'] %}
+                <p style="cursor: pointer;" onclick="autoLogin('{{ cred.role }}', '{{ cred.contact_no }}', '{{ cred.password }}', '{{ cred.display.split(' ')[1] }}')">{{ cred.display }}</p>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <script>
+        async function autoLogin(role, contact_no, password, municipality) {
+            document.getElementById('role').value = role;
+            document.getElementById('username').value = contact_no;
+            document.getElementById('password').value = password;
+            document.getElementById('municipality').value = municipality || '';
+            document.getElementById('loginForm').submit();
+        }
+    </script>
 </body>
 </html>

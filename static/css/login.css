@@ -100,3 +100,11 @@ body {
 .form2 button:hover {
     background-color: #66c2ff;
 }
+.form3 p {
+    margin: 5px 0;
+    cursor: pointer;
+}
+
+.form3 p:hover {
+    text-decoration: underline;
+}
