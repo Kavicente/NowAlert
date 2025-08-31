@@ -514,12 +514,10 @@ def download_db():
 
 @app.route('/download_android_db', methods=['GET'])
 def download_android_db():
-    db_path = os.path.join('/database', 'AlertNowLocal.db')
-    if not os.path.exists(db_path):
-        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
     if not os.path.exists(db_path):
         return "Database file not found", 404
-    logger.debug(f"Serving database from: {db_path}")
+    logger.debug(f"Serving Android database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='AlertNowLocal.db')
 
 def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
