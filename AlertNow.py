@@ -498,7 +498,7 @@ def download_db():
 
 @app.route('/download_android_db', methods=['GET'])
 def download_android_db():
-    db_path = os.path.join('/database', 'users_web.db')
+    db_path = os.path.join('/database', 'AlertNowLocal.db')
     if not os.path.exists(db_path):
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
     if not os.path.exists(db_path):
