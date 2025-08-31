@@ -61,7 +61,7 @@ def get_db_connection():
 
 
 def get_android_db_connection():
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNow.db')
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -495,6 +495,16 @@ def download_db():
         return "Database file not found", 404
     logger.debug(f"Serving database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='users_web.db')
+
+@app.route('/download_android_db', methods=['GET'])
+def download_android_db():
+    db_path = os.path.join('/database', 'users_web.db')
+    if not os.path.exists(db_path):
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+    if not os.path.exists(db_path):
+        return "Database file not found", 404
+    logger.debug(f"Serving database from: {db_path}")
+    return send_file(db_path, as_attachment=True, download_name='AlertNowLocal.db')
 
 def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
     if role == 'barangay':
@@ -1347,7 +1357,7 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
         
-        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNow.db')
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
@@ -1386,7 +1396,7 @@ if __name__ == '__main__':
         ''')
         conn.commit()
         conn.close()
-        logger.info("Android database 'AlertNow.db' initialized successfully or already exists.")
+        logger.info("Android database 'AlertNowLocal.db' initialized successfully or already exists.")
     except Exception as e:
         logger.error(f"Failed to initialize Android database: {e}")
 
