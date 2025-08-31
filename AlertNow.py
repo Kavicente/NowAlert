@@ -1370,13 +1370,14 @@ if __name__ == '__main__':
         logger.info("Database 'users_web.db' initialized successfully or already exists.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
-        
-        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
+                users TEXT,
                 username TEXT PRIMARY KEY,
                 password TEXT NOT NULL,
                 role TEXT NOT NULL,
