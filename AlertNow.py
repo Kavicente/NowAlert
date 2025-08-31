@@ -59,6 +59,13 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+
+def get_android_db_connection():
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNow.db')
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
 def get_municipality_from_barangay(barangay):
     for municipality, barangays in barangay_coords.items():
         if barangay in barangays:
@@ -84,6 +91,66 @@ def classify_image(base64_image):
     except Exception as e:
         logger.error(f"Image classification failed: {e}")
         return 'unknown'
+
+@app.route('/api/android_signup', methods=['POST'])
+def android_signup():
+    data = request.json
+    conn = get_android_db_connection()
+    try:
+        username = data.get('username')
+        password = data.get('password')
+        role = data.get('role')
+        first_name = data.get('first_name')
+        middle_name = data.get('middle_name')
+        last_name = data.get('last_name')
+        age = data.get('age')
+        contact_no = data.get('contact_no')
+        house_no = data.get('house_no')
+        street_no = data.get('street_no')
+        barangay = data.get('barangay')
+        municipality = data.get('municipality')
+        province = data.get('province')
+        position = data.get('position')
+        synced = 1
+
+        conn.execute('''
+            INSERT INTO users (username, password, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position, synced)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (username, password, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position, synced))
+        conn.commit()
+        return jsonify({'message': 'Signup successful'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+    finally:
+        conn.close()
+
+@app.route('/api/android_login', methods=['POST'])
+def android_login():
+    data = request.json
+    conn = get_android_db_connection()
+    try:
+        if 'username' in data:
+            username = data['username']
+            password = data['password']
+            user = conn.execute('SELECT role, barangay FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
+            if user:
+                return jsonify({'role': user['role'], 'barangay': user['barangay']})
+            else:
+                return jsonify({'error': 'Invalid credentials'}), 401
+        else:
+            role = data['role']
+            municipality = data['municipality']
+            contact_no = data['contact_no']
+            password = data['password']
+            user = conn.execute('SELECT role FROM users WHERE role = ? AND municipality = ? AND contact_no = ? AND password = ?', (role, municipality, contact_no, password)).fetchone()
+            if user:
+                return jsonify({'role': user['role']})
+            else:
+                return jsonify({'error': 'Invalid credentials'}), 401
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+    finally:
+        conn.close()
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
@@ -1279,6 +1346,49 @@ if __name__ == '__main__':
         logger.info("Database 'users_web.db' initialized successfully or already exists.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
+        
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNow.db')
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL,
+                first_name TEXT,
+                middle_name TEXT,
+                last_name TEXT,
+                age INTEGER,
+                contact_no TEXT,
+                house_no TEXT,
+                street_no TEXT,
+                barangay TEXT,
+                municipality TEXT,
+                province TEXT,
+                position TEXT,
+                synced INTEGER DEFAULT 0
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT NOT NULL,
+                synced INTEGER DEFAULT 0
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT NOT NULL,
+                synced INTEGER DEFAULT 0
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Android database 'AlertNow.db' initialized successfully or already exists.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Android database: {e}")
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
