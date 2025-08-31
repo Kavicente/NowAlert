@@ -99,7 +99,7 @@ def android_signup():
     try:
         username = data.get('username')
         password = data.get('password')
-        role = data.get('role')
+        role = data.get('role').lower()
         first_name = data.get('first_name')
         middle_name = data.get('middle_name')
         last_name = data.get('last_name')
@@ -118,8 +118,10 @@ def android_signup():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (username, password, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position, synced))
         conn.commit()
+        logger.info(f"User {username} signed up successfully with role {role}")
         return jsonify({'message': 'Signup successful'})
     except Exception as e:
+        logger.error(f"Signup failed for {username}: {e}")
         return jsonify({'error': str(e)}), 400
     finally:
         conn.close()
@@ -132,22 +134,28 @@ def android_login():
         if 'username' in data:
             username = data['username']
             password = data['password']
-            user = conn.execute('SELECT role, barangay FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
+            user = conn.execute('SELECT role, barangay, house_no, street_no FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
             if user:
-                return jsonify({'role': user['role'], 'barangay': user['barangay']})
+                logger.info(f"Login successful for username: {username}, role: {user['role']}")
+                return jsonify({'role': user['role'], 'barangay': user['barangay'] or '', 'house_no': user['house_no'] or '', 'street_no': user['street_no'] or ''})
             else:
+                logger.warning(f"Invalid credentials for username: {username}")
                 return jsonify({'error': 'Invalid credentials'}), 401
         else:
-            role = data['role']
+            role = data['role'].lower()
             municipality = data['municipality']
             contact_no = data['contact_no']
             password = data['password']
-            user = conn.execute('SELECT role FROM users WHERE role = ? AND municipality = ? AND contact_no = ? AND password = ?', (role, municipality, contact_no, password)).fetchone()
+            user = conn.execute('SELECT role, municipality FROM users WHERE role = ? AND municipality = ? AND contact_no = ? AND password = ?', 
+                                (role, municipality, contact_no, password)).fetchone()
             if user:
-                return jsonify({'role': user['role']})
+                logger.info(f"Login successful for contact_no: {contact_no}, role: {user['role']}")
+                return jsonify({'role': user['role'], 'municipality': user['municipality'] or ''})
             else:
+                logger.warning(f"Invalid credentials for contact_no: {contact_no}, role: {role}")
                 return jsonify({'error': 'Invalid credentials'}), 401
     except Exception as e:
+        logger.error(f"Login error: {e}")
         return jsonify({'error': str(e)}), 400
     finally:
         conn.close()
@@ -165,13 +173,16 @@ def admin_login():
             session['role'] = 'admin'
             session['unique_id'] = f"admin_{username}"
             session.permanent = True
+            logger.info(f"Admin login successful for {username}")
             return redirect(url_for('admin_dashboard'))
+        logger.warning(f"Invalid admin credentials for {username}")
         return jsonify({'error': 'Invalid credentials'}), 401
     return render_template('admin_login.html')
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if 'role' not in session or session['role'] != 'admin':
+        logger.warning("Unauthorized access to admin_dashboard")
         return redirect(url_for('admin_login'))
     conn = get_db_connection()
     users = conn.execute('SELECT * FROM users WHERE role != "admin"').fetchall()
@@ -181,9 +192,10 @@ def admin_dashboard():
 @app.route('/admin/create_user', methods=['POST'])
 def admin_create_user():
     if 'role' not in session or session['role'] != 'admin':
+        logger.warning("Unauthorized access to admin_create_user")
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.form
-    role = data.get('role')
+    role = data.get('role').lower()
     contact_no = data.get('contact_no')
     password = data.get('password')
     barangay = data.get('barangay') if role == 'barangay' else None
@@ -193,8 +205,10 @@ def admin_create_user():
         conn.execute('INSERT INTO users (role, contact_no, password, barangay, assigned_municipality) VALUES (?, ?, ?, ?, ?)',
                     (role, contact_no, password, barangay, municipality))
         conn.commit()
+        logger.info(f"User created with contact_no: {contact_no}, role: {role}")
     except sqlite3.IntegrityError:
         conn.close()
+        logger.error(f"User creation failed, contact_no {contact_no} already exists")
         return jsonify({'error': 'User already exists'}), 400
     conn.close()
     return jsonify({'message': 'User created successfully'})
@@ -202,11 +216,13 @@ def admin_create_user():
 @app.route('/admin/delete_user/<contact_no>', methods=['POST'])
 def admin_delete_user(contact_no):
     if 'role' not in session or session['role'] != 'admin':
+        logger.warning("Unauthorized access to admin_delete_user")
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db_connection()
     conn.execute('DELETE FROM users WHERE contact_no = ?', (contact_no,))
     conn.commit()
     conn.close()
+    logger.info(f"User deleted with contact_no: {contact_no}")
     return jsonify({'message': 'User deleted successfully'})
 
 @socketio.on('disconnect')
