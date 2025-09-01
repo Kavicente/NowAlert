@@ -55,6 +55,8 @@ today_responses = []
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+    if not os.path.exists(os.path.dirname(db_path)):
+        os.makedirs(os.path.dirname(db_path))
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -549,10 +551,10 @@ def get_credentials():
         logger.error(f"Error fetching credentials: {e}")
         return jsonify({'error': str(e)}), 500
 
-def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
+def construct_unique_id(role, barangay, municipality, contact_no):
     if role == 'barangay':
         return f"{barangay}_{contact_no}"
-    return f"{role}_{assigned_municipality}_{contact_no}"
+    return f"{role}_{municipality}_{contact_no}"
 
 @app.route('/')
 def home():
@@ -596,13 +598,12 @@ def signup_barangay():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    logger.debug("Accessing /login with method: %s", request.method)
     if request.method == 'POST':
         barangay = request.form['barangay']
         contact_no = request.form['contact_no']
         password = request.form['password']
-        unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
-       
+        unique_id = f"{barangay}_{contact_no}"
+        
         conn = get_db_connection()
         try:
             user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ? AND role = ?',
@@ -613,22 +614,20 @@ def login():
                 session.permanent = True
                 logger.info(f"Login successful for barangay: {barangay}, contact_no: {contact_no}")
                 return redirect(url_for('barangay_dashboard'))
-            else:
-                logger.warning(f"Invalid credentials for barangay: {barangay}, contact_no: {contact_no}")
-                return "Invalid credentials", 401
+            logger.warning(f"Invalid credentials for barangay: {barangay}, contact_no: {contact_no}")
+            return "Invalid credentials", 401
         except Exception as e:
             logger.error(f"Login error for {unique_id}: {e}")
             return f"Login failed: {e}", 500
         finally:
             conn.close()
-   
-    # Fetch credentials directly from users_web.db
+    
     try:
         conn = get_db_connection()
-        users = conn.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role = "barangay"').fetchall()
+        users = conn.execute('SELECT barangay, contact_no, password FROM users WHERE role = "barangay"').fetchall()
         credentials = [
             {
-                'role': user['role'],
+                'role': 'barangay',
                 'display': user['barangay'] or 'Unknown Barangay',
                 'contact_no': user['contact_no'],
                 'password': user['password'],
@@ -637,9 +636,9 @@ def login():
         ]
         conn.close()
     except Exception as e:
-        credentials = []
         logger.error(f"Error fetching credentials: {e}")
-   
+        credentials = []
+    
     return render_template('LogInPage.html', credentials=credentials)
 
 @app.route('/api/login', methods=['POST'])
@@ -702,8 +701,8 @@ def login_cdrrmo_pnp_bfp():
         contact_no = request.form['contact_no']
         password = request.form['password']
         role = request.form['role'].lower()
-        unique_id = construct_unique_id(role, assigned_municipality=municipality, contact_no=contact_no)
-       
+        unique_id = f"{role}_{municipality}_{contact_no}"
+        
         conn = get_db_connection()
         try:
             user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ?',
@@ -719,19 +718,17 @@ def login_cdrrmo_pnp_bfp():
                     return redirect(url_for('pnp_dashboard'))
                 elif role == 'bfp':
                     return redirect(url_for('bfp_dashboard'))
-            else:
-                logger.warning(f"Invalid credentials for role: {role}, contact_no: {contact_no}")
-                return "Invalid credentials", 401
+            logger.warning(f"Invalid credentials for role: {role}, contact_no: {contact_no}")
+            return "Invalid credentials", 401
         except Exception as e:
             logger.error(f"Login error for {unique_id}: {e}")
             return f"Login failed: {e}", 500
         finally:
             conn.close()
-   
-    # Fetch credentials directly from users_web.db
+    
     try:
         conn = get_db_connection()
-        users = conn.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role IN ("cdrrmo", "pnp", "bfp")').fetchall()
+        users = conn.execute('SELECT role, assigned_municipality, contact_no, password FROM users WHERE role IN ("cdrrmo", "pnp", "bfp")').fetchall()
         credentials = [
             {
                 'role': user['role'],
@@ -743,9 +740,9 @@ def login_cdrrmo_pnp_bfp():
         ]
         conn.close()
     except Exception as e:
-        credentials = []
         logger.error(f"Error fetching credentials: {e}")
-   
+        credentials = []
+    
     return render_template('CDRRMOPNPBFPIn.html', credentials=credentials)
 
 @app.route('/login', methods=['GET', 'POST'])

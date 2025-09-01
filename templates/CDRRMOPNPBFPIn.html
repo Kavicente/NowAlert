@@ -5,12 +5,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
     <script>
         function autoLogin(role, municipality, contactNo, password) {
-            // Populate the form fields
+            console.log('AutoLogin:', role, municipality, contactNo, password);
             document.getElementById('role').value = role;
             document.getElementById('municipality').value = municipality;
             document.getElementById('contact_no').value = contactNo;
             document.getElementById('password').value = password;
-            // Submit the form
+            console.log('Submitting form');
             document.getElementById('loginForm').submit();
         }
     </script>
@@ -34,7 +34,7 @@
         <h2>Quick Login</h2>
         <div class="form3">
             {% for credential in credentials %}
-                <p onclick="autoLogin('{{ credential.role }}', '{{ credential.municipality | default('') }}', '{{ credential.contact_no }}', '{{ credential.password }}')">
+                <p onclick="autoLogin('{{ credential.role }}', '{{ credential.municipality | default('') }}', '{{ credential.contact_no }}')">
                     {{ credential.display }}
                 </p>
             {% endfor %}

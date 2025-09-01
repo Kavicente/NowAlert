@@ -11,7 +11,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def login_cdrmo_pnp_bfp():
+def login_cdrrmo_pnp_bfp():
     if request.method == 'POST':
         municipality = request.form['municipality']
         contact_no = request.form['contact_no']
