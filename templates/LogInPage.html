@@ -6,10 +6,12 @@
 <body>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
      <script>
-        async function autoLogin(contact_no, password, barangay) {
-            document.getElementById('contact_no').value = contact_no;
-            document.getElementById('password').value = password;
+        function autoLogin(barangay, contactNo, password) {
+            // Populate the form fields
             document.getElementById('barangay').value = barangay;
+            document.getElementById('contact_no').value = contactNo;
+            document.getElementById('password').value = password;
+            // Submit the form
             document.getElementById('loginForm').submit();
         }
     </script>
@@ -22,12 +24,12 @@
         <button class="button3" type="submit">Log In</button>
         <button class="button4" onclick="window.location.href='/signup_na'">Sign Up</button>
         <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
-        <div class="form3" style="margin-top: 20px;">
-            <h2>Quick Login</h2>
-            {% for cred in credentials %}
-                {% if cred.role == 'barangay' %}
-                    <p style="cursor: pointer;" onclick="autoLogin('{{ cred.contact_no }}', '{{ cred.password }}', '{{ cred.barangay }}')">{{ cred.display }}</p>
-                {% endif %}
+        <h2>Quick Login</h2>
+        <div class="form3">
+            {% for credential in credentials %}
+                <p onclick="autoLogin('{{ credential.barangay | default('') }}', '{{ credential.contact_no }}', '{{ credential.password }}')">
+                    {{ credential.display }}
+                </p>
             {% endfor %}
         </div>
     </form>
