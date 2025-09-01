@@ -30,13 +30,17 @@
         <button class="button4" onclick="window.location.href='/signup_muna'">Sign Up</button>
         <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
         <div class="form3" style="margin-top: 20px;">
-            <h2>Quick Login</h2>
+        <h2>Quick Login</h2>
+        {% if credentials %}
             {% for cred in credentials %}
                 {% if cred.role in ['cdrrmo', 'pnp', 'bfp'] %}
-                    <p style="cursor: pointer;" onclick="autoLogin('{{ cred.role }}', '{{ cred.contact_no }}', '{{ cred.password }}', '{{ cred.display.split(' ')[1] if cred.display.split(' ')[1] else '' }}')">{{ cred.display }}</p>
+                    <p style="cursor: pointer;" onclick="autoLogin('{{ cred.role }}', '{{ cred.contact_no }}', '{{ cred.password }}', '{{ cred.municipality }}')">{{ cred.display }}</p>
                 {% endif %}
             {% endfor %}
-        </div>
+        {% else %}
+            <p>No saved credentials found.</p>
+        {% endif %}
+    </div>
     </form>
 </body>
 </html>

@@ -1,38 +1,55 @@
-from flask import request, redirect, url_for, render_template
+from flask import request, redirect, url_for, render_template, session
 import requests
+from AlertNow import app, get_db_connection
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def login_page():
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        barangay = request.form['barangay']
-        payload = {'username': username, 'password': password, 'barangay': barangay}
-        response = requests.post('https://alert-858l.onrender.com/login', json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            role = data.get('role')
-            if role == 'barangay':
+        contact_no = request.form.get('contact_no')
+        password = request.form.get('password')
+        barangay = request.form.get('barangay')
+        
+        conn = get_db_connection()
+        try:
+            user = conn.execute('SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND barangay = ?',
+                               ('barangay', contact_no, password, barangay)).fetchone()
+            if user:
+                session['role'] = 'barangay'
+                session['unique_id'] = f"{barangay}_{contact_no}"
+                session.permanent = True
+                logger.info(f"Login successful for barangay {barangay}")
                 return redirect(url_for('barangay_dashboard'))
-            elif role == 'cdrrmo':
-                return redirect(url_for('cdrrmo_dashboard'))
-            elif role == 'pnp':
-                return redirect(url_for('pnp_dashboard'))
-            elif role == 'bfp':
-                return redirect(url_for('bfp_dashboard'))
-        return "Invalid credentials", 401
+            else:
+                logger.warning(f"Invalid credentials for contact_no: {contact_no}, barangay: {barangay}")
+                return render_template('LogInPage.html', error="Invalid credentials", credentials=[])
+        except Exception as e:
+            logger.error(f"Login failed: {e}")
+            return render_template('LogInPage.html', error=str(e), credentials=[])
+        finally:
+            conn.close()
     
     # Fetch credentials for display
     try:
-        response = requests.get('https://alert-858l.onrender.com/api/get_credentials')
-        if response.status_code == 200:
-            credentials = response.json()
-        else:
-            credentials = []
-    except Exception as e:
+        conn = get_db_connection()
+        users = conn.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role != "admin"').fetchall()
         credentials = []
-        print(f"Error fetching credentials: {e}")
-    
-    return render_template('LogInPage.html', credentials=credentials)
+        for user in users:
+            if user['role'] == 'barangay':
+                credentials.append({
+                    'role': user['role'],
+                    'display': user['barangay'] or 'Unknown Barangay',
+                    'contact_no': user['contact_no'],
+                    'password': user['password'],
+                    'barangay': user['barangay'] or ''
+                })
+        conn.close()
+        return render_template('LogInPage.html', credentials=credentials)
+    except Exception as e:
+        logger.error(f"Error fetching credentials: {e}")
+        return render_template('LogInPage.html', error=str(e), credentials=[])
 
 def choose_login_type():
     return render_template('LoginType.html')
