@@ -527,7 +527,6 @@ def get_credentials():
     try:
         conn = get_db_connection()
         users = conn.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role != "admin"').fetchall()
-        conn.close()
         credentials = []
         for user in users:
             if user['role'] == 'barangay':
@@ -546,6 +545,7 @@ def get_credentials():
                     'password': user['password'],
                     'municipality': user['assigned_municipality']
                 })
+        conn.close()
         return jsonify(credentials)
     except Exception as e:
         logger.error(f"Error fetching credentials: {e}")
@@ -612,13 +612,13 @@ def login():
                 session['role'] = 'barangay'
                 session['unique_id'] = unique_id
                 session.permanent = True
-                logger.info(f"Login successful for barangay: {barangay}, contact_no: {contact_no}")
+                logger.info(f"Login successful for {unique_id}")
                 return redirect(url_for('barangay_dashboard'))
-            logger.warning(f"Invalid credentials for barangay: {barangay}, contact_no: {contact_no}")
+            logger.warning(f"Invalid credentials for {unique_id}")
             return "Invalid credentials", 401
         except Exception as e:
             logger.error(f"Login error for {unique_id}: {e}")
-            return f"Login failed: {e}", 500
+            return f"Login error: {e}", 500
         finally:
             conn.close()
     
@@ -711,18 +711,18 @@ def login_cdrrmo_pnp_bfp():
                 session['role'] = role
                 session['unique_id'] = unique_id
                 session.permanent = True
-                logger.info(f"Login successful for role: {role}, contact_no: {contact_no}")
+                logger.info(f"Login successful for {unique_id}")
                 if role == 'cdrrmo':
                     return redirect(url_for('cdrrmo_dashboard'))
                 elif role == 'pnp':
                     return redirect(url_for('pnp_dashboard'))
                 elif role == 'bfp':
                     return redirect(url_for('bfp_dashboard'))
-            logger.warning(f"Invalid credentials for role: {role}, contact_no: {contact_no}")
+            logger.warning(f"Invalid credentials for {unique_id}")
             return "Invalid credentials", 401
         except Exception as e:
             logger.error(f"Login error for {unique_id}: {e}")
-            return f"Login failed: {e}", 500
+            return f"Login error: {e}", 500
         finally:
             conn.close()
     

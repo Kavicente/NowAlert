@@ -1,8 +1,11 @@
 from flask import request, redirect, url_for, render_template, session
 import requests
-
 import sqlite3
 import os
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -27,8 +30,13 @@ def login_page():
                 session['role'] = 'barangay'
                 session['unique_id'] = unique_id
                 session.permanent = True
+                logger.info(f"Login successful for {unique_id}")
                 return redirect(url_for('barangay_dashboard'))
+            logger.warning(f"Invalid credentials for {unique_id}")
             return "Invalid credentials", 401
+        except Exception as e:
+            logger.error(f"Login error for {unique_id}: {e}")
+            return f"Login error: {e}", 500
         finally:
             conn.close()
     
@@ -46,7 +54,7 @@ def login_page():
         ]
         conn.close()
     except Exception as e:
-        print(f"Error fetching credentials: {e}")
+        logger.error(f"Error fetching credentials: {e}")
         credentials = []
     
     return render_template('LogInPage.html', credentials=credentials)

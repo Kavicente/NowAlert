@@ -1,7 +1,10 @@
-from flask import request, redirect, url_for, render_template,session
-import requests
+from flask import request, redirect, url_for, render_template, session
 import sqlite3
 import os
+import logging
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -11,7 +14,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def login_cdrrmo_pnp_bfp():
+def login_cdrmo_pnp_bfp():
     if request.method == 'POST':
         municipality = request.form['municipality']
         contact_no = request.form['contact_no']
@@ -27,13 +30,18 @@ def login_cdrrmo_pnp_bfp():
                 session['role'] = role
                 session['unique_id'] = unique_id
                 session.permanent = True
+                logger.info(f"Login successful for {unique_id}")
                 if role == 'cdrrmo':
                     return redirect(url_for('cdrrmo_dashboard'))
                 elif role == 'pnp':
                     return redirect(url_for('pnp_dashboard'))
                 elif role == 'bfp':
                     return redirect(url_for('bfp_dashboard'))
+            logger.warning(f"Invalid credentials for {unique_id}")
             return "Invalid credentials", 401
+        except Exception as e:
+            logger.error(f"Login error for {unique_id}: {e}")
+            return f"Login error: {e}", 500
         finally:
             conn.close()
     
@@ -51,7 +59,7 @@ def login_cdrrmo_pnp_bfp():
         ]
         conn.close()
     except Exception as e:
-        print(f"Error fetching credentials: {e}")
+        logger.error(f"Error fetching credentials: {e}")
         credentials = []
     
     return render_template('CDRRMOPNPBFPIn.html', credentials=credentials)

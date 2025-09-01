@@ -5,36 +5,7 @@
 </head>
 <body>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
-     <script>
-        function autoLogin(role, municipality, contactNo, password) {
-            console.log('AutoLogin:', role, municipality, contactNo, password);
-            document.getElementById('role').value = role;
-            document.getElementById('municipality').value = municipality;
-            document.getElementById('contact_no').value = contactNo;
-            document.getElementById('password').value = password;
-            console.log('Submitting form');
-            document.getElementById('loginForm').submit();
-        }
-
-        function loadCredentials() {
-        fetch('/api/get_credentials')
-            .then(response => response.json())
-            .then(data => {
-                const form3 = document.querySelector('.form3');
-                form3.innerHTML = '';
-                data.forEach(cred => {
-                    if (cred.role === 'barangay') {
-                        const p = document.createElement('p');
-                        p.textContent = cred.display;
-                        p.onclick = () => autoLogin(cred.barangay, cred.contact_no, cred.password);
-                        form3.appendChild(p);
-                    }
-                });
-            })
-            .catch(error => console.error('Error fetching credentials:', error));
-    }
-    window.onload = loadCredentials;
-    </script>
+     
     <form class="form2" action="/login" method="post">
         <h1>Log In</h1>
         <label>Barangay: <input type="text" name="barangay" required></label><br>
@@ -47,12 +18,22 @@
         <h2>Quick Login</h2>
         <div class="form3">
             {% for credential in credentials %}
-                <p onclick="autoLogin('{{ credential.role }}', '{{ credential.municipality | default('') }}', '{{ credential.contact_no }}', '{{ credential.password }}')">
-                    {{ credential.display }}
+                <p onclick="autoLogin('{{ credential.barangay | default('') | safe }}', '{{ credential.contact_no | safe }}', '{{ credential.password | safe }}')">
+                    {{ credential.display | safe }}
                 </p>
             {% endfor %}
         </div>
     </form>
+    <script>
+        function autoLogin(barangay, contactNo, password) {
+            console.log('AutoLogin:', barangay, contactNo, password);
+            document.getElementById('barangay').value = barangay;
+            document.getElementById('contact_no').value = contactNo;
+            document.getElementById('password').value = password;
+            console.log('Submitting form');
+            document.getElementById('loginForm').submit();
+        }
+    </script>
 </body>
 </html>
 

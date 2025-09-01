@@ -3,17 +3,7 @@
 <head>
     <title>Log In CDRRMO or PNP or BFP</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
-    <script>
-        function autoLogin(role, municipality, contactNo, password) {
-            console.log('AutoLogin:', role, municipality, contactNo, password);
-            document.getElementById('role').value = role;
-            document.getElementById('municipality').value = municipality;
-            document.getElementById('contact_no').value = contactNo;
-            document.getElementById('password').value = password;
-            console.log('Submitting form');
-            document.getElementById('loginForm').submit();
-        }
-    </script>
+    
 </head>
 <body>
     <h1 class="h1">Log In CDRRMO or PNP or BFP</h1>
@@ -34,11 +24,22 @@
         <h2>Quick Login</h2>
         <div class="form3">
             {% for credential in credentials %}
-                <p onclick="autoLogin('{{ credential.role }}', '{{ credential.municipality | default('') }}', '{{ credential.contact_no }}')">
-                    {{ credential.display }}
+                <p onclick="autoLogin('{{ credential.role | safe }}', '{{ credential.municipality | default('') | safe }}', '{{ credential.contact_no | safe }}', '{{ credential.password | safe }}')">
+                    {{ credential.display | safe }}
                 </p>
             {% endfor %}
         </div>
     </form>
+    <script>
+        function autoLogin(role, municipality, contactNo, password) {
+            console.log('AutoLogin:', role, municipality, contactNo, password);
+            document.getElementById('role').value = role;
+            document.getElementById('municipality').value = municipality;
+            document.getElementById('contact_no').value = contactNo;
+            document.getElementById('password').value = password;
+            console.log('Submitting form');
+            document.getElementById('loginForm').submit();
+        }
+    </script>
 </body>
 </html>
