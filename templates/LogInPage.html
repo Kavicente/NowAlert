@@ -5,6 +5,14 @@
 </head>
 <body>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <script>
+        async function autoLogin(contact_no, password, barangay) {
+            document.getElementById('contact_no').value = contact_no;
+            document.getElementById('password').value = password;
+            document.getElementById('barangay').value = barangay;
+            document.getElementById('loginForm').submit();
+        }
+    </script>
     <form class="form2" action="/login" method="post">
         <h1>Log In</h1>
         <label>Barangay: <input type="text" name="barangay" required></label><br>
@@ -14,24 +22,15 @@
         <button class="button3" type="submit">Log In</button>
         <button class="button4" onclick="window.location.href='/signup_na'">Sign Up</button>
         <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
-
+        <div class="form3" style="margin-top: 20px;">
+            <h2>Quick Login</h2>
+            {% for cred in credentials %}
+                {% if cred.role == 'barangay' %}
+                    <p style="cursor: pointer;" onclick="autoLogin('{{ cred.contact_no }}', '{{ cred.password }}', '{{ cred.display }}')">{{ cred.display }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
     </form>
-    <div class="form3" style="background-color: #deeaee; margin-top: 20px; display: block; margin-left: auto; margin-right: auto; color: #000000; text-align: center; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 400px;">
-        <h2>Saved Credentials</h2>
-        {% for cred in credentials %}
-            {% if cred.role == 'barangay' %}
-                <p style="cursor: pointer;" onclick="autoLogin('{{ cred.contact_no }}', '{{ cred.password }}', '{{ cred.display }}')">{{ cred.display }}</p>
-            {% endif %}
-        {% endfor %}
-    </div>
-    <script>
-        async function autoLogin(username, password, barangay) {
-            document.getElementById('username').value = username;
-            document.getElementById('password').value = password;
-            document.getElementById('barangay').value = barangay;
-            document.getElementById('loginForm').submit();
-        }
-    </script>
 </body>
 </html>
 
