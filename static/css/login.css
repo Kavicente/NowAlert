@@ -101,9 +101,20 @@ body {
 .form2 button:hover {
     background-color: #66c2ff;
 }
+.form3 {
+    text-align: center;
+}
+
+.form3 h2 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #000000;
+}
+
 .form3 p {
     margin: 5px 0;
     cursor: pointer;
+    color: #000000;
 }
 
 .form3 p:hover {
