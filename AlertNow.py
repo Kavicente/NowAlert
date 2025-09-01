@@ -55,8 +55,6 @@ today_responses = []
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
-    if not os.path.exists(os.path.dirname(db_path)):
-        os.makedirs(os.path.dirname(db_path))
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -527,6 +525,7 @@ def get_credentials():
     try:
         conn = get_db_connection()
         users = conn.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role != "admin"').fetchall()
+        conn.close()
         credentials = []
         for user in users:
             if user['role'] == 'barangay':
@@ -534,27 +533,24 @@ def get_credentials():
                     'role': user['role'],
                     'display': user['barangay'] or 'Unknown Barangay',
                     'contact_no': user['contact_no'],
-                    'password': user['password'],
-                    'barangay': user['barangay']
+                    'password': user['password']
                 })
             elif user['role'] in ['cdrrmo', 'pnp', 'bfp']:
                 credentials.append({
                     'role': user['role'],
                     'display': f"{user['role'].upper()} {user['assigned_municipality'] or 'Unknown Municipality'}",
                     'contact_no': user['contact_no'],
-                    'password': user['password'],
-                    'municipality': user['assigned_municipality']
+                    'password': user['password']
                 })
-        conn.close()
         return jsonify(credentials)
     except Exception as e:
         logger.error(f"Error fetching credentials: {e}")
         return jsonify({'error': str(e)}), 500
 
-def construct_unique_id(role, barangay, municipality, contact_no):
+def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
     if role == 'barangay':
         return f"{barangay}_{contact_no}"
-    return f"{role}_{municipality}_{contact_no}"
+    return f"{role}_{assigned_municipality}_{contact_no}"
 
 @app.route('/')
 def home():
@@ -598,48 +594,27 @@ def signup_barangay():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    logger.debug("Accessing /login with method: %s", request.method)
     if request.method == 'POST':
         barangay = request.form['barangay']
         contact_no = request.form['contact_no']
         password = request.form['password']
-        unique_id = f"{barangay}_{contact_no}"
+        unique_id = construct_unique_id('barangay', barangay=barangay, contact_no=contact_no)
         
         conn = get_db_connection()
-        try:
-            user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ? AND role = ?',
-                                (barangay, contact_no, password, 'barangay')).fetchone()
-            if user:
-                session['role'] = 'barangay'
-                session['unique_id'] = unique_id
-                session.permanent = True
-                logger.info(f"Login successful for {unique_id}")
-                return redirect(url_for('barangay_dashboard'))
-            logger.warning(f"Invalid credentials for {unique_id}")
-            return "Invalid credentials", 401
-        except Exception as e:
-            logger.error(f"Login error for {unique_id}: {e}")
-            return f"Login error: {e}", 500
-        finally:
-            conn.close()
-    
-    try:
-        conn = get_db_connection()
-        users = conn.execute('SELECT barangay, contact_no, password FROM users WHERE role = "barangay"').fetchall()
-        credentials = [
-            {
-                'role': 'barangay',
-                'display': user['barangay'] or 'Unknown Barangay',
-                'contact_no': user['contact_no'],
-                'password': user['password'],
-                'barangay': user['barangay']
-            } for user in users
-        ]
+        user = conn.execute('''
+            SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?
+        ''', (barangay, contact_no, password)).fetchone()
         conn.close()
-    except Exception as e:
-        logger.error(f"Error fetching credentials: {e}")
-        credentials = []
-    
-    return render_template('LogInPage.html', credentials=credentials)
+        
+        if user:
+            session['unique_id'] = unique_id
+            session['role'] = user['role']
+            logger.debug(f"Web login successful for barangay: {unique_id}")
+            return redirect(url_for('barangay_dashboard'))
+        logger.warning(f"Web login failed for unique_id: {unique_id}")
+        return "Invalid credentials", 401
+    return render_template('LogInPage.html')
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -696,54 +671,42 @@ def signup_cdrrmo_pnp_bfp():
 
 @app.route('/login_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
 def login_cdrrmo_pnp_bfp():
+    logger.debug("Accessing /login_cdrrmo_pnp_bfp with method: %s", request.method)
     if request.method == 'POST':
-        municipality = request.form['municipality']
+        role = request.form['role'].lower()
+        if 'role' not in request.form:
+            logger.error("Role field is missing in the form data")
+            return "Role is required", 400
+        assigned_municipality = request.form['municipality']
         contact_no = request.form['contact_no']
         password = request.form['password']
-        role = request.form['role'].lower()
-        unique_id = f"{role}_{municipality}_{contact_no}"
+        
+        if role not in ['cdrrmo', 'pnp', 'bfp']:
+            logger.error(f"Invalid role provided: {role}")
+            return "Invalid role", 400
+        
+        logger.debug(f"Login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
         
         conn = get_db_connection()
-        try:
-            user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ?',
-                                (role, municipality, contact_no, password)).fetchone()
-            if user:
-                session['role'] = role
-                session['unique_id'] = unique_id
-                session.permanent = True
-                logger.info(f"Login successful for {unique_id}")
-                if role == 'cdrrmo':
-                    return redirect(url_for('cdrrmo_dashboard'))
-                elif role == 'pnp':
-                    return redirect(url_for('pnp_dashboard'))
-                elif role == 'bfp':
-                    return redirect(url_for('bfp_dashboard'))
-            logger.warning(f"Invalid credentials for {unique_id}")
-            return "Invalid credentials", 401
-        except Exception as e:
-            logger.error(f"Login error for {unique_id}: {e}")
-            return f"Login error: {e}", 500
-        finally:
-            conn.close()
-    
-    try:
-        conn = get_db_connection()
-        users = conn.execute('SELECT role, assigned_municipality, contact_no, password FROM users WHERE role IN ("cdrrmo", "pnp", "bfp")').fetchall()
-        credentials = [
-            {
-                'role': user['role'],
-                'display': f"{user['role'].upper()} {user['assigned_municipality'] or 'Unknown Municipality'}",
-                'contact_no': user['contact_no'],
-                'password': user['password'],
-                'municipality': user['assigned_municipality']
-            } for user in users
-        ]
+        user = conn.execute('''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
+        ''', (role, contact_no, password, assigned_municipality)).fetchone()
         conn.close()
-    except Exception as e:
-        logger.error(f"Error fetching credentials: {e}")
-        credentials = []
-    
-    return render_template('CDRRMOPNPBFPIn.html', credentials=credentials)
+        
+        if user:
+            unique_id = construct_unique_id(user['role'], assigned_municipality=assigned_municipality, contact_no=contact_no)
+            session['unique_id'] = unique_id
+            session['role'] = user['role']
+            logger.debug(f"Web login successful for user: {unique_id} ({user['role']})")
+            if user['role'] == 'cdrrmo':
+                return redirect(url_for('cdrrmo_dashboard'))
+            elif user['role'] == 'pnp':
+                return redirect(url_for('pnp_dashboard'))
+            elif user['role'] == 'bfp':
+                return redirect(url_for('bfp_dashboard'))
+        logger.warning(f"Web login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
+        return "Invalid credentials", 401
+    return render_template('CDRRMOPNPBFPIn.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def log():

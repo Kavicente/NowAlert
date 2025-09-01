@@ -31,7 +31,6 @@ body {
     backdrop-filter: blur(5px);
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     max-width: 400px;
-    height: 700px;
 }
 
 .form2 h2 {
@@ -101,20 +100,9 @@ body {
 .form2 button:hover {
     background-color: #66c2ff;
 }
-.form3 {
-    text-align: center;
-}
-
-.form3 h2 {
-    font-size: 18px;
-    margin-bottom: 10px;
-    color: #000000;
-}
-
 .form3 p {
     margin: 5px 0;
     cursor: pointer;
-    color: #000000;
 }
 
 .form3 p:hover {
