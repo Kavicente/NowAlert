@@ -23,6 +23,7 @@ from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrr
 from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes
 from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
 import random
+from flask_cors import CORS
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -214,6 +215,61 @@ def get_all_users():
         return jsonify(users)
     except Exception as e:
         logger.error(f"Error fetching all users: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin_accounts', methods=['GET'])
+def admin_accounts():
+    try:
+        # Reuse get_all_users logic
+        conn_web = get_db_connection()
+        web_users = conn_web.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role != "admin"').fetchall()
+        conn_web.close()
+
+        conn_android = get_android_db_connection()
+        android_users = conn_android.execute('SELECT username, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position FROM users').fetchall()
+        conn_android.close()
+
+        users = []
+        for user in web_users:
+            users.append({
+                'source': 'web',
+                'role': user['role'],
+                'barangay': user['barangay'] or '',
+                'municipality': user['assigned_municipality'] or '',
+                'contact_no': user['contact_no'],
+                'username': '',
+                'first_name': '',
+                'middle_name': '',
+                'last_name': '',
+                'age': None,
+                'house_no': '',
+                'street_no': '',
+                'province': '',
+                'position': '',
+                'status': 'active'
+            })
+        for user in android_users:
+            users.append({
+                'source': 'android',
+                'role': user['role'],
+                'barangay': user['barangay'] or '',
+                'municipality': user['municipality'] or '',
+                'contact_no': user['contact_no'] or '',
+                'username': user['username'],
+                'first_name': user['first_name'] or '',
+                'middle_name': user['middle_name'] or '',
+                'last_name': user['last_name'] or '',
+                'age': user['age'],
+                'house_no': user['house_no'] or '',
+                'street_no': user['street_no'] or '',
+                'province': user['province'] or '',
+                'position': user['position'] or '',
+                'status': 'active'
+            })
+        logger.info("Successfully fetched admin accounts")
+        return jsonify(users)
+    except Exception as e:
+        logger.error(f"Error fetching admin accounts: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/update_user_status', methods=['POST'])
