@@ -160,70 +160,88 @@ def android_login():
     finally:
         conn.close()
 
-@app.route('/admin/login', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        conn = get_db_connection()
-        admin = conn.execute('SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ?',
-                             ('admin', username, password)).fetchone()
-        conn.close()
-        if admin:
-            session['role'] = 'admin'
-            session['unique_id'] = f"admin_{username}"
-            session.permanent = True
-            logger.info(f"Admin login successful for {username}")
-            return redirect(url_for('admin_dashboard'))
-        logger.warning(f"Invalid admin credentials for {username}")
-        return jsonify({'error': 'Invalid credentials'}), 401
-    return render_template('admin_login.html')
-
-@app.route('/admin/dashboard')
-def admin_dashboard():
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to admin_dashboard")
-        return redirect(url_for('admin_login'))
-    conn = get_db_connection()
-    users = conn.execute('SELECT * FROM users WHERE role != "admin"').fetchall()
-    conn.close()
-    return render_template('admin_dashboard.html', users=users)
-
-@app.route('/admin/create_user', methods=['POST'])
-def admin_create_user():
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to admin_create_user")
-        return jsonify({'error': 'Unauthorized'}), 401
-    data = request.form
-    role = data.get('role').lower()
-    contact_no = data.get('contact_no')
-    password = data.get('password')
-    barangay = data.get('barangay') if role == 'barangay' else None
-    municipality = data.get('municipality') if role in ['pnp', 'cdrrmo', 'bfp'] else None
-    conn = get_db_connection()
+@app.route('/api/get_all_users', methods=['GET'])
+def get_all_users():
     try:
-        conn.execute('INSERT INTO users (role, contact_no, password, barangay, assigned_municipality) VALUES (?, ?, ?, ?, ?)',
-                    (role, contact_no, password, barangay, municipality))
-        conn.commit()
-        logger.info(f"User created with contact_no: {contact_no}, role: {role}")
-    except sqlite3.IntegrityError:
-        conn.close()
-        logger.error(f"User creation failed, contact_no {contact_no} already exists")
-        return jsonify({'error': 'User already exists'}), 400
-    conn.close()
-    return jsonify({'message': 'User created successfully'})
+        # Fetch web app users
+        conn_web = get_db_connection()
+        web_users = conn_web.execute('SELECT role, barangay, assigned_municipality, contact_no, password FROM users WHERE role != "admin"').fetchall()
+        conn_web.close()
 
-@app.route('/admin/delete_user/<contact_no>', methods=['POST'])
-def admin_delete_user(contact_no):
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to admin_delete_user")
-        return jsonify({'error': 'Unauthorized'}), 401
-    conn = get_db_connection()
-    conn.execute('DELETE FROM users WHERE contact_no = ?', (contact_no,))
-    conn.commit()
-    conn.close()
-    logger.info(f"User deleted with contact_no: {contact_no}")
-    return jsonify({'message': 'User deleted successfully'})
+        # Fetch Android app users
+        conn_android = get_android_db_connection()
+        android_users = conn_android.execute('SELECT username, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position FROM users').fetchall()
+        conn_android.close()
+
+        # Combine users
+        users = []
+        for user in web_users:
+            users.append({
+                'source': 'web',
+                'role': user['role'],
+                'barangay': user['barangay'] or '',
+                'municipality': user['assigned_municipality'] or '',
+                'contact_no': user['contact_no'],
+                'username': '',
+                'first_name': '',
+                'middle_name': '',
+                'last_name': '',
+                'age': None,
+                'house_no': '',
+                'street_no': '',
+                'province': '',
+                'position': '',
+                'status': 'active'  # Default status
+            })
+        for user in android_users:
+            users.append({
+                'source': 'android',
+                'role': user['role'],
+                'barangay': user['barangay'] or '',
+                'municipality': user['municipality'] or '',
+                'contact_no': user['contact_no'] or '',
+                'username': user['username'],
+                'first_name': user['first_name'] or '',
+                'middle_name': user['middle_name'] or '',
+                'last_name': user['last_name'] or '',
+                'age': user['age'],
+                'house_no': user['house_no'] or '',
+                'street_no': user['street_no'] or '',
+                'province': user['province'] or '',
+                'position': user['position'] or '',
+                'status': 'active'  # Default status
+            })
+        return jsonify(users)
+    except Exception as e:
+        logger.error(f"Error fetching all users: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update_user_status', methods=['POST'])
+def update_user_status():
+    try:
+        data = request.json
+        source = data.get('source')
+        identifier = data.get('identifier')  # contact_no for web, username for android
+        status = data.get('status')  # active, warning, suspended
+
+        if source == 'web':
+            conn = get_db_connection()
+            conn.execute('UPDATE users SET status = ? WHERE contact_no = ?', (status, identifier))
+            conn.commit()
+            conn.close()
+        elif source == 'android':
+            conn = get_android_db_connection()
+            conn.execute('UPDATE users SET status = ? WHERE username = ?', (status, identifier))
+            conn.commit()
+            conn.close()
+        else:
+            return jsonify({'error': 'Invalid source'}), 400
+
+        logger.info(f"Updated status for {source} user {identifier} to {status}")
+        return jsonify({'message': 'Status updated successfully'})
+    except Exception as e:
+        logger.error(f"Error updating user status: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @socketio.on('disconnect')
 def handle_disconnect():

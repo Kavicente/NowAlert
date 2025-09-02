@@ -201,3 +201,34 @@ canvas {
     }
     
 }
+
+@media (max-width: 575.98px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .dashboard {
+        margin-left: 0;
+    }
+    main {
+        left: 0;
+    }
+    .main-content {
+        position: static;       /* Change to static for small screens */
+        width: 100%;           /* Full width */
+        height: auto;          /* Auto height */
+        margin: 0;             /* Remove margins */
+        padding: 10px;         /* Adjust padding */
+        top: 0;                /* Reset top */
+        left: 0;               /* Reset left */
+    }
+    #map { 
+        width: 100%; 
+        height: 400px; 
+        position:"static"; 
+        top: 0; 
+        left: 0; 
+        border-radius: 20px; 
+    }
+}
