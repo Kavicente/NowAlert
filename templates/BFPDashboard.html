@@ -125,6 +125,10 @@
 
             socket.on('new_alert', (data) => {
                 console.log('New alert received:', data);
+                if (!data.alert_id) {
+                    console.error('No alert_id in new_alert data:', data);
+                    return;
+                }
                 updateUIWithAlert(data);
                 notifyAlert(data);
             });
@@ -142,6 +146,7 @@
 
             socket.on('fire_response_submitted', (data) => {
                 console.log('Fire response submitted:', data);
+                console.log('Current alertElements:', Array.from(alertElements.keys()));
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem && document.getElementById('alert-container').contains(alertItem)) {
                     let predictionDiv = alertItem.querySelector('.prediction');
@@ -169,20 +174,22 @@
                     }
                     predictionDiv.textContent = `Prediction: There will be a ${formattedPrediction}% chance of Fire Incident Again in next ${randomRange}`;
                     alertItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    console.log('Prediction added to alertItem:', alertItem);
                 } else {
                     console.error('Alert item not found or not in DOM for alert_id:', data.alert_id);
-                    // Attempt to recreate alert item if missing
                     const feed = document.getElementById('alert-container');
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
                     alertDiv.dataset.alertId = data.alert_id;
                     alertElements.set(data.alert_id, alertDiv);
-                    alertDiv.innerHTML = `<p>Response for Alert ${data.alert_id}</p>`;
+                    alertDiv.innerHTML = `<p>Response for Alert ${data.alert_id} (${data.barangay || 'Unknown'})</p>`;
                     const predictionDiv = document.createElement('p');
                     predictionDiv.className = 'prediction';
                     predictionDiv.textContent = `Prediction: There will be a ${formattedPrediction}% chance of Fire Incident Again in next ${randomRange}`;
                     alertDiv.appendChild(predictionDiv);
                     feed.prepend(alertDiv);
+                    alertDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    console.log('Fallback alert item created:', alertDiv);
                 }
             });
 
