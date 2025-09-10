@@ -518,13 +518,13 @@ def handle_fire_response_submitted(data):
     
     try:
         if fire_accident_predictor:
-            # Convert features to a DataFrame with appropriate column names
-            feature_names = ['fire_type', 'fire_cause', 'is_sunny', 'is_high_severity']
+            # Convert features to a DataFrame with expected column names
+            feature_names = ['Fire_Type', 'Fire_Cause', 'Barangay', 'Year']
             features = pd.DataFrame([[
                 cleaned_data['fire_type'],
                 cleaned_data['fire_cause'],
-                1 if cleaned_data['weather'] == 'Sunny' else 0,
-                1 if cleaned_data['fire_severity'] == 'High' else 0
+                cleaned_data['barangay'],
+                datetime.now().year
             ]], columns=feature_names)
             prediction = fire_accident_predictor.predict(features)[0]
             probability = fire_accident_predictor.predict_proba(features)[0][1]
