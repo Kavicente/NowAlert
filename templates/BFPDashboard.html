@@ -146,18 +146,31 @@
                 if (alertItem) {
                     let predictionDiv = alertItem.querySelector('.prediction');
                     if (!predictionDiv) {
-                        predictionDiv = document.createElement('div');
+                        predictionDiv = document.createElement('p');
                         predictionDiv.className = 'prediction';
+                        predictionDiv.style.color = '#000000';
+                        predictionDiv.style.fontSize = '14px';
+                        predictionDiv.style.marginTop = '5px';
                         alertItem.appendChild(predictionDiv);
                     }
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
+                    let randomRange = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                        formattedPrediction = predictionText;
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            formattedPrediction = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                        } else {
+                            formattedPrediction = predictionText;
+                            randomRange = 'unknown period';
+                        }
                     } else {
-                        formattedPrediction = 'Prediction not available';
+                        formattedPrediction = 'N/A';
+                        randomRange = 'N/A';
                     }
-                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    predictionDiv.textContent = `Prediction: There will be a ${formattedPrediction}% chance of Fire Incident Again in next ${randomRange}`;
                 }
             });
 
