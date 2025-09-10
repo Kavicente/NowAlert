@@ -489,66 +489,54 @@ def handle_response_submitted(data):
 
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
-    logger.info(f"Fire response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    logger.info(f"Received fire response: {data}")
+    default_values = {}
+    ftype_mapping = {
+        'Electrical Fire': 1,
+        'Grass Fire': 2,
+        'Residential Fire': 3,
+        'Natural Fire': 4,
+        'Other Fire': 5
+    }
+    fcause_mapping = {
+        'Arson': 1,
+        'Cooking': 2,
+        'Electrical': 3,
+        'Natural': 4
+    }
+    cleaned_data = {
+        'fire_type': ftype_mapping.get(data.get('fire_type'), 0),
+        'fire_cause': fcause_mapping.get(data.get('fire_cause'), 0),
+        'weather': data.get('weather', 'Unknown'),
+        'fire_severity': data.get('fire_severity', 'Unknown'),
+        'lat': data.get('lat', 0.0),
+        'lon': data.get('lon', 0.0),
+        'barangay': data.get('barangay', 'Unknown'),
+        'emergency_type': data.get('emergency_type', 'Unknown')
+    }
+    cleaned_data.update(default_values)
     
-    # Check if response is from today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
-    if response_time.date() == today:
-        today_responses.append(data)
-    
-    # Compute prediction using fire ML model
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': 'Electrical Fire',
-            'Fire_Cause': 'Electrical'
-        }
-        
-        input_data = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': data.get('fire_type', default_values['Fire_Type']),
-            'Fire_Cause': data.get('fire_cause', default_values['Fire_Cause']),
-            'Weather': data.get('weather', 'Sunny'),
-            'Fire_Severity': data.get('fire_severity', 'Medium')
-        }
-        
-        fire_df = pd.DataFrame([input_data])
-        fire_df = pd.get_dummies(fire_df, columns=['Barangay', 'Fire_Type', 'Fire_Cause', 'Weather', 'Fire_Severity'])
-        
-        expected_columns = ['Year'] + [col for col in road_accident_df.columns if col != 'Year']
-        for col in expected_columns:
-            if col not in fire_df.columns:
-                fire_df[col] = 0
-        
-        fire_df = fire_df[expected_columns]
-        
-        prediction = 'N/A'
         if fire_accident_predictor:
-            try:
-                pred = fire_accident_predictor.predict_proba(fire_df)[:, 1][0]
-                prediction = f"{pred * 100:.1f}% chance in year {datetime.now().year}"
-            except Exception as e:
-                logger.error(f"Fire prediction error: {e}")
-                prediction = 'prediction_error'
-        
-        data['prediction'] = prediction
-        responses.append(data)
-        
-        barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-        municipality = get_municipality_from_barangay(data.get('barangay'))
-        if municipality:
-            municipality = municipality.lower()
-            bfp_room = f"bfp_{municipality}"
-            emit('fire_response_submitted', data, room=bfp_room)
-            logger.info(f"Fire response emitted to room {bfp_room}")
+            features = [
+                cleaned_data['fire_type'],
+                cleaned_data['fire_cause'],
+                1 if cleaned_data['weather'] == 'Sunny' else 0,
+                1 if cleaned_data['fire_severity'] == 'High' else 0
+            ]
+            prediction = fire_accident_predictor.predict([features])[0]
+            probability = fire_accident_predictor.predict_proba([features])[0][1]
+            cleaned_data['prediction'] = f"{probability*100:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            cleaned_data['prediction'] = 'prediction_error'
     except Exception as e:
-        logger.error(f"Error processing fire response: {e}")
-        data['prediction'] = 'prediction_error'
-        emit('fire_response_submitted', data)
+        logger.error(f"Prediction error: {e}")
+        cleaned_data['prediction'] = 'prediction_error'
+    
+    responses.append(cleaned_data)
+    today_responses.append(cleaned_data)
+    emit('fire_response_submitted', cleaned_data, broadcast=True)
+    logger.info(f"Fire response processed and broadcasted: {cleaned_data}")
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}
