@@ -35,6 +35,15 @@ except FileNotFoundError:
     logger.error("road_accident_predictor_lr.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading road_accident_predictor_lr.pkl: {e}")
+    
+fire_accident_predictor = None
+try:
+    fire_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Fire Models', 'fire_predictor_lr.pkl'))
+    logger.info("fire_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("fire_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
 road_accident_df = pd.DataFrame()
 try:
@@ -469,6 +478,70 @@ def handle_response_submitted(data):
         emit('update_analytics', data, room=cdrrmo_room)
     if pnp_room:
         emit('update_analytics', data, room=pnp_room)
+
+
+@socketio.on('fire_response_submitted')
+def handle_fire_response_submitted(data):
+    logger.info(f"Fire response received: {data}")
+    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    
+    # Check if response is from today for analytics
+    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+    today = datetime.now(pytz.timezone('Asia/Manila')).date()
+    if response_time.date() == today:
+        today_responses.append(data)
+    
+    # Compute prediction using fire ML model
+    try:
+        default_values = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Fire_Type': 'Electrical Fire',
+            'Fire_Cause': 'Electrical'
+        }
+        
+        input_data = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Fire_Type': data.get('fire_type', default_values['Fire_Type']),
+            'Fire_Cause': data.get('fire_cause', default_values['Fire_Cause']),
+            'Weather': data.get('weather', 'Sunny'),
+            'Fire_Severity': data.get('fire_severity', 'Medium')
+        }
+        
+        fire_df = pd.DataFrame([input_data])
+        fire_df = pd.get_dummies(fire_df, columns=['Barangay', 'Fire_Type', 'Fire_Cause', 'Weather', 'Fire_Severity'])
+        
+        expected_columns = ['Year'] + [col for col in road_accident_df.columns if col != 'Year']
+        for col in expected_columns:
+            if col not in fire_df.columns:
+                fire_df[col] = 0
+        
+        fire_df = fire_df[expected_columns]
+        
+        prediction = 'N/A'
+        if fire_accident_predictor:
+            try:
+                pred = fire_accident_predictor.predict_proba(fire_df)[:, 1][0]
+                prediction = f"{pred * 100:.1f}% chance in year {datetime.now().year}"
+            except Exception as e:
+                logger.error(f"Fire prediction error: {e}")
+                prediction = 'prediction_error'
+        
+        data['prediction'] = prediction
+        responses.append(data)
+        
+        barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+        municipality = get_municipality_from_barangay(data.get('barangay'))
+        if municipality:
+            municipality = municipality.lower()
+            bfp_room = f"bfp_{municipality}"
+            emit('fire_response_submitted', data, room=bfp_room)
+            logger.info(f"Fire response emitted to room {bfp_room}")
+    except Exception as e:
+        logger.error(f"Error processing fire response: {e}")
+        data['prediction'] = 'prediction_error'
+        emit('fire_response_submitted', data)
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}

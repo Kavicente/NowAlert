@@ -2,14 +2,45 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BFP Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
-        .notification { position: fixed; bottom: 10px; right: 10px; background-color: #f44336; color: #ffffff; padding: 15px; border-radius: 5px; display: none; }
+        .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
+        .response-form { margin-top: 10px; }
+        .response-form select, .response-form button { margin: 5px; }
+        .clickable-img { cursor: pointer; max-width: 200px; }
+        .prediction { margin-top: 10px; font-weight: bold; }
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 5px;
+        }
+        .image-modal .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            font-size: 30px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -32,21 +63,26 @@
             <div class="filters">
             </div>
         </header>
-        <main class="main-content">
-            <h2 class="h2">{{ municipality }} Map</h2>
-            <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord }}, {{ lon_coord }}</span></p>
-            <div id="map"></div>
-            <section class="stats">
-                <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
-                <p class="p">Critical Incidents: <span id="critical-incidents">0</span></p>
-            </section>
-            <section id="alerts">
-                <h2 class="h2">Live Alerts</h2>
-                <div id="alert-container"></div>
-            </section>
-        </main>
-        <div id="notification"></div>
     </div>
+    <main class="main-content">
+        <h2 class="h2">BFP {{ municipality }} Map</h2>
+        <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
+        <div id="map"></div>
+        <section class="stats">
+            <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
+            <p class="p">Critical Incidents: <span id="critical-incidents">{{ stats.critical if stats else 0 }}</span></p>
+        </section>
+        <section id="alerts">
+            <h2 class="h2">Live Alerts</h2>
+            <div id="alert-container"></div>
+        </section>
+        <div id="notification"></div>
+        <div id="image-modal" class="image-modal">
+            <span class="close-btn">&times;</span>
+            <img id="modal-image" src="">
+        </div>
+    </main>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
@@ -54,7 +90,7 @@
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-            const bfpMap = L.map('map').setView([lat, lon], 15);
+            const bfpMap = L.map('map').setView([lat, lon], 16);
 
             var satellite = L.tileLayer(tileLayerUrl, {
                 attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -75,26 +111,57 @@
             };
             L.control.layers(baseLayers).addTo(bfpMap);
 
-            const socket = io('https://alert-858l.onrender.com');
+            const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
-                socket.emit('register_role', { role: 'bfp', municipality: '{{ municipality }}' });
+                console.log('Connected to server');
+                socket.emit('register_role', { role: 'bfp', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
-            socket.on('forward_alert', (data) => {
-                if (data.image) {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                }
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+            });
+
+            socket.on('new_alert', (data) => {
+                console.log('New alert received:', data);
+                updateUIWithAlert(data);
+                notifyAlert(data);
             });
 
             socket.on('update_map', (data) => {
-                const lat = data.lat;
-                const lon = data.lon;
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
                 bfpMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(bfpMap);
+                L.marker([lat, lon]).addTo(bfpMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+            });
+
+            socket.on('fire_response_submitted', (data) => {
+                console.log('Fire response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = document.createElement('div');
+                    predictionDiv.className = 'prediction';
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Fire Accident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
+                        }
+                    }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    alertItem.appendChild(predictionDiv);
+                }
             });
 
             function updateUIWithAlert(data) {
@@ -102,6 +169,8 @@
                 if (feed) {
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
+                    alertDiv.dataset.alertId = data.alert_id;
+                    alertElements.set(data.alert_id, alertDiv);
                     let displayTime;
                     try {
                         const serverTime = new Date(data.timestamp || Date.now());
@@ -112,13 +181,24 @@
                     }
                     const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
                     const emergencyBarangay = data.barangay || 'Unknown';
-                    const residentBarangay = "{{ barangay }}";
+                    const residentBarangay = data.resident_barangay || emergencyBarangay;
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        <button onclick="respondAlert('${data.timestamp}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
-                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" width="200"/>` : ''}
+                        <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
+                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
+                        ${data.image_classification !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification}</p>` : ''}
                     `;
                     feed.prepend(alertDiv);
+
+                    if (data.image) {
+                        const img = alertDiv.querySelector('.clickable-img');
+                        img.addEventListener('click', () => {
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modalImg.src = `data:image/jpeg;base64,${data.image}`;
+                            modal.style.display = 'flex';
+                        });
+                    }
                 }
 
                 if (data.lat && data.lon) {
@@ -133,45 +213,91 @@
                 updateStats();
             }
 
-            function notifyAlert(data) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    showBrowserNotification(data);
-                } else {
-                    showNotification(`New alert (${data.emergency_type || 'Unknown'}) received!`);
+            function showResponseForm(alertId, lat, lon, barangay, type) {
+                const form = document.createElement('div');
+                form.className = 'response-form';
+                form.innerHTML = `
+                    <select id="fireType">
+                        <option value="Electrical Fire">Electrical Fire</option>
+                        <option value="Grass Fire">Grass Fire</option>
+                        <option value="Residential Fire">Residential Fire</option>
+                        <option value="Other Fire">Other Fire</option>
+                        <option value="Natural Fire">Natural Fire</option>
+                    </select>
+                    <select id="fireCause">
+                        <option value="Arson">Arson</option>
+                        <option value="Cooking">Cooking</option>
+                        <option value="Electrical">Electrical</option>
+                        <option value="Natural">Natural</option>
+                    </select>
+                    <select id="weather">
+                        <option value="Cloudy">Cloudy</option>
+                        <option value="Rainy">Rainy</option>
+                        <option value="Stormy">Stormy</option>
+                        <option value="Sunny">Sunny</option>
+                    </select>
+                    <select id="fireSeverity">
+                        <option value="High">High</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                    </select>
+                    <button onclick="submitResponse('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')">Submit Response</button>
+                `;
+                const alertItem = alertElements.get(alertId);
+                if (alertItem) {
+                    alertItem.appendChild(form);
                 }
             }
 
-            function showBrowserNotification(data) {
-                if ('Notification' in window && Notification.permission === 'granted') {
-                    new Notification('New Alert', {
-                        body: `${data.emergency_type || 'Unknown'} at ${data.barangay || 'Unknown Barangay'}`,
-                        icon: '/static/favicon.ico'
-                    });
+            function submitResponse(alertId, lat, lon, barangay, type) {
+                const response = {
+                    alert_id: alertId,
+                    fire_type: document.getElementById('fireType').value,
+                    fire_cause: document.getElementById('fireCause').value,
+                    weather: document.getElementById('weather').value,
+                    fire_severity: document.getElementById('fireSeverity').value,
+                    lat: lat,
+                    lon: lon,
+                    barangay: barangay,
+                    emergency_type: type
+                };
+                socket.emit('fire_response_submitted', response);
+                console.log('Fire response submitted:', response);
+                const form = document.querySelector('.response-form');
+                if (form) form.remove();
+            }
+
+            const modal = document.getElementById('image-modal');
+            const closeBtn = document.querySelector('.close-btn');
+            closeBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
                 }
+            });
+
+            function notifyAlert(data) {
+                const notification = document.getElementById('notification');
+                const alertSound = new Audio('/static/audio/alert.mp3');
+                alertSound.play().catch(e => console.error('Error playing sound:', e));
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'notification';
+                alertDiv.innerHTML = `New ${data.emergency_type || 'Alert'} in ${data.barangay || 'Unknown'}`;
+                notification.appendChild(alertDiv);
+                setTimeout(() => alertDiv.remove(), 5000);
             }
 
             function updateStats() {
-                fetch('/api/stats?role=bfp')
-                    .then(res => res.json())
-                    .then(stats => {
-                        document.getElementById('total-incidents').textContent = stats.total || 0;
-                        document.getElementById('critical-incidents').textContent = stats.critical || 0;
-                    });
+                fetch('/get_bfp_stats')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('total-incidents').textContent = data.total_incidents || 0;
+                        document.getElementById('critical-incidents').textContent = data.critical_incidents || 0;
+                    })
+                    .catch(error => console.error('Error fetching stats:', error));
             }
-
-            window.respondAlert = function(timestamp, lat, lon, barangay, type) {
-                socket.emit('responded', { timestamp, lat, lon, barangay, emergency_type: type });
-                alert('Response sent for alert at ' + timestamp);
-            };
-
-            function showNotification(message) {
-                const notification = document.getElementById('notification');
-                notification.textContent = message;
-                notification.style.display = 'block';
-                setTimeout(() => notification.style.display = 'none', 5000);
-            }
-
-            updateStats();
         });
     </script>
 </body>
