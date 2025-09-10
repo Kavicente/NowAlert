@@ -290,7 +290,7 @@
             }
 
             function updateStats() {
-                fetch('/get_bfp_stats')
+                fetch('/api/bfp_stats')
                     .then(response => response.json())
                     .then(data => {
                         document.getElementById('total-incidents').textContent = data.total_incidents || 0;
