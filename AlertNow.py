@@ -293,10 +293,12 @@ def handle_new_alert(data):
         municipality = municipality.lower()
         cdrrmo_room = f"cdrrmo_{municipality}"
         pnp_room = f"pnp_{municipality}"
+        bfp_room = f"bfp_{municipality}"
     else:
         logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
         cdrrmo_room = None
         pnp_room = None
+        bfp_room = None
     
     emit('new_alert', data, room=barangay_room)
     logger.info(f"Alert emitted to room {barangay_room}")
@@ -319,6 +321,8 @@ def handle_new_alert(data):
         emit('update_map', map_data, room=cdrrmo_room)
     if pnp_room:
         emit('update_map', map_data, room=pnp_room)
+    if bfp_room:
+        emit('update_map', map_data, room=bfp_room)    
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
