@@ -10,12 +10,12 @@
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
+        .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; background-color: #f9f9f9; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
         .response-form { margin-top: 10px; }
         .response-form select, .response-form button { margin: 5px; }
         .clickable-img { cursor: pointer; max-width: 200px; }
-        .prediction { margin-top: 10px; font-weight: bold; }
+        .prediction { margin-top: 5px; font-weight: bold; color: #000000; font-size: 14px; }
         .image-modal {
             display: none;
             position: fixed;
@@ -143,14 +143,11 @@
             socket.on('fire_response_submitted', (data) => {
                 console.log('Fire response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
+                if (alertItem && document.getElementById('alert-container').contains(alertItem)) {
                     let predictionDiv = alertItem.querySelector('.prediction');
                     if (!predictionDiv) {
                         predictionDiv = document.createElement('p');
                         predictionDiv.className = 'prediction';
-                        predictionDiv.style.color = '#000000';
-                        predictionDiv.style.fontSize = '14px';
-                        predictionDiv.style.marginTop = '5px';
                         alertItem.appendChild(predictionDiv);
                     }
                     const predictionText = data.prediction || 'N/A';
@@ -171,6 +168,21 @@
                         randomRange = 'N/A';
                     }
                     predictionDiv.textContent = `Prediction: There will be a ${formattedPrediction}% chance of Fire Incident Again in next ${randomRange}`;
+                    alertItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    console.error('Alert item not found or not in DOM for alert_id:', data.alert_id);
+                    // Attempt to recreate alert item if missing
+                    const feed = document.getElementById('alert-container');
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert-item';
+                    alertDiv.dataset.alertId = data.alert_id;
+                    alertElements.set(data.alert_id, alertDiv);
+                    alertDiv.innerHTML = `<p>Response for Alert ${data.alert_id}</p>`;
+                    const predictionDiv = document.createElement('p');
+                    predictionDiv.className = 'prediction';
+                    predictionDiv.textContent = `Prediction: There will be a ${formattedPrediction}% chance of Fire Incident Again in next ${randomRange}`;
+                    alertDiv.appendChild(predictionDiv);
+                    feed.prepend(alertDiv);
                 }
             });
 
