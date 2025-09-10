@@ -490,6 +490,7 @@ def handle_response_submitted(data):
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
     logger.info(f"Received fire response: {data}")
+    logger.debug(f"Processing fire response for alert_id: {data.get('alert_id')}")
     default_values = {}
     ftype_mapping = {
         'Electrical Fire': 1,
@@ -505,6 +506,7 @@ def handle_fire_response_submitted(data):
         'Natural': 4
     }
     cleaned_data = {
+        'alert_id': data.get('alert_id'),  # Ensure alert_id is included
         'fire_type': ftype_mapping.get(data.get('fire_type'), 0),
         'fire_cause': fcause_mapping.get(data.get('fire_cause'), 0),
         'weather': data.get('weather', 'Unknown'),
@@ -518,7 +520,6 @@ def handle_fire_response_submitted(data):
     
     try:
         if fire_accident_predictor:
-            # Convert features to a DataFrame with expected column names
             feature_names = ['Fire_Type', 'Fire_Cause', 'Barangay', 'Year']
             features = pd.DataFrame([[
                 cleaned_data['fire_type'],
@@ -537,8 +538,13 @@ def handle_fire_response_submitted(data):
     
     responses.append(cleaned_data)
     today_responses.append(cleaned_data)
-    emit('fire_response_submitted', cleaned_data, broadcast=True)
-    logger.info(f"Fire response processed and broadcasted: {cleaned_data}")
+    municipality = get_municipality_from_barangay(cleaned_data['barangay'])
+    if not municipality:
+        logger.error(f"No municipality found for barangay: {cleaned_data['barangay']}")
+        municipality = 'unknown'
+    bfp_room = f"bfp_{municipality.lower()}"
+    emit('fire_response_submitted', cleaned_data, room=bfp_room)
+    logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}
