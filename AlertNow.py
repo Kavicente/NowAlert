@@ -309,7 +309,7 @@ def handle_new_alert(data):
         emit('new_alert', data, room=pnp_room)
         logger.info(f"Alert emitted to room {pnp_room}")
     if bfp_room:
-        emit('new_alert', data, room=pnp_room)
+        emit('new_alert', data, room=bfp_room)
         logger.info(f"Alert emitted to room {bfp_room}")
 
     # Emit update_map to relevant rooms
