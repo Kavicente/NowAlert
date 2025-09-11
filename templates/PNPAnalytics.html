@@ -119,6 +119,157 @@
             filterData(document.querySelector('.tab.active').textContent.toLowerCase());
         }
 
+        function updateCharts(data) {
+            const ctxTrends = document.getElementById('roadIncidentTrendsChart').getContext('2d');
+            const ctxDistribution = document.getElementById('roadAccidentDistributionChart').getContext('2d');
+            const ctxCauses = document.getElementById('roadCauseAnalysisChart').getContext('2d');
+            const ctxWeather = document.getElementById('roadWeatherChart').getContext('2d');
+            const ctxRoadCondition = document.getElementById('roadConditionChart').getContext('2d');
+            const ctxVehicleTypes = document.getElementById('roadVehicleTypesChart').getContext('2d');
+            const ctxDriverAge = document.getElementById('roadDriverAgeChart').getContext('2d');
+            const ctxDriverGender = document.getElementById('roadDriverGenderChart').getContext('2d');
+            const ctxAccidentType = document.getElementById('roadAccidentTypeChart').getContext('2d');
+
+            if (charts['roadIncidentTrendsChart']) charts['roadIncidentTrendsChart'].destroy();
+            charts['roadIncidentTrendsChart'] = new Chart(ctxTrends, {
+                type: 'line',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [
+                        {
+                            label: 'Total Incidents',
+                            data: data.trends.total,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            fill: false
+                        },
+                        {
+                            label: 'Responded Incidents',
+                            data: data.trends.responded,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            fill: false
+                        }
+                    ]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadAccidentDistributionChart']) charts['roadAccidentDistributionChart'].destroy();
+            charts['roadAccidentDistributionChart'] = new Chart(ctxDistribution, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.distribution),
+                    datasets: [{
+                        label: 'Total Incidents',
+                        data: Object.values(data.distribution).map(v => v.total),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadCauseAnalysisChart']) charts['roadCauseAnalysisChart'].destroy();
+            charts['roadCauseAnalysisChart'] = new Chart(ctxCauses, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.causes),
+                    datasets: [{
+                        data: Object.values(data.causes),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadWeatherChart']) charts['roadWeatherChart'].destroy();
+            charts['roadWeatherChart'] = new Chart(ctxWeather, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.weather),
+                    datasets: [{
+                        data: Object.values(data.weather),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadConditionChart']) charts['roadConditionChart'].destroy();
+            charts['roadConditionChart'] = new Chart(ctxRoadCondition, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.road_conditions),
+                    datasets: [{
+                        data: Object.values(data.road_conditions),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadVehicleTypesChart']) charts['roadVehicleTypesChart'].destroy();
+            charts['roadVehicleTypesChart'] = new Chart(ctxVehicleTypes, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.vehicle_types),
+                    datasets: [{
+                        label: 'Vehicle Types',
+                        data: Object.values(data.vehicle_types),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadDriverAgeChart']) charts['roadDriverAgeChart'].destroy();
+            charts['roadDriverAgeChart'] = new Chart(ctxDriverAge, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.driver_age),
+                    datasets: [{
+                        label: 'Driver Age',
+                        data: Object.values(data.driver_age),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadDriverGenderChart']) charts['roadDriverGenderChart'].destroy();
+            charts['roadDriverGenderChart'] = new Chart(ctxDriverGender, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.driver_gender),
+                    datasets: [{
+                        data: Object.values(data.driver_gender),
+                        backgroundColor: ['#FF6384', '#36A2EB']
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            if (charts['roadAccidentTypeChart']) charts['roadAccidentTypeChart'].destroy();
+            charts['roadAccidentTypeChart'] = new Chart(ctxAccidentType, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.accident_type),
+                    datasets: [{
+                        label: 'Accident Type',
+                        data: Object.values(data.accident_type),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true }
+            });
+        }
+
         function filterData(timePeriod) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timePeriod}')"]`).classList.add('active');
@@ -137,136 +288,6 @@
                     console.error('Error fetching data:', error);
                     alert('Failed to load analytics data');
                 });
-        }
-
-        function updateCharts(data) {
-            Object.values(charts).forEach(chart => chart.destroy());
-            charts = {};
-
-            charts.roadIncidentTrendsChart = new Chart(document.getElementById('roadIncidentTrendsChart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    labels: data.trends.labels,
-                    datasets: [
-                        { label: 'Total Incidents', data: data.trends.total, borderColor: '#36A2EB', fill: false },
-                        { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', fill: false }
-                    ]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadAccidentDistributionChart = new Chart(document.getElementById('roadAccidentDistributionChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.distribution),
-                    datasets: [{
-                        data: Object.values(data.distribution).map(d => d.total),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.accident_cause || {}),
-                    datasets: [{
-                        label: 'Accident Causes',
-                        data: Object.values(data.accident_cause || {}),
-                        backgroundColor: '#36A2EB'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadRespondedAlertsChart = new Chart(document.getElementById('roadRespondedAlertsChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.distribution),
-                    datasets: [{
-                        label: 'Responded Alerts',
-                        data: Object.values(data.distribution).map(d => d.responded),
-                        backgroundColor: '#FF6384'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.weather || {}),
-                    datasets: [{
-                        data: Object.values(data.weather || {}),
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.road_conditions || {}),
-                    datasets: [{
-                        label: 'Road Conditions',
-                        data: Object.values(data.road_conditions || {}),
-                        backgroundColor: '#4BC0C0'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadVehicleTypesChart = new Chart(document.getElementById('roadVehicleTypesChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.vehicle_types || {}),
-                    datasets: [{
-                        data: Object.values(data.vehicle_types || {}),
-                        backgroundColor: ['#FF9F40', '#9966FF', '#FFCE56', '#4BC0C0']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadDriverAgeChart = new Chart(document.getElementById('roadDriverAgeChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.driver_age || {}),
-                    datasets: [{
-                        label: 'Driver Age Groups',
-                        data: Object.values(data.driver_age || {}),
-                        backgroundColor: '#9966FF'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadDriverGenderChart = new Chart(document.getElementById('roadDriverGenderChart').getContext('2d'), {
-                type: 'pie',
-                data: {
-                    labels: Object.keys(data.driver_gender || {}),
-                    datasets: [{
-                        data: Object.values(data.driver_gender || {}),
-                        backgroundColor: ['#FFCE56', '#4BC0C0']
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
-
-            charts.roadAccidentTypeChart = new Chart(document.getElementById('roadAccidentTypeChart').getContext('2d'), {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(data.accident_type || {}),
-                    datasets: [{
-                        label: 'Accident Types',
-                        data: Object.values(data.accident_type || {}),
-                        backgroundColor: '#FF9F40'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false }
-            });
         }
     </script>
 </body>

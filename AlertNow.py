@@ -1307,55 +1307,75 @@ def pnp_analytics():
 
 @app.route('/api/cdrrmo_analytics_data', methods=['GET'])
 def get_cdrrmo_analytics_data():
-    time_filter = request.args.get('time', 'weekly')
-    unique_id = session.get('unique_id')
-    municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-    
-    trends = get_cdrrmo_trends(time_filter)
-    distribution = get_cdrrmo_distribution(time_filter)
-    causes_data = get_cdrrmo_causes(time_filter)
-    analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
-    
-    return jsonify({
-        'trends': trends,
-        'distribution': distribution,
-        'causes': causes_data['road'],
-        'weather': analytics_data['weather'],
-        'road_conditions': analytics_data['road_conditions'],
-        'vehicle_types': analytics_data['vehicle_types'],
-        'driver_age': analytics_data['driver_age'],
-        'driver_gender': analytics_data['driver_gender'],
-        'accident_type': analytics_data['accident_type'],
-        'accident_cause': analytics_data['accident_cause'],
-        'injuries': analytics_data['injuries'],
-        'fatalities': analytics_data['fatalities']
-    })
+    try:
+        time_filter = request.args.get('time', 'weekly')
+        unique_id = session.get('unique_id')
+        municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
+        
+        trends = get_cdrrmo_trends(time_filter)
+        distribution = get_cdrrmo_distribution(time_filter)
+        causes_data = get_cdrrmo_causes(time_filter)
+        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
+        
+        logger.debug(f"CDRRMO trends type: {type(trends)}, value: {trends}")
+        logger.debug(f"CDRRMO distribution type: {type(distribution)}, value: {distribution}")
+        logger.debug(f"CDRRMO causes_data type: {type(causes_data)}, value: {causes_data}")
+        logger.debug(f"CDRRMO analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        
+        return jsonify({
+            'trends': trends,
+            'distribution': distribution,
+            'causes': causes_data['road'],
+            'weather': analytics_data['weather'],
+            'road_conditions': analytics_data['road_conditions'],
+            'vehicle_types': analytics_data['vehicle_types'],
+            'driver_age': analytics_data['driver_age'],
+            'driver_gender': analytics_data['driver_gender'],
+            'accident_type': analytics_data['accident_type'],
+            'accident_cause': analytics_data['accident_cause'],
+            'injuries': analytics_data['injuries'],
+            'fatalities': analytics_data['fatalities']
+        })
+    except Exception as e:
+        logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 
 @app.route('/api/pnp_analytics_data', methods=['GET'])
 def get_pnp_analytics_data():
-    time_filter = request.args.get('time', 'weekly')
-    unique_id = session.get('unique_id')
-    municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-    
-    trends = get_pnp_trends(time_filter)
-    distribution = get_pnp_distribution(time_filter)
-    causes_data = get_pnp_causes(time_filter)
-    analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
-    
-    return jsonify({
-        'trends': trends,
-        'distribution': distribution,
-        'causes': causes_data['road'],
-        'weather': analytics_data['weather'],
-        'road_conditions': analytics_data['road_conditions'],
-        'vehicle_types': analytics_data['vehicle_types'],
-        'driver_age': analytics_data['driver_age'],
-        'driver_gender': analytics_data['driver_gender'],
-        'accident_type': analytics_data['accident_type'],
-        'accident_cause': analytics_data['accident_cause'],
-        'injuries': analytics_data['injuries'],
-        'fatalities': analytics_data['fatalities']
-    })
+    try:
+        time_filter = request.args.get('time', 'weekly')
+        unique_id = session.get('unique_id')
+        municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
+        
+        trends = get_pnp_trends(time_filter)
+        distribution = get_pnp_distribution(time_filter)
+        causes_data = get_pnp_causes(time_filter)
+        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
+        
+        logger.debug(f"PNP trends type: {type(trends)}, value: {trends}")
+        logger.debug(f"PNP distribution type: {type(distribution)}, value: {distribution}")
+        logger.debug(f"PNP causes_data type: {type(causes_data)}, value: {causes_data}")
+        logger.debug(f"PNP analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        
+        return jsonify({
+            'trends': trends,
+            'distribution': distribution,
+            'causes': causes_data['road'],
+            'weather': analytics_data['weather'],
+            'road_conditions': analytics_data['road_conditions'],
+            'vehicle_types': analytics_data['vehicle_types'],
+            'driver_age': analytics_data['driver_age'],
+            'driver_gender': analytics_data['driver_gender'],
+            'accident_type': analytics_data['accident_type'],
+            'accident_cause': analytics_data['accident_cause'],
+            'injuries': analytics_data['injuries'],
+            'fatalities': analytics_data['fatalities']
+        })
+    except Exception as e:
+        logger.error(f"Error in get_pnp_analytics_data: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/bfp/analytics')
 def bfp_analytics():
