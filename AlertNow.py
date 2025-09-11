@@ -9,7 +9,7 @@ import joblib
 import cv2
 import numpy as np
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import pandas as pd
 import uuid
@@ -545,6 +545,59 @@ def handle_fire_response_submitted(data):
     bfp_room = f"bfp_{municipality.lower()}"
     emit('fire_response_submitted', cleaned_data, room=bfp_room)
     logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
+    
+def handle_road_analytics_data(time_filter, municipality, barangays):
+    try:
+        weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
+        road_conditions = {'Dry': 0, 'Wet': 0, 'Icy': 0, 'Snowy': 0}
+        vehicle_types = {'Car': 0, 'Motorcycle': 0, 'Truck': 0, 'Bus': 0}
+        driver_age = {'18-25': 0, '26-35': 0, '36-50': 0, '51+': 0}
+        driver_gender = {'Male': 0, 'Female': 0}
+        accident_type = {'Head-on collision': 0, 'Rear-end collision': 0, 'Side-impact collision': 0, 'Single vehicle accident': 0, 'Pedestrian accident': 0}
+        accident_cause = {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0}
+        injuries = [0] * 24  # For hourly data in 'today' filter
+        fatalities = [0] * 24  # For hourly data in 'today' filter
+
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            for response in today_responses:
+                response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('barangay', '') in barangays and response.get('emergency_type') == 'Road Accident':
+                    weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
+                    road_conditions[response.get('road_condition', 'Unknown')] = road_conditions.get(response.get('road_condition', 'Unknown'), 0) + 1
+                    vehicle_types[response.get('vehicle_type', 'Unknown')] = vehicle_types.get(response.get('vehicle_type', 'Unknown'), 0) + 1
+                    driver_age[response.get('driver_age', 'Unknown')] = driver_age.get(response.get('driver_age', 'Unknown'), 0) + 1
+                    driver_gender[response.get('driver_gender', 'Unknown')] = driver_gender.get(response.get('driver_gender', 'Unknown'), 0) + 1
+                    accident_type[response.get('road_accident_cause', 'Unknown')] = accident_type.get(response.get('road_accident_cause', 'Unknown'), 0) + 1
+                    accident_cause[response.get('road_accident_type', 'Unknown')] = accident_cause.get(response.get('road_accident_type', 'Unknown'), 0) + 1
+                    hour = response_time.hour
+                    injuries[hour] += 1  # Mock injuries count
+                    fatalities[hour] += random.randint(0, 1)  # Mock fatalities count
+
+        return {
+            'weather': weather,
+            'road_conditions': road_conditions,
+            'vehicle_types': vehicle_types,
+            'driver_age': driver_age,
+            'driver_gender': driver_gender,
+            'accident_type': accident_type,
+            'accident_cause': accident_cause,
+            'injuries': injuries,
+            'fatalities': fatalities
+        }
+    except Exception as e:
+        logger.error(f"Error in handle_road_analytics_data: {e}")
+        return {
+            'weather': {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0},
+            'road_conditions': {'Dry': 0, 'Wet': 0, 'Icy': 0, 'Snowy': 0},
+            'vehicle_types': {'Car': 0, 'Motorcycle': 0, 'Truck': 0, 'Bus': 0},
+            'driver_age': {'18-25': 0, '26-35': 0, '36-50': 0, '51+': 0},
+            'driver_gender': {'Male': 0, 'Female': 0},
+            'accident_type': {'Head-on collision': 0, 'Rear-end collision': 0, 'Side-impact collision': 0, 'Single vehicle accident': 0, 'Pedestrian accident': 0},
+            'accident_cause': {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0},
+            'injuries': [0] * 24,
+            'fatalities': [0] * 24
+        }
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}
@@ -1244,46 +1297,21 @@ def get_cdrrmo_analytics_data():
     trends = get_cdrrmo_trends(time_filter)
     distribution = get_cdrrmo_distribution(time_filter)
     causes_data = get_cdrrmo_causes(time_filter)
-    
-    # Initialize chart data
-    weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
-    road_conditions = {'Dry': 0, 'Wet': 0, 'Icy': 0, 'Snowy': 0}
-    vehicle_types = {'Car': 0, 'Motorcycle': 0, 'Truck': 0, 'Bus': 0}
-    driver_age = {'18-25': 0, '26-35': 0, '36-50': 0, '51+': 0}
-    driver_gender = {'Male': 0, 'Female': 0}
-    accident_type = {'Head-on collision': 0, 'Rear-end collision': 0, 'Side-impact collision': 0, 'Single vehicle accident': 0, 'Pedestrian accident': 0}
-    accident_cause = {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0}
-    injuries = [0] * (len(trends['labels']) if trends['labels'] else 1)
-    fatalities = [0] * (len(trends['labels']) if trends['labels'] else 1)
-    
-    # Aggregate today's responses for this municipality
-    if time_filter == 'today':
-        today = datetime.now(pytz.timezone('Asia/Manila')).date()
-        barangays = barangay_coords.get(municipality, [])
-        for response in today_responses:
-            response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-            if response_time.date() == today and response.get('barangay', '') in barangays:
-                weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
-                road_conditions[response.get('road_condition', 'Unknown')] = road_conditions.get(response.get('road_condition', 'Unknown'), 0) + 1
-                vehicle_types[response.get('vehicle_type', 'Unknown')] = vehicle_types.get(response.get('vehicle_type', 'Unknown'), 0) + 1
-                driver_age[response.get('driver_age', 'Unknown')] = driver_age.get(response.get('driver_age', 'Unknown'), 0) + 1
-                driver_gender[response.get('driver_gender', 'Unknown')] = driver_gender.get(response.get('driver_gender', 'Unknown'), 0) + 1
-                accident_type[response.get('road_accident_cause', 'Unknown')] = accident_type.get(response.get('road_accident_cause', 'Unknown'), 0) + 1
-                accident_cause[response.get('road_accident_type', 'Unknown')] = accident_cause.get(response.get('road_accident_type', 'Unknown'), 0) + 1
+    analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
     
     return jsonify({
         'trends': trends,
         'distribution': distribution,
         'causes': causes_data['road'],
-        'weather': weather,
-        'road_conditions': road_conditions,
-        'vehicle_types': vehicle_types,
-        'driver_age': driver_age,
-        'driver_gender': driver_gender,
-        'accident_type': accident_type,
-        'accident_cause': accident_cause,
-        'injuries': injuries,
-        'fatalities': fatalities
+        'weather': analytics_data['weather'],
+        'road_conditions': analytics_data['road_conditions'],
+        'vehicle_types': analytics_data['vehicle_types'],
+        'driver_age': analytics_data['driver_age'],
+        'driver_gender': analytics_data['driver_gender'],
+        'accident_type': analytics_data['accident_type'],
+        'accident_cause': analytics_data['accident_cause'],
+        'injuries': analytics_data['injuries'],
+        'fatalities': analytics_data['fatalities']
     })
 
 @app.route('/pnp/analytics')
@@ -1301,55 +1329,30 @@ def pnp_analytics():
     barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
-@app.route('/api/pnp_analytics_data', methods=['GET'])
-def get_pnp_analytics_data():
+@app.route('/api/cdrrmo_analytics_data', methods=['GET'])
+def get_cdrrmo_analytics_data():
     time_filter = request.args.get('time', 'weekly')
     unique_id = session.get('unique_id')
     municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
     
-    trends = get_pnp_trends(time_filter)
-    distribution = get_pnp_distribution(time_filter)
-    causes_data = get_pnp_causes(time_filter)
-    
-    # Initialize chart data
-    weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
-    road_conditions = {'Dry': 0, 'Wet': 0, 'Icy': 0, 'Snowy': 0}
-    vehicle_types = {'Car': 0, 'Motorcycle': 0, 'Truck': 0, 'Bus': 0}
-    driver_age = {'18-25': 0, '26-35': 0, '36-50': 0, '51+': 0}
-    driver_gender = {'Male': 0, 'Female': 0}
-    accident_type = {'Head-on collision': 0, 'Rear-end collision': 0, 'Side-impact collision': 0, 'Single vehicle accident': 0, 'Pedestrian accident': 0}
-    accident_cause = {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0}
-    injuries = [0] * (len(trends['labels']) if trends['labels'] else 1)
-    fatalities = [0] * (len(trends['labels']) if trends['labels'] else 1)
-    
-    # Aggregate today's responses for this municipality
-    if time_filter == 'today':
-        today = datetime.now(pytz.timezone('Asia/Manila')).date()
-        barangays = barangay_coords.get(municipality, [])
-        for response in today_responses:
-            response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-            if response_time.date() == today and response.get('barangay', '') in barangays:
-                weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
-                road_conditions[response.get('road_condition', 'Unknown')] = road_conditions.get(response.get('road_condition', 'Unknown'), 0) + 1
-                vehicle_types[response.get('vehicle_type', 'Unknown')] = vehicle_types.get(response.get('vehicle_type', 'Unknown'), 0) + 1
-                driver_age[response.get('driver_age', 'Unknown')] = driver_age.get(response.get('driver_age', 'Unknown'), 0) + 1
-                driver_gender[response.get('driver_gender', 'Unknown')] = driver_gender.get(response.get('driver_gender', 'Unknown'), 0) + 1
-                accident_type[response.get('road_accident_cause', 'Unknown')] = accident_type.get(response.get('road_accident_cause', 'Unknown'), 0) + 1
-                accident_cause[response.get('road_accident_type', 'Unknown')] = accident_cause.get(response.get('road_accident_type', 'Unknown'), 0) + 1
+    trends = get_cdrrmo_trends(time_filter)
+    distribution = get_cdrrmo_distribution(time_filter)
+    causes_data = get_cdrrmo_causes(time_filter)
+    analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
     
     return jsonify({
         'trends': trends,
         'distribution': distribution,
         'causes': causes_data['road'],
-        'weather': weather,
-        'road_conditions': road_conditions,
-        'vehicle_types': vehicle_types,
-        'driver_age': driver_age,
-        'driver_gender': driver_gender,
-        'accident_type': accident_type,
-        'accident_cause': accident_cause,
-        'injuries': injuries,
-        'fatalities': fatalities
+        'weather': analytics_data['weather'],
+        'road_conditions': analytics_data['road_conditions'],
+        'vehicle_types': analytics_data['vehicle_types'],
+        'driver_age': analytics_data['driver_age'],
+        'driver_gender': analytics_data['driver_gender'],
+        'accident_type': analytics_data['accident_type'],
+        'accident_cause': analytics_data['accident_cause'],
+        'injuries': analytics_data['injuries'],
+        'fatalities': analytics_data['fatalities']
     })
 
 @app.route('/bfp/analytics')
