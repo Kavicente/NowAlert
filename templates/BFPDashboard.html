@@ -174,7 +174,7 @@
                     }
                     predictionDiv.textContent = `Prediction: There will be a ${formattedPrediction}% chance of Fire Incident Again in next ${randomRange}`;
                     alertItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    console.log('Prediction added to alertItem:', alertItem);
+                    console.log('Prediction added to alertItem:', alertItem.outerHTML);
                 } else {
                     console.error('Alert item not found or not in DOM for alert_id:', data.alert_id);
                     const feed = document.getElementById('alert-container');
@@ -189,7 +189,7 @@
                     alertDiv.appendChild(predictionDiv);
                     feed.prepend(alertDiv);
                     alertDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    console.log('Fallback alert item created:', alertDiv);
+                    console.log('Fallback alert item created:', alertDiv.outerHTML);
                 }
             });
 
