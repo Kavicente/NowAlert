@@ -1331,6 +1331,32 @@ def get_cdrrmo_analytics_data():
         'fatalities': analytics_data['fatalities']
     })
 
+@app.route('/api/pnp_analytics_data', methods=['GET'])
+def get_pnp_analytics_data():
+    time_filter = request.args.get('time', 'weekly')
+    unique_id = session.get('unique_id')
+    municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
+    
+    trends = get_pnp_trends(time_filter)
+    distribution = get_pnp_distribution(time_filter)
+    causes_data = get_pnp_causes(time_filter)
+    analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
+    
+    return jsonify({
+        'trends': trends,
+        'distribution': distribution,
+        'causes': causes_data['road'],
+        'weather': analytics_data['weather'],
+        'road_conditions': analytics_data['road_conditions'],
+        'vehicle_types': analytics_data['vehicle_types'],
+        'driver_age': analytics_data['driver_age'],
+        'driver_gender': analytics_data['driver_gender'],
+        'accident_type': analytics_data['accident_type'],
+        'accident_cause': analytics_data['accident_cause'],
+        'injuries': analytics_data['injuries'],
+        'fatalities': analytics_data['fatalities']
+    })
+
 @app.route('/bfp/analytics')
 def bfp_analytics():
     if 'role' not in session or session['role'] != 'bfp':
