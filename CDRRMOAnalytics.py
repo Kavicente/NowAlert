@@ -10,6 +10,9 @@ import numpy as np
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+today_responses = []
+
 def get_time_range(time_filter):
     now = datetime.now(pytz.timezone('Asia/Manila'))
     if time_filter == 'today':
@@ -171,75 +174,59 @@ def load_csv_data_fire(file_path, time_filter):
         logger.error(f"Error loading CSV {file_path}: {e}. Generating mock data.")
         return generate_mock_data(time_filter, 'fire')
 
-def get_cdrrmo_trends(time_filter):
+def get_cdrrmo_trends(time_filter, barangay=None):
     try:
-        road_df = load_csv_data_road('road_accident.csv', time_filter)
-        fire_df = load_csv_data_fire('fire_incident.csv', time_filter)
-        start, end = get_time_range(time_filter)
-        
         if time_filter == 'today':
-            labels = [(start + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
-            total = [len(road_df[road_df['timestamp'].dt.hour == i]) + len(fire_df[fire_df['timestamp'].dt.hour == i]) for i in range(24)]
-            responded = [len(road_df[(road_df['timestamp'].dt.hour == i) & (road_df['responded'] == True)]) + 
-                         len(fire_df[(fire_df['timestamp'].dt.hour == i) & (fire_df['responded'] == True)]) for i in range(24)]
-        elif time_filter == 'daily':
-            labels = [(start + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
-            total = [len(road_df[road_df['timestamp'].dt.hour == i]) + len(fire_df[fire_df['timestamp'].dt.hour == i]) for i in range(24)]
-            responded = [len(road_df[(road_df['timestamp'].dt.hour == i) & (road_df['responded'] == True)]) + 
-                         len(fire_df[(fire_df['timestamp'].dt.hour == i) & (fire_df['responded'] == True)]) for i in range(24)]
-        elif time_filter == 'weekly':
-            labels = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-            total = [len(road_df[road_df['timestamp'].dt.date == (start + timedelta(days=i)).date()]) + 
-                     len(fire_df[fire_df['timestamp'].dt.date == (start + timedelta(days=i)).date()]) for i in range(7)]
-            responded = [len(road_df[(road_df['timestamp'].dt.date == (start + timedelta(days=i)).date()) & (road_df['responded'] == True)]) + 
-                         len(fire_df[(fire_df['timestamp'].dt.date == (start + timedelta(days=i)).date()) & (fire_df['responded'] == True)]) for i in range(7)]
-        elif time_filter == 'monthly':
-            labels = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 30, 2)]
-            total = [len(road_df[(road_df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
-                                 (road_df['timestamp'].dt.date < (start + timedelta(days=i+2)).date())]) + 
-                     len(fire_df[(fire_df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
-                                 (fire_df['timestamp'].dt.date < (start + timedelta(days=i+2)).date())]) for i in range(0, 30, 2)]
-            responded = [len(road_df[(road_df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
-                                     (road_df['timestamp'].dt.date < (start + timedelta(days=i+2)).date()) & 
-                                     (road_df['responded'] == True)]) + 
-                         len(fire_df[(fire_df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
-                                     (fire_df['timestamp'].dt.date < (start + timedelta(days=i+2)).date()) & 
-                                     (fire_df['responded'] == True)]) for i in range(0, 30, 2)]
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            labels = [f"{i:02d}:00" for i in range(24)]
+            total = [0] * 24
+            responded = [0] * 24
+            for response in today_responses:
+                response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type') == 'Road Accident':
+                    hour = response_time.hour
+                    total[hour] += 1
+                    if response.get('responded', False):
+                        responded[hour] += 1
+            return {'labels': labels, 'total': total, 'responded': responded}
         else:
-            labels = [(start + timedelta(days=i*30)).strftime('%Y-%m') for i in range(12)]
-            total = [len(road_df[(road_df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
-                                 (road_df['timestamp'].dt.month == (start + timedelta(days=i*30)).month)]) + 
-                     len(fire_df[(fire_df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
-                                 (fire_df['timestamp'].dt.month == (start + timedelta(days=i*30)).month)]) for i in range(12)]
-            responded = [len(road_df[(road_df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
-                                     (road_df['timestamp'].dt.month == (start + timedelta(days=i*30)).month) & 
-                                     (road_df['responded'] == True)]) + 
-                         len(fire_df[(fire_df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
-                                     (fire_df['timestamp'].dt.month == (start + timedelta(days=i*30)).month) & 
-                                     (fire_df['responded'] == True)]) for i in range(12)]
-        return {'labels': labels, 'total': total, 'responded': responded}
+            return generate_mock_data(time_filter, 'road')
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_trends: {e}")
         return {'labels': [], 'total': [], 'responded': []}
 
-def get_cdrrmo_distribution(time_filter):
+def get_cdrrmo_distribution(time_filter, barangay=None):
     try:
-        road_df = load_csv_data_road('road_accident.csv', time_filter)
-        fire_df = load_csv_data_fire('fire_incident.csv', time_filter)
-        distribution = Counter(road_df['emergency_type']) + Counter(fire_df['emergency_type'])
-        return {k: {'total': v, 'responded': len(road_df[(road_df['emergency_type'] == k) & (road_df['responded'] == True)]) + 
-                    len(fire_df[(fire_df['emergency_type'] == k) & (fire_df['responded'] == True)])} for k, v in distribution.items()}
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            distribution = Counter()
+            for response in today_responses:
+                response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type') == 'Road Accident':
+                    emergency_type = response.get('emergency_type', 'Unknown')
+                    distribution[emergency_type] += 1
+            return {k: {'total': v, 'responded': sum(1 for r in today_responses if r.get('emergency_type') == k and r.get('responded', False))} for k, v in distribution.items()}
+        else:
+            return generate_mock_data(time_filter, 'road')['emergency_type'].value_counts().to_dict()
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_distribution: {e}")
         return {'Unknown': {'total': 0, 'responded': 0}}
 
-def get_cdrrmo_causes(time_filter):
+def get_cdrrmo_causes(time_filter, barangay=None):
     try:
-        road_df = load_csv_data_road('road_accident.csv', time_filter)
-        fire_df = load_csv_data_fire('fire_incident.csv', time_filter)
-        road_causes = Counter(road_df['predicted_cause'] if 'predicted_cause' in road_df.columns else road_df['cause'])
-        fire_causes = Counter(fire_df['predicted_cause'] if 'predicted_cause' in fire_df.columns else fire_df['cause'])
-        return {'road': dict(road_causes), 'fire': dict(fire_causes)}
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            road_causes = Counter()
+            for response in today_responses:
+                response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type') == 'Road Accident':
+                    cause = response.get('road_accident_cause', 'Unknown')
+                    road_causes[cause] += 1
+            return {'road': dict(road_causes), 'fire': {'Unknown': 0}}
+        else:
+            mock_data = generate_mock_data(time_filter, 'road')
+            road_causes = Counter(mock_data['cause'])
+            return {'road': dict(road_causes), 'fire': {'Unknown': 0}}
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_causes: {e}")
         return {'road': {'Unknown': 0}, 'fire': {'Unknown': 0}}

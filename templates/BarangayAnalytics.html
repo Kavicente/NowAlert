@@ -10,7 +10,7 @@
 </head>
 <body>
     <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
-    <header class="h1">Barangay {{ barangay }} Reports</header>
+    <header class="h1">Barangay {{ barangay }} Reports</header>a
     <p id="datetime">{{ current_datetime }}</p>
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
@@ -38,14 +38,15 @@
         <div id="roadSection" class="section">
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="roadIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Accident Distribution</h2><canvas id="roadAccidentDistributionChart"></canvas></div>
-            <div class="chart-container"><h2>Accident Cause Analysis</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
             <div class="chart-container"><h2>Responded Alerts</h2><canvas id="roadRespondedAlertsChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Condition</h2><canvas id="roadWeatherChart"></canvas></div>
+            <div class="chart-container"><h2>Accident Cause</h2><canvas id="roadCauseAnalysisChart"></canvas></div>
+            <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
             <div class="chart-container"><h2>Road Condition</h2><canvas id="roadConditionChart"></canvas></div>
+            <div class="chart-container"><h2>Weather Condition</h2><canvas id="roadWeatherChart"></canvas></div>
             <div class="chart-container"><h2>Vehicle Types</h2><canvas id="roadVehicleTypesChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Age</h2><canvas id="roadDriverAgeChart"></canvas></div>
             <div class="chart-container"><h2>Driver's Gender</h2><canvas id="roadDriverGenderChart"></canvas></div>
-            <div class="chart-container"><h2>Accident Type</h2><canvas id="roadAccidentTypeChart"></canvas></div>
+            
         </div>
 
         <!-- Fire Incident Section -->
