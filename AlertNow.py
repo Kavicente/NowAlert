@@ -1288,31 +1288,7 @@ def cdrrmo_analytics():
     barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('CDRRMOAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
-@app.route('/api/cdrrmo_analytics_data', methods=['GET'])
-def get_cdrrmo_analytics_data():
-    time_filter = request.args.get('time', 'weekly')
-    unique_id = session.get('unique_id')
-    municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-    
-    trends = get_cdrrmo_trends(time_filter)
-    distribution = get_cdrrmo_distribution(time_filter)
-    causes_data = get_cdrrmo_causes(time_filter)
-    analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
-    
-    return jsonify({
-        'trends': trends,
-        'distribution': distribution,
-        'causes': causes_data['road'],
-        'weather': analytics_data['weather'],
-        'road_conditions': analytics_data['road_conditions'],
-        'vehicle_types': analytics_data['vehicle_types'],
-        'driver_age': analytics_data['driver_age'],
-        'driver_gender': analytics_data['driver_gender'],
-        'accident_type': analytics_data['accident_type'],
-        'accident_cause': analytics_data['accident_cause'],
-        'injuries': analytics_data['injuries'],
-        'fatalities': analytics_data['fatalities']
-    })
+
 
 @app.route('/pnp/analytics')
 def pnp_analytics():
