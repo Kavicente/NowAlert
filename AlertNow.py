@@ -470,25 +470,21 @@ def handle_cdrrmo_response_submitted(data):
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A')
         }
+        
+        input_df = pd.DataFrame([{'prediction': 0}])  # Dummy initialization
+        
         if road_accident_predictor:
-            try:
-                features = pd.DataFrame([{
-                    'weather': response['weather'],
-                    'road_condition': response['road_condition'],
-                    'vehicle_type': response['vehicle_type'],
-                    'driver_age': response['driver_age'],
-                    'driver_gender': response['driver_gender'],
-                    'road_accident_type': response['road_accident_type'],
-                    'cause': response['cause']
-                }])
-                prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
-                response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
-            except Exception as e:
-                logger.error(f"Prediction error for CDRRMO response: {e}")
-                response['prediction'] = 'prediction_error'
+            prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            logger.info(f"Prediction for barangay response: {data['prediction']}")
         else:
-            response['prediction'] = 'prediction_error'
-        responses.append(response)
+            data['prediction'] = 'prediction_error'
+            logger.error("Road accident predictor not loaded")
+    except Exception as e:
+        data['prediction'] = 'prediction_error'
+        logger.error(f"Error in prediction for barangay response: {e}")
+    
+        responses.append(data)
         today_responses.append(response)
         socketio.emit('cdrrmo_response', response, room=f'cdrrmo_{municipality}')
         socketio.emit('stats_update', {
@@ -527,25 +523,20 @@ def handle_pnp_response_submitted(data):
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A')
         }
+        input_df = pd.DataFrame([{'prediction': 0}])  # Dummy initialization
+        
         if road_accident_predictor:
-            try:
-                features = pd.DataFrame([{
-                    'weather': response['weather'],
-                    'road_condition': response['road_condition'],
-                    'vehicle_type': response['vehicle_type'],
-                    'driver_age': response['driver_age'],
-                    'driver_gender': response['driver_gender'],
-                    'road_accident_type': response['road_accident_type'],
-                    'cause': response['cause']
-                }])
-                prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
-                response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
-            except Exception as e:
-                logger.error(f"Prediction error for PNP response: {e}")
-                response['prediction'] = 'prediction_error'
+            prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            logger.info(f"Prediction for barangay response: {data['prediction']}")
         else:
-            response['prediction'] = 'prediction_error'
-        responses.append(response)
+            data['prediction'] = 'prediction_error'
+            logger.error("Road accident predictor not loaded")
+    except Exception as e:
+        data['prediction'] = 'prediction_error'
+        logger.error(f"Error in prediction for barangay response: {e}")
+    
+        responses.append(data)
         today_responses.append(response)
         socketio.emit('pnp_response', response, room=f'pnp_{municipality}')
         socketio.emit('stats_update', {
