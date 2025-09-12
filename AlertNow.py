@@ -481,12 +481,6 @@ def handle_cdrrmo_response_submitted(data):
                     'road_accident_type': response['road_accident_type'],
                     'cause': response['cause']
                 }])
-                features = pd.get_dummies(features)
-                expected_columns = road_accident_df.drop(columns=['severity']).columns
-                for col in expected_columns:
-                    if col not in features.columns:
-                        features[col] = 0
-                features = features[expected_columns]
                 prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
                 response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
             except Exception as e:
@@ -544,12 +538,6 @@ def handle_pnp_response_submitted(data):
                     'road_accident_type': response['road_accident_type'],
                     'cause': response['cause']
                 }])
-                features = pd.get_dummies(features)
-                expected_columns = road_accident_df.drop(columns=['severity']).columns
-                for col in expected_columns:
-                    if col not in features.columns:
-                        features[col] = 0
-                features = features[expected_columns]
                 prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
                 response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
             except Exception as e:
