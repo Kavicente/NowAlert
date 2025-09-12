@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 def get_pnp_stats():
     try:
-        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'pnp' or a.get('assigned_municipality')]
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'pnp' or a.get('municipality')]
         return Counter(types)
     except Exception as e:
         logger.error(f"Error in get_pnp_stats: {e}")
