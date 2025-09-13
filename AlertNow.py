@@ -18,7 +18,7 @@ from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
-from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes
+from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes, generate_mock_data
 from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes
 from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes
 from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
@@ -716,7 +716,7 @@ def handle_fire_response_submitted(data):
     emit('fire_response_submitted', cleaned_data, room=bfp_room)
     logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
     
-def handle_road_analytics_data(time_filter, municipality, barangays):
+def handle_road_analytics_data(time_filter, municipality, barangays, role='barangay'):
     try:
         weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
         road_conditions = {'Dry': 0, 'Wet': 0, 'Icy': 0, 'Snowy': 0}
@@ -725,24 +725,44 @@ def handle_road_analytics_data(time_filter, municipality, barangays):
         driver_gender = {'Male': 0, 'Female': 0}
         accident_type = {'Head-on collision': 0, 'Rear-end collision': 0, 'Side-impact collision': 0, 'Single vehicle accident': 0, 'Pedestrian accident': 0}
         accident_cause = {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0}
-        injuries = [0] * 24  # For hourly data in 'today' filter
-        fatalities = [0] * 24  # For hourly data in 'today' filter
+        injuries = [0] * 24
+        fatalities = [0] * 24
 
         if time_filter == 'today':
             today = datetime.now(pytz.timezone('Asia/Manila')).date()
             for response in today_responses:
-                response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and response.get('barangay', '') in barangays and response.get('emergency_type') == 'Road Accident':
+                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if (response_time.date() == today and 
+                    response.get('role', '').lower() == role.lower() and 
+                    response.get('emergency_type', '') == 'Road Accident' and
+                    response.get('barangay', '') in barangays and
+                    response.get('municipality', '').lower() == municipality.lower()):
                     weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
                     road_conditions[response.get('road_condition', 'Unknown')] = road_conditions.get(response.get('road_condition', 'Unknown'), 0) + 1
                     vehicle_types[response.get('vehicle_type', 'Unknown')] = vehicle_types.get(response.get('vehicle_type', 'Unknown'), 0) + 1
                     driver_age[response.get('driver_age', 'Unknown')] = driver_age.get(response.get('driver_age', 'Unknown'), 0) + 1
                     driver_gender[response.get('driver_gender', 'Unknown')] = driver_gender.get(response.get('driver_gender', 'Unknown'), 0) + 1
-                    accident_type[response.get('road_accident_cause', 'Unknown')] = accident_type.get(response.get('road_accident_cause', 'Unknown'), 0) + 1
-                    accident_cause[response.get('road_accident_type', 'Unknown')] = accident_cause.get(response.get('road_accident_type', 'Unknown'), 0) + 1
+                    accident_type[response.get('road_accident_type', 'Unknown')] = accident_type.get(response.get('road_accident_type', 'Unknown'), 0) + 1
+                    accident_cause[response.get('cause', 'Unknown')] = accident_cause.get(response.get('cause', 'Unknown'), 0) + 1
                     hour = response_time.hour
-                    injuries[hour] += 1  # Mock injuries count
-                    fatalities[hour] += random.randint(0, 1)  # Mock fatalities count
+                    injuries[hour] += response.get('injuries', 0)
+                    fatalities[hour] += response.get('fatalities', 0)
+        else:
+            mock_data = generate_mock_data(time_filter, 'road')
+            for record in mock_data:
+                if (record.get('role', '').lower() == role.lower() and 
+                    record.get('emergency_type', '') == 'Road Accident' and
+                    record.get('barangay', '') in barangays and
+                    record.get('municipality', '').lower() == municipality.lower()):
+                    weather[record.get('weather', 'Unknown')] = weather.get(record.get('weather', 'Unknown'), 0) + 1
+                    road_conditions[record.get('road_condition', 'Unknown')] = road_conditions.get(record.get('road_condition', 'Unknown'), 0) + 1
+                    vehicle_types[record.get('vehicle_type', 'Unknown')] = vehicle_types.get(record.get('vehicle_type', 'Unknown'), 0) + 1
+                    driver_age[record.get('driver_age', 'Unknown')] = driver_age.get(record.get('driver_age', 'Unknown'), 0) + 1
+                    driver_gender[record.get('driver_gender', 'Unknown')] = driver_gender.get(record.get('driver_gender', 'Unknown'), 0) + 1
+                    accident_type[record.get('road_accident_type', 'Unknown')] = accident_type.get(record.get('road_accident_type', 'Unknown'), 0) + 1
+                    accident_cause[record.get('cause', 'Unknown')] = accident_cause.get(record.get('cause', 'Unknown'), 0) + 1
+                    injuries[0] += record.get('injuries', 0)
+                    fatalities[0] += record.get('fatalities', 0)
 
         return {
             'weather': weather,
@@ -767,6 +787,44 @@ def handle_road_analytics_data(time_filter, municipality, barangays):
             'accident_cause': {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0},
             'injuries': [0] * 24,
             'fatalities': [0] * 24
+        }
+
+# Added handle_fire_analytics_data
+def handle_fire_analytics_data(time_filter, municipality, barangays, role='barangay'):
+    try:
+        weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
+        property_types = {'Residential': 0, 'Commercial': 0, 'Industrial': 0, 'Other': 0}
+
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            for response in today_responses:
+                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if (response_time.date() == today and 
+                    response.get('role', '').lower() == role.lower() and 
+                    response.get('emergency_type', '') == 'Fire' and
+                    response.get('barangay', '') in barangays and
+                    response.get('municipality', '').lower() == municipality.lower()):
+                    weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
+                    property_types[response.get('property_type', 'Unknown')] = property_types.get(response.get('property_type', 'Unknown'), 0) + 1
+        else:
+            mock_data = generate_mock_data(time_filter, 'fire')
+            for record in mock_data:
+                if (record.get('role', '').lower() == role.lower() and 
+                    record.get('emergency_type', '') == 'Fire' and
+                    record.get('barangay', '') in barangays and
+                    record.get('municipality', '').lower() == municipality.lower()):
+                    weather[record.get('weather', 'Unknown')] = weather.get(record.get('weather', 'Unknown'), 0) + 1
+                    property_types[record.get('property_type', 'Unknown')] = property_types.get(record.get('property_type', 'Unknown'), 0) + 1
+
+        return {
+            'weather': weather,
+            'property_types': property_types
+        }
+    except Exception as e:
+        logger.error(f"Error in handle_fire_analytics_data: {e}")
+        return {
+            'weather': {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0},
+            'property_types': {'Residential': 0, 'Commercial': 0, 'Industrial': 0, 'Other': 0}
         }
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
@@ -1482,20 +1540,23 @@ def get_cdrrmo_analytics_data():
         unique_id = session.get('unique_id')
         municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
         
-        trends = get_cdrrmo_trends(time_filter)
-        distribution = get_cdrrmo_distribution(time_filter)
-        causes_data = get_cdrrmo_causes(time_filter)
-        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
+        trends = get_cdrrmo_trends(time_filter, municipality=municipality)
+        distribution = get_cdrrmo_distribution(time_filter, municipality=municipality)
+        causes_data = get_cdrrmo_causes(time_filter, municipality=municipality)
+        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
+        fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
         
         logger.debug(f"CDRRMO trends type: {type(trends)}, value: {trends}")
         logger.debug(f"CDRRMO distribution type: {type(distribution)}, value: {distribution}")
         logger.debug(f"CDRRMO causes_data type: {type(causes_data)}, value: {causes_data}")
         logger.debug(f"CDRRMO analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        logger.debug(f"CDRRMO fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
         
         return jsonify({
             'trends': trends,
             'distribution': distribution,
             'causes': causes_data['road'],
+            'fire_causes': causes_data['fire'],
             'weather': analytics_data['weather'],
             'road_conditions': analytics_data['road_conditions'],
             'vehicle_types': analytics_data['vehicle_types'],
@@ -1504,7 +1565,9 @@ def get_cdrrmo_analytics_data():
             'accident_type': analytics_data['accident_type'],
             'accident_cause': analytics_data['accident_cause'],
             'injuries': analytics_data['injuries'],
-            'fatalities': analytics_data['fatalities']
+            'fatalities': analytics_data['fatalities'],
+            'fire_weather': fire_analytics_data['weather'],
+            'property_types': fire_analytics_data['property_types']
         })
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
@@ -1513,27 +1576,30 @@ def get_cdrrmo_analytics_data():
 
 
 
-@app.route('/api/pnp_analytics_data', methods=['GET'])
-def get_pnp_analytics_data():
+@app.route('/api/cdrrmo_analytics_data', methods=['GET'])
+def get_cdrrmo_analytics_data():
     try:
         time_filter = request.args.get('time', 'weekly')
         unique_id = session.get('unique_id')
         municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
         
-        trends = get_pnp_trends(time_filter)
-        distribution = get_pnp_distribution(time_filter)
-        causes_data = get_pnp_causes(time_filter)
-        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []))
+        trends = get_cdrrmo_trends(time_filter, municipality=municipality)
+        distribution = get_cdrrmo_distribution(time_filter, municipality=municipality)
+        causes_data = get_cdrrmo_causes(time_filter, municipality=municipality)
+        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
+        fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
         
-        logger.debug(f"PNP trends type: {type(trends)}, value: {trends}")
-        logger.debug(f"PNP distribution type: {type(distribution)}, value: {distribution}")
-        logger.debug(f"PNP causes_data type: {type(causes_data)}, value: {causes_data}")
-        logger.debug(f"PNP analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        logger.debug(f"CDRRMO trends type: {type(trends)}, value: {trends}")
+        logger.debug(f"CDRRMO distribution type: {type(distribution)}, value: {distribution}")
+        logger.debug(f"CDRRMO causes_data type: {type(causes_data)}, value: {causes_data}")
+        logger.debug(f"CDRRMO analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        logger.debug(f"CDRRMO fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
         
         return jsonify({
             'trends': trends,
             'distribution': distribution,
             'causes': causes_data['road'],
+            'fire_causes': causes_data['fire'],
             'weather': analytics_data['weather'],
             'road_conditions': analytics_data['road_conditions'],
             'vehicle_types': analytics_data['vehicle_types'],
@@ -1542,10 +1608,12 @@ def get_pnp_analytics_data():
             'accident_type': analytics_data['accident_type'],
             'accident_cause': analytics_data['accident_cause'],
             'injuries': analytics_data['injuries'],
-            'fatalities': analytics_data['fatalities']
+            'fatalities': analytics_data['fatalities'],
+            'fire_weather': fire_analytics_data['weather'],
+            'property_types': fire_analytics_data['property_types']
         })
     except Exception as e:
-        logger.error(f"Error in get_pnp_analytics_data: {e}")
+        logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/bfp/analytics')
@@ -1580,6 +1648,9 @@ def get_bfp_analytics_data():
     except Exception as e:
         logger.error(f"Error in get_bfp_analytics_data: {e}")
         return jsonify({'error': 'Failed to retrieve analytics data'}), 500
+
+
+
 
 def get_latest_alert():
     try:
