@@ -470,21 +470,33 @@ def handle_cdrrmo_response_submitted(data):
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A')
         }
-        
-        input_df = pd.DataFrame([{'prediction': 0}])  # Dummy initialization
-        
         if road_accident_predictor:
-            prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for barangay response: {data['prediction']}")
+            try:
+                features = pd.DataFrame([{
+                    'Weather': response['weather'],
+                    'Road_Condition': response['road_condition'],
+                    'Vehicle_Type': response['vehicle_type'],
+                    'Driver_Age': response['driver_age'],
+                    'Driver_Gender': response['driver_gender'],
+                    'Road_Accident_Type': response['road_accident_type'],
+                    'Accident_Cause': response['cause'],
+                    'Barangay': response['barangay'],
+                    'Year': datetime.now().year
+                }])
+                features = pd.get_dummies(features)
+                expected_columns = road_accident_df.drop(columns=['road_condition']).columns
+                for col in expected_columns:
+                    if col not in features.columns:
+                        features[col] = 0
+                features = features[expected_columns]
+                prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
+                response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Prediction error for CDRRMO response: {e}")
+                response['prediction'] = 'Prediction unavailable'
         else:
-            data['prediction'] = 'prediction_error'
-            logger.error("Road accident predictor not loaded")
-    except Exception as e:
-        data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for barangay response: {e}")
-    
-        responses.append(data)
+            response['prediction'] = 'Prediction unavailable'
+        responses.append(response)
         today_responses.append(response)
         socketio.emit('cdrrmo_response', response, room=f'cdrrmo_{municipality}')
         socketio.emit('stats_update', {
@@ -523,20 +535,33 @@ def handle_pnp_response_submitted(data):
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A')
         }
-        input_df = pd.DataFrame([{'prediction': 0}])  # Dummy initialization
-        
         if road_accident_predictor:
-            prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for barangay response: {data['prediction']}")
+            try:
+                features = pd.DataFrame([{
+                    'Weather': response['weather'],
+                    'Road_Condition': response['road_condition'],
+                    'Vehicle_Type': response['vehicle_type'],
+                    'Driver_Age': response['driver_age'],
+                    'Driver_Gender': response['driver_gender'],
+                    'Road_Accident_Type': response['road_accident_type'],
+                    'Accident_Cause': response['cause'],
+                    'Barangay': response['barangay'],
+                    'Year': datetime.now().year
+                }])
+                features = pd.get_dummies(features)
+                expected_columns = road_accident_df.drop(columns=['road_condition']).columns
+                for col in expected_columns:
+                    if col not in features.columns:
+                        features[col] = 0
+                features = features[expected_columns]
+                prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
+                response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Prediction error for PNP response: {e}")
+                response['prediction'] = 'Prediction unavailable'
         else:
-            data['prediction'] = 'prediction_error'
-            logger.error("Road accident predictor not loaded")
-    except Exception as e:
-        data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for barangay response: {e}")
-    
-        responses.append(data)
+            response['prediction'] = 'Prediction unavailable'
+        responses.append(response)
         today_responses.append(response)
         socketio.emit('pnp_response', response, room=f'pnp_{municipality}')
         socketio.emit('stats_update', {
