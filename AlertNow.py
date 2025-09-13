@@ -18,9 +18,9 @@ from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
-from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes, get_barangay_analytics_data, generate_mock_data
-from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes, get_cdrrmo_analytics_data
-from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes, get_pnp_analytics_data
+from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes, generate_mock_data
+from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes
+from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes
 from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
 import random
 
@@ -1483,6 +1483,20 @@ def pnp_analytics():
     barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
+@app.route('/api/barangay_analytics_data')
+def barangay_analytics_data():
+    from BarangayAnalytics import get_barangay_analytics_data
+    return get_barangay_analytics_data(responses)
+
+@app.route('/api/cdrrmo_analytics_data')
+def cdrrmo_analytics_data():
+    from CDRRMOAnalytics import get_cdrrmo_analytics_data
+    return get_cdrrmo_analytics_data(responses)
+
+@app.route('/api/pnp_analytics_data')
+def pnp_analytics_data():
+    from PNPAnalytics import get_pnp_analytics_data
+    return get_pnp_analytics_data(responses)
 
 @app.route('/api/bfp_analytics_data', methods=['GET'])
 def get_bfp_analytics_data():

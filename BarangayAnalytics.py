@@ -4,11 +4,10 @@ from collections import Counter
 from datetime import datetime, timedelta
 import pytz
 from flask import request, jsonify
-from AlertNow import responses
 
 logger = logging.getLogger(__name__)
 
-def load_response_data(time_filter, role='barangay', barangay=''):
+def load_response_data(responses, time_filter, role='barangay', barangay=''):
     try:
         response_data = [r for r in responses if r.get('role') == role and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -29,9 +28,9 @@ def load_response_data(time_filter, role='barangay', barangay=''):
         logger.error(f"Error in load_response_data: {e}")
         return pd.DataFrame()
 
-def get_barangay_trends(time_filter, barangay=''):
+def get_barangay_trends(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         labels = []
         total = []
         if time_filter == 'today':
@@ -58,91 +57,91 @@ def get_barangay_trends(time_filter, barangay=''):
         logger.error(f"Error in get_barangay_trends: {e}")
         return {'labels': [], 'total': []}
 
-def get_barangay_distribution(time_filter, barangay=''):
+def get_barangay_distribution(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         distribution = Counter(df.get('emergency_type', ['unknown']))
         return {k: {'total': v, 'responded': len(df[(df['emergency_type'] == k) & (df.get('responded', False) == True)])} for k, v in distribution.items()}
     except Exception as e:
         logger.error(f"Error in get_barangay_distribution: {e}")
         return {'Unknown': {'total': 0, 'responded': 0}}
 
-def get_barangay_causes(time_filter, barangay=''):
+def get_barangay_causes(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         road_causes = Counter(df.get('predicted_cause', df.get('cause', ['Unknown'])))
         return {'road': dict(road_causes)}
     except Exception as e:
         logger.error(f"Error in get_barangay_causes: {e}")
         return {'road': {'Unknown': 0}}
 
-def get_barangay_accident_types(time_filter, barangay=''):
+def get_barangay_accident_types(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         accident_types = Counter(df.get('road_accident_type', df.get('accident_type', ['Unknown'])))
         return dict(accident_types)
     except Exception as e:
         logger.error(f"Error in get_barangay_accident_types: {e}")
         return {'Unknown': 0}
 
-def get_barangay_road_conditions(time_filter, barangay=''):
+def get_barangay_road_conditions(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         road_conditions = Counter(df.get('road_condition', ['Unknown']))
         return dict(road_conditions)
     except Exception as e:
         logger.error(f"Error in get_barangay_road_conditions: {e}")
         return {'Unknown': 0}
 
-def get_barangay_weather(time_filter, barangay=''):
+def get_barangay_weather(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         weather = Counter(df.get('weather', ['Unknown']))
         return dict(weather)
     except Exception as e:
         logger.error(f"Error in get_barangay_weather: {e}")
         return {'Unknown': 0}
 
-def get_barangay_vehicle_types(time_filter, barangay=''):
+def get_barangay_vehicle_types(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         vehicle_types = Counter(df.get('vehicle_type', ['Unknown']))
         return dict(vehicle_types)
     except Exception as e:
         logger.error(f"Error in get_barangay_vehicle_types: {e}")
         return {'Unknown': 0}
 
-def get_barangay_driver_age(time_filter, barangay=''):
+def get_barangay_driver_age(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         driver_age = Counter(df.get('driver_age', ['Unknown']))
         return dict(driver_age)
     except Exception as e:
         logger.error(f"Error in get_barangay_driver_age: {e}")
         return {'Unknown': 0}
 
-def get_barangay_driver_gender(time_filter, barangay=''):
+def get_barangay_driver_gender(responses, time_filter, barangay=''):
     try:
-        df = load_response_data(time_filter, 'barangay', barangay)
+        df = load_response_data(responses, time_filter, 'barangay', barangay)
         driver_gender = Counter(df.get('driver_gender', ['Unknown']))
         return dict(driver_gender)
     except Exception as e:
         logger.error(f"Error in get_barangay_driver_gender: {e}")
         return {'Unknown': 0}
 
-def get_barangay_analytics_data():
+def get_barangay_analytics_data(responses):
     try:
         time_filter = request.args.get('time', 'weekly')
         barangay = request.args.get('barangay', '')
-        trends = get_barangay_trends(time_filter, barangay)
-        distribution = get_barangay_distribution(time_filter, barangay)
-        causes = get_barangay_causes(time_filter, barangay)
-        accident_types = get_barangay_accident_types(time_filter, barangay)
-        road_conditions = get_barangay_road_conditions(time_filter, barangay)
-        weather = get_barangay_weather(time_filter, barangay)
-        vehicle_types = get_barangay_vehicle_types(time_filter, barangay)
-        driver_age = get_barangay_driver_age(time_filter, barangay)
-        driver_gender = get_barangay_driver_gender(time_filter, barangay)
+        trends = get_barangay_trends(responses, time_filter, barangay)
+        distribution = get_barangay_distribution(responses, time_filter, barangay)
+        causes = get_barangay_causes(responses, time_filter, barangay)
+        accident_types = get_barangay_accident_types(responses, time_filter, barangay)
+        road_conditions = get_barangay_road_conditions(responses, time_filter, barangay)
+        weather = get_barangay_weather(responses, time_filter, barangay)
+        vehicle_types = get_barangay_vehicle_types(responses, time_filter, barangay)
+        driver_age = get_barangay_driver_age(responses, time_filter, barangay)
+        driver_gender = get_barangay_driver_gender(responses, time_filter, barangay)
         responded = {k: v['responded'] for k, v in distribution.items()}
         
         return jsonify({
