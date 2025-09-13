@@ -67,10 +67,9 @@
         const socket = io('https://alert-858l.onrender.com');
 
         socket.on('connect', () => {
-            socket.emit('register_role', {
-                role: 'barangay',
-                barangay: '{{ barangay | lower }}'
-            });
+            const barangay = "{{ barangay }}".toLowerCase();
+            socket.emit('join', { room: `barangay_analytics_${barangay}` });
+            console.log(`Registered to room: barangay_analytics_${barangay}`);
         });
 
         
@@ -108,6 +107,15 @@
             document.querySelector(`[onclick="filterData('${timeFilter}')"]`).classList.add('active');
             updateCharts(timeFilter);
         }
+
+        socket.on('barangay_response', (data) => {
+            console.log('Barangay response received:', data);
+            updateCharts('today');
+        });
+        socket.on('analytics_update', (data) => {
+            console.log('Analytics update received:', data);
+            updateCharts('today');
+        });
         
         function updateCharts(timeFilter) {
             fetch(`/api/barangay_analytics_data?time=${timeFilter}&role=barangay&barangay={{ barangay | lower }}`)

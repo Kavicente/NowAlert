@@ -66,10 +66,9 @@
         const socket = io('https://alert-858l.onrender.com');
 
         socket.on('connect', () => {
-            socket.emit('register_role', {
-                role: 'cdrrmo',
-                municipality: '{{ municipality | lower }}'
-            });
+            const municipality = "{{ municipality }}".toLowerCase();
+            socket.emit('join', { room: `cdrrmo_analytics_${municipality}` });
+            console.log(`Registered to room: cdrrmo_analytics_${municipality}`);
         });
 
         socket.on('update_analytics', (data) => {
@@ -97,6 +96,15 @@
             sidebar.classList.toggle('active');
             mainContent.classList.toggle('shifted');
         }
+
+        socket.on('cdrrmo_response', (data) => {
+            console.log('CDRRMO response received:', data);
+            updateCharts('today');
+        });
+        socket.on('analytics_update', (data) => {
+            console.log('Analytics update received:', data);
+            updateCharts('today');
+        });
 
         function showSection(type) {
             const roadHeader = document.getElementById('letterR');

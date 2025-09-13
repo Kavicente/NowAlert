@@ -66,10 +66,9 @@
         const socket = io('https://alert-858l.onrender.com');
 
         socket.on('connect', () => {
-            socket.emit('register_role', {
-                role: 'pnp',
-                municipality: '{{ municipality | lower }}'
-            });
+            const municipality = "{{ municipality }}".toLowerCase();
+            socket.emit('join', { room: `pnp_analytics_${municipality}` });
+            console.log(`Registered to room: pnp_analytics_${municipality}`);
         });
 
         socket.on('update_analytics', (data) => {
@@ -118,6 +117,15 @@
 
             filterData(document.querySelector('.tab.active').textContent.toLowerCase());
         }
+
+        socket.on('pnp_response', (data) => {
+            console.log('PNP response received:', data);
+            updateCharts('today');
+        });
+        socket.on('analytics_update', (data) => {
+            console.log('Analytics update received:', data);
+            updateCharts('today');
+        });
 
        function filterData(timeFilter) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
