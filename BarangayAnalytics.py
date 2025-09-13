@@ -1,15 +1,14 @@
-from flask import Flask, request, jsonify
 import pandas as pd
 import logging
 from collections import Counter
 from datetime import datetime, timedelta
 import pytz
-from AlertNow import responses, road_accident_df, fire_incident_df
-
+from flask import request, jsonify
 
 logger = logging.getLogger(__name__)
 
 def load_csv_data(file_name, time_filter, incident_type=None):
+    from AlertNow import road_accident_df, fire_incident_df
     try:
         df = road_accident_df if incident_type == 'road' else fire_incident_df
         if df.empty:
@@ -93,6 +92,7 @@ def get_barangay_causes(time_filter, barangay=''):
         return {'road': {'Unknown': 0}}
 
 def get_barangay_accident_types(time_filter, barangay=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -115,6 +115,7 @@ def get_barangay_accident_types(time_filter, barangay=''):
         return {'Unknown': 0}
 
 def get_barangay_road_conditions(time_filter, barangay=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -137,6 +138,7 @@ def get_barangay_road_conditions(time_filter, barangay=''):
         return {'Unknown': 0}
 
 def get_barangay_weather(time_filter, barangay=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -159,6 +161,7 @@ def get_barangay_weather(time_filter, barangay=''):
         return {'Unknown': 0}
 
 def get_barangay_vehicle_types(time_filter, barangay=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -181,6 +184,7 @@ def get_barangay_vehicle_types(time_filter, barangay=''):
         return {'Unknown': 0}
 
 def get_barangay_driver_age(time_filter, barangay=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -203,6 +207,7 @@ def get_barangay_driver_age(time_filter, barangay=''):
         return {'Unknown': 0}
 
 def get_barangay_driver_gender(time_filter, barangay=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
         df = pd.DataFrame(response_data)
@@ -254,3 +259,7 @@ def get_barangay_analytics_data():
     except Exception as e:
         logger.error(f"Error in get_barangay_analytics_data: {e}")
         return jsonify({'error': 'Failed to retrieve analytics data'}), 500
+
+def generate_mock_data():
+    # Existing function, unchanged
+    pass

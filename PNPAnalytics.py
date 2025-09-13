@@ -4,11 +4,11 @@ from collections import Counter
 from datetime import datetime, timedelta
 import pytz
 from flask import request, jsonify
-from AlertNow import responses, road_accident_df
 
 logger = logging.getLogger(__name__)
 
 def load_csv_data(file_name, time_filter, incident_type=None):
+    from AlertNow import road_accident_df
     try:
         df = road_accident_df
         if df.empty:
@@ -92,6 +92,7 @@ def get_pnp_causes(time_filter, municipality=''):
         return {'road': {'Unknown': 0}}
 
 def get_pnp_accident_types(time_filter, municipality=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'pnp' and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
         df = pd.DataFrame(response_data)
@@ -114,6 +115,7 @@ def get_pnp_accident_types(time_filter, municipality=''):
         return {'Unknown': 0}
 
 def get_pnp_road_conditions(time_filter, municipality=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'pnp' and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
         df = pd.DataFrame(response_data)
@@ -136,6 +138,7 @@ def get_pnp_road_conditions(time_filter, municipality=''):
         return {'Unknown': 0}
 
 def get_pnp_weather(time_filter, municipality=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'pnp' and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
         df = pd.DataFrame(response_data)
@@ -158,6 +161,7 @@ def get_pnp_weather(time_filter, municipality=''):
         return {'Unknown': 0}
 
 def get_pnp_vehicle_types(time_filter, municipality=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'pnp' and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
         df = pd.DataFrame(response_data)
@@ -180,6 +184,7 @@ def get_pnp_vehicle_types(time_filter, municipality=''):
         return {'Unknown': 0}
 
 def get_pnp_driver_age(time_filter, municipality=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'pnp' and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
         df = pd.DataFrame(response_data)
@@ -202,6 +207,7 @@ def get_pnp_driver_age(time_filter, municipality=''):
         return {'Unknown': 0}
 
 def get_pnp_driver_gender(time_filter, municipality=''):
+    from AlertNow import responses
     try:
         response_data = [r for r in responses if r.get('role') == 'pnp' and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
         df = pd.DataFrame(response_data)
