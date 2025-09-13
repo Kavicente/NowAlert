@@ -1574,26 +1574,24 @@ def get_cdrrmo_analytics_data():
         return jsonify({'error': str(e)}), 500
 
 
-
-
-@app.route('/api/cdrrmo_analytics_data', methods=['GET'])
-def get_cdrrmo_analytics_data():
+@app.route('/api/pnp_analytics_data', methods=['GET'])
+def get_pnp_analytics_data():
     try:
         time_filter = request.args.get('time', 'weekly')
         unique_id = session.get('unique_id')
         municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
         
-        trends = get_cdrrmo_trends(time_filter, municipality=municipality)
-        distribution = get_cdrrmo_distribution(time_filter, municipality=municipality)
-        causes_data = get_cdrrmo_causes(time_filter, municipality=municipality)
-        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
-        fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
+        trends = get_pnp_trends(time_filter, municipality=municipality)
+        distribution = get_pnp_distribution(time_filter, municipality=municipality)
+        causes_data = get_pnp_causes(time_filter, municipality=municipality)
+        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'pnp')
+        fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'pnp')
         
-        logger.debug(f"CDRRMO trends type: {type(trends)}, value: {trends}")
-        logger.debug(f"CDRRMO distribution type: {type(distribution)}, value: {distribution}")
-        logger.debug(f"CDRRMO causes_data type: {type(causes_data)}, value: {causes_data}")
-        logger.debug(f"CDRRMO analytics_data type: {type(analytics_data)}, value: {analytics_data}")
-        logger.debug(f"CDRRMO fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
+        logger.debug(f"PNP trends type: {type(trends)}, value: {trends}")
+        logger.debug(f"PNP distribution type: {type(distribution)}, value: {distribution}")
+        logger.debug(f"PNP causes_data type: {type(causes_data)}, value: {causes_data}")
+        logger.debug(f"PNP analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        logger.debug(f"PNP fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
         
         return jsonify({
             'trends': trends,
@@ -1613,8 +1611,9 @@ def get_cdrrmo_analytics_data():
             'property_types': fire_analytics_data['property_types']
         })
     except Exception as e:
-        logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
+        logger.error(f"Error in get_pnp_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/bfp/analytics')
 def bfp_analytics():
