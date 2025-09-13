@@ -243,6 +243,18 @@ def add_response(data):
             return
     today_responses.append(data)
 
+@socketio.on('response')
+def handle_response(data):
+    try:
+        if isinstance(data, str):
+            data = json.loads(data)
+        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        today_responses.append(data)
+        logger.debug(f"Received response: {data}")
+        emit('response_received', data, broadcast=True)
+    except Exception as e:
+        logger.error(f"Error handling response: {e}")
+
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
@@ -1458,55 +1470,42 @@ def barangay_analytics():
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
     return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
 
-@app.route('/api/barangay_analytics_data')
-def barangay_analytics_data():
-    time_filter = request.args.get('time', 'weekly')
-    unique_id = session.get('unique_id')
-    barangay = unique_id.split('_')[0] if unique_id else 'Unknown'
-    
-    trends = get_barangay_trends(time_filter)
-    distribution = get_barangay_distribution(time_filter)
-    causes_data = get_barangay_causes(time_filter)
-    
-    # Initialize chart data
-    weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
-    road_conditions = {'Dry': 0, 'Wet': 0, 'Icy': 0, 'Snowy': 0}
-    vehicle_types = {'Car': 0, 'Motorcycle': 0, 'Truck': 0, 'Bus': 0}
-    driver_age = {'18-25': 0, '26-35': 0, '36-50': 0, '51+': 0}
-    driver_gender = {'Male': 0, 'Female': 0}
-    accident_type = {'Head-on collision': 0, 'Rear-end collision': 0, 'Side-impact collision': 0, 'Single vehicle accident': 0, 'Pedestrian accident': 0}
-    accident_cause = {'Overspeeding': 0, 'Drunk Driving': 0, 'Reckless Driving': 0, 'Overloading': 0, 'Fatigue': 0, 'Distracted Driving': 0, 'Poor Maintenance': 0, 'Mechanical Failure': 0, 'Inexperience': 0}
-    injuries = [0] * (len(trends['labels']) if trends['labels'] else 1)
-    fatalities = [0] * (len(trends['labels']) if trends['labels'] else 1)
-    
-    # Aggregate today's responses for this barangay
-    if time_filter == 'today':
-        today = datetime.now(pytz.timezone('Asia/Manila')).date()
-        for response in today_responses:
-            response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-            if response_time.date() == today and response.get('barangay', '').lower() == barangay.lower():
-                weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
-                road_conditions[response.get('road_condition', 'Unknown')] = road_conditions.get(response.get('road_condition', 'Unknown'), 0) + 1
-                vehicle_types[response.get('vehicle_type', 'Unknown')] = vehicle_types.get(response.get('vehicle_type', 'Unknown'), 0) + 1
-                driver_age[response.get('driver_age', 'Unknown')] = driver_age.get(response.get('driver_age', 'Unknown'), 0) + 1
-                driver_gender[response.get('driver_gender', 'Unknown')] = driver_gender.get(response.get('driver_gender', 'Unknown'), 0) + 1
-                accident_type[response.get('road_accident_cause', 'Unknown')] = accident_type.get(response.get('road_accident_cause', 'Unknown'), 0) + 1
-                accident_cause[response.get('road_accident_type', 'Unknown')] = accident_cause.get(response.get('road_accident_type', 'Unknown'), 0) + 1
-    
-    return jsonify({
-        'trends': trends,
-        'distribution': distribution,
-        'causes': causes_data['road'],
-        'weather': weather,
-        'road_conditions': road_conditions,
-        'vehicle_types': vehicle_types,
-        'driver_age': driver_age,
-        'driver_gender': driver_gender,
-        'accident_type': accident_type,
-        'accident_cause': accident_cause,
-        'injuries': injuries,
-        'fatalities': fatalities
-    })
+@app.route('/api/barangay_analytics_data', methods=['GET'])
+def get_barangay_analytics_data():
+    try:
+        time_filter = request.args.get('time', 'weekly')
+        unique_id = session.get('unique_id')
+        barangay = unique_id.split('_')[0] if unique_id and '_' in unique_id else 'Unknown'
+        trends = get_barangay_trends(time_filter, barangay=barangay)
+        distribution = get_barangay_distribution(time_filter, barangay=barangay)
+        causes_data = get_barangay_causes(time_filter, barangay=barangay)
+        analytics_data = handle_road_analytics_data(time_filter, 'Unknown', [barangay], 'barangay')
+        fire_analytics_data = handle_fire_analytics_data(time_filter, 'Unknown', [barangay], 'barangay')
+        logger.debug(f"Barangay trends type: {type(trends)}, value: {trends}")
+        logger.debug(f"Barangay distribution type: {type(distribution)}, value: {distribution}")
+        logger.debug(f"Barangay causes_data type: {type(causes_data)}, value: {causes_data}")
+        logger.debug(f"Barangay analytics_data type: {type(analytics_data)}, value: {analytics_data}")
+        logger.debug(f"Barangay fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
+        return jsonify({
+            'trends': trends,
+            'distribution': distribution,
+            'causes': causes_data['road'],
+            'fire_causes': causes_data['fire'],
+            'weather': analytics_data['weather'],
+            'road_conditions': analytics_data['road_conditions'],
+            'vehicle_types': analytics_data['vehicle_types'],
+            'driver_age': analytics_data['driver_age'],
+            'driver_gender': analytics_data['driver_gender'],
+            'accident_type': analytics_data['accident_type'],
+            'accident_cause': analytics_data['accident_cause'],
+            'injuries': analytics_data['injuries'],
+            'fatalities': analytics_data['fatalities'],
+            'fire_weather': fire_analytics_data['weather'],
+            'property_types': fire_analytics_data['property_types']
+        })
+    except Exception as e:
+        logger.error(f"Error in get_barangay_analytics_data: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/cdrrmo/analytics')
 def cdrrmo_analytics():
@@ -1546,19 +1545,16 @@ def get_cdrrmo_analytics_data():
         time_filter = request.args.get('time', 'weekly')
         unique_id = session.get('unique_id')
         municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-        
         trends = get_cdrrmo_trends(time_filter, municipality=municipality)
         distribution = get_cdrrmo_distribution(time_filter, municipality=municipality)
         causes_data = get_cdrrmo_causes(time_filter, municipality=municipality)
         analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
         fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
-        
         logger.debug(f"CDRRMO trends type: {type(trends)}, value: {trends}")
         logger.debug(f"CDRRMO distribution type: {type(distribution)}, value: {distribution}")
         logger.debug(f"CDRRMO causes_data type: {type(causes_data)}, value: {causes_data}")
         logger.debug(f"CDRRMO analytics_data type: {type(analytics_data)}, value: {analytics_data}")
         logger.debug(f"CDRRMO fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
-        
         return jsonify({
             'trends': trends,
             'distribution': distribution,
@@ -1580,26 +1576,22 @@ def get_cdrrmo_analytics_data():
         logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/pnp_analytics_data', methods=['GET'])
 def get_pnp_analytics_data():
     try:
         time_filter = request.args.get('time', 'weekly')
         unique_id = session.get('unique_id')
         municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-        
         trends = get_pnp_trends(time_filter, municipality=municipality)
         distribution = get_pnp_distribution(time_filter, municipality=municipality)
         causes_data = get_pnp_causes(time_filter, municipality=municipality)
         analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'pnp')
         fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'pnp')
-        
         logger.debug(f"PNP trends type: {type(trends)}, value: {trends}")
         logger.debug(f"PNP distribution type: {type(distribution)}, value: {distribution}")
         logger.debug(f"PNP causes_data type: {type(causes_data)}, value: {causes_data}")
         logger.debug(f"PNP analytics_data type: {type(analytics_data)}, value: {analytics_data}")
         logger.debug(f"PNP fire_analytics_data type: {type(fire_analytics_data)}, value: {fire_analytics_data}")
-        
         return jsonify({
             'trends': trends,
             'distribution': distribution,
