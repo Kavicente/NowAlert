@@ -103,9 +103,12 @@
         }
         
         function filterData(timeFilter) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`[onclick="filterData('${timeFilter}')"]`).classList.add('active');
             updateCharts(timeFilter);
+            const tabs = document.getElementsByClassName('tab');
+            for (let tab of tabs) {
+                tab.classList.remove('active');
+            }
+            event.target.classList.add('active');
         }
 
         socket.on('barangay_response', (data) => {
@@ -114,7 +117,7 @@
         });
         socket.on('analytics_update', (data) => {
             console.log('Analytics update received:', data);
-            updateCharts('today');
+            updateCharts('today', data.data); // Pass submitted data
         });
         
         function updateCharts(timeFilter) {
@@ -147,6 +150,11 @@
                 })
                 .catch(err => console.error('Analytics load error:', err));
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCharts('today');
+            showSection('road');
+        });
     </script>
 </body>
 </html>

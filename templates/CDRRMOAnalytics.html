@@ -103,7 +103,7 @@
         });
         socket.on('analytics_update', (data) => {
             console.log('Analytics update received:', data);
-            updateCharts('today');
+            updateCharts('today', data.data);
         });
 
         function showSection(type) {
@@ -127,11 +127,16 @@
             filterData(document.querySelector('.tab.active').textContent.toLowerCase());
         }
 
+        
         function filterData(timeFilter) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`[onclick="filterData('${timeFilter}')"]`).classList.add('active');
             updateCharts(timeFilter);
+            const tabs = document.getElementsByClassName('tab');
+            for (let tab of tabs) {
+                tab.classList.remove('active');
+            }
+            event.target.classList.add('active');
         }
+
         function updateCharts(timeFilter) {
             fetch(`/api/cdrrmo_analytics_data?time=${timeFilter}&role=cdrrmo&municipality={{ municipality | lower }}`)
                 .then(res => res.json())
@@ -152,6 +157,11 @@
                 })
                 .catch(err => console.error('Analytics load error:', err));
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCharts('today');
+            showSection('road');
+        });
     </script>
 </body>
 </html>

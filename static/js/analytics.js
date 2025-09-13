@@ -1,56 +1,40 @@
-// analytics.js
-document.addEventListener('DOMContentLoaded', () => {
-    updateCharts();
-});
+// Initial load and update charts
+function updateCharts(timeFilter, submittedData = null) {
+    const role = window.location.pathname.includes('bfp') ? 'bfp' :
+                 window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
+                 window.location.pathname.includes('pnp') ? 'pnp' : 'barangay';
+    const location = role === 'barangay' || role === 'bfp' ? '{{ barangay }}'.toLowerCase() :
+                     '{{ municipality }}'.toLowerCase();
+    const url = `/api/${role}_analytics_data?time=${timeFilter}&${role === 'barangay' || role === 'bfp' ? 'barangay' : 'municipality'}=${location}`;
 
-function updateCharts(timeFilter = 'today') {
-    // Determine role from path
-    const path = window.location.pathname;
-    let role = 'all';
-    let endpoint = '/api/barangay_analytics_data';
-    let location = '';
-    if (path.includes('barangay')) {
-        role = 'barangay';
-        endpoint = '/api/barangay_analytics_data';
-        location = `&barangay=${path.split('/').pop().toLowerCase()}`;
-    } else if (path.includes('cdrrmo')) {
-        role = 'cdrrmo';
-        endpoint = '/api/cdrrmo_analytics_data';
-        location = `&municipality=${path.split('/').pop().toLowerCase()}`;
-    } else if (path.includes('pnp')) {
-        role = 'pnp';
-        endpoint = '/api/pnp_analytics_data';
-        location = `&municipality=${path.split('/').pop().toLowerCase()}`;
-    } else if (path.includes('bfp')) {
-        role = 'bfp';
-        endpoint = '/api/bfp_analytics_data';
-        location = `&municipality=${path.split('/').pop().toLowerCase()}`;
-    }
-
-    // Fetch analytics data
-    fetch(`${endpoint}?time=${timeFilter}&role=${role}${location}`)
-        .then(res => res.json())
+    fetch(submittedData ? null : url)
+        .then(response => submittedData ? Promise.resolve({ json: () => Promise.resolve({ data: submittedData }) }) : response.json())
         .then(data => {
+            if (data.error) {
+                console.error('Error fetching data:', data.error);
+                return;
+            }
+            const d = data.data || data;
             if (role === 'barangay' || role === 'cdrrmo' || role === 'pnp') {
-                renderLine('roadIncidentTrendsChart', data.trends.labels, data.trends.total, 'Total Incidents');
-                renderPie('roadAccidentDistributionChart', data.distribution, 'Accident Distribution');
-                renderPie('roadRespondedAlertsChart', data.responded, 'Responded Alerts');
-                renderBar('roadCauseAnalysisChart', data.causes.road, 'Accident Cause');
-                renderBar('roadAccidentTypeChart', data.accident_types, 'Accident Type');
-                renderBar('roadConditionChart', data.road_conditions, 'Road Condition');
-                renderBar('roadWeatherChart', data.weather, 'Weather Condition');
-                renderBar('roadVehicleTypesChart', data.vehicle_types, 'Vehicle Types');
-                renderBar('roadDriverAgeChart', data.driver_age, 'Driver Age Groups');
-                renderBar('roadDriverGenderChart', data.driver_gender, 'Driver Gender');
+                renderLine('roadIncidentTrendsChart', d.trends.labels, d.trends.total, 'Incident Trends');
+                renderPie('roadAccidentDistributionChart', d.distribution, 'Accident Distribution');
+                renderPie('roadRespondedAlertsChart', d.responded, 'Responded Alerts');
+                renderBar('roadCauseAnalysisChart', d.causes.road, 'Accident Cause');
+                renderBar('roadAccidentTypeChart', d.accident_types, 'Accident Type');
+                renderBar('roadConditionChart', d.road_conditions, 'Road Condition');
+                renderBar('roadWeatherChart', d.weather, 'Weather Condition');
+                renderBar('roadVehicleTypesChart', d.vehicle_types, 'Vehicle Types');
+                renderBar('roadDriverAgeChart', d.driver_age, 'Driver\'s Age');
+                renderBar('roadDriverGenderChart', d.driver_gender, 'Driver\'s Gender');
             }
             if (role === 'barangay' || role === 'bfp') {
-                renderLine('fireIncidentTrendsChart', data.trends.labels, data.trends.total, 'Total Incidents');
-                renderPie('fireIncidentDistributionChart', data.distribution, 'Incident Distribution');
-                renderPie('fireRespondedAlertsChart', data.responded, 'Responded Alerts');
-                renderBar('fireCauseAnalysisChart', data.causes.fire, 'Fire Cause Analysis');
-                renderBar('fireWeatherChart', data.weather, 'Weather Impact');
-                renderBar('firePropertyTypeChart', data.property_types, 'Property Type');
-                renderBar('fireCauseChart', data.causes.fire, 'Fire Cause');
+                renderLine('fireIncidentTrendsChart', d.trends.labels, d.trends.total, 'Incident Trends');
+                renderPie('fireIncidentDistributionChart', d.distribution, 'Incident Distribution');
+                renderPie('fireRespondedAlertsChart', d.responded, 'Responded Alerts');
+                renderBar('fireCauseAnalysisChart', d.causes.fire, 'Fire Cause Analysis');
+                renderBar('fireWeatherChart', d.weather, 'Weather Impact');
+                renderBar('firePropertyTypeChart', d.property_types, 'Property Type');
+                renderBar('fireCauseChart', d.causes.fire, 'Fire Cause');
             }
         })
         .catch(err => console.error('Analytics load error:', err));
