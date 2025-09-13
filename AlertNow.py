@@ -53,6 +53,15 @@ except FileNotFoundError:
     logger.error("road_accident.csv not found in dataset directory")
 except Exception as e:
     logger.error(f"Error loading road_accident.csv: {e}")
+    
+fire_incident_df = pd.DataFrame()
+try:
+    fire_incident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'fire_incident.csv'))
+    logger.info("Successfully loaded fire_incident.csv")
+except FileNotFoundError:
+    logger.error("fire_incident.csv not found in dataset directory")
+except Exception as e:
+    logger.error(f"Error loading fire_incident.csv: {e}")
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
@@ -246,14 +255,112 @@ def add_response(data):
 @socketio.on('response')
 def handle_response(data):
     try:
-        if isinstance(data, str):
-            data = json.loads(data)
-        data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        today_responses.append(data)
-        logger.debug(f"Received response: {data}")
-        emit('response_received', data, broadcast=True)
+        logger.info(f"Received response: {data}")
+        response = data if isinstance(data, dict) else json.loads(data)
+        response['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        response['responded'] = True
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('INSERT INTO responses (data, synced) VALUES (?, 0)', (json.dumps(response),))
+        conn.commit()
+        conn.close()
+        today_responses.append(response)
+        emit('response_received', {
+            'barangay_data': get_barangay_trends('today', response.get('barangay')),
+            'cdrrmo_data': get_cdrrmo_trends('today', response.get('municipality')),
+            'pnp_data': get_pnp_trends('today', response.get('municipality')),
+            'bfp_data': get_bfp_trends('today', response.get('municipality')),
+            'barangay_distribution': get_barangay_distribution('today', response.get('barangay')),
+            'cdrrmo_distribution': get_cdrrmo_distribution('today', response.get('municipality')),
+            'pnp_distribution': get_pnp_distribution('today', response.get('municipality')),
+            'bfp_distribution': get_bfp_distribution('today', response.get('municipality')),
+            'barangay_causes': get_barangay_causes('today', response.get('barangay')),
+            'cdrrmo_causes': get_cdrrmo_causes('today', response.get('municipality')),
+            'pnp_causes': get_pnp_causes('today', response.get('municipality')),
+            'bfp_causes': get_bfp_causes('today', response.get('municipality')),
+            'accident_type': get_accident_type('today', response.get('barangay'), response.get('municipality')),
+            'road_condition': get_road_condition('today', response.get('barangay'), response.get('municipality'))
+        }, broadcast=True)
     except Exception as e:
-        logger.error(f"Error handling response: {e}")
+        logger.error(f"Error in handle_response: {e}")
+    
+def get_accident_type(time_filter, barangay=None, municipality=None):
+    try:
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            accident_types = Counter()
+            from AlertNow import today_responses
+            for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
+                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type', '') == 'Road Accident':
+                    if (barangay is None or response.get('barangay', '').lower() == barangay.lower()) or \
+                       (municipality is None or response.get('municipality', '').lower() == municipality.lower()):
+                        accident_types[response.get('road_accident_type', 'Unknown')] += 1
+            return dict(accident_types)
+        else:
+            mock_data = generate_mock_data(time_filter, 'road')
+            accident_types = Counter()
+            for record in mock_data:
+                if isinstance(record, str):
+                    try:
+                        record = json.loads(record)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON record: {record}")
+                        continue
+                if record.get('emergency_type', '') == 'Road Accident':
+                    if (barangay is None or record.get('barangay', '').lower() == barangay.lower()) or \
+                       (municipality is None or record.get('municipality', '').lower() == municipality.lower()):
+                        accident_types[record.get('road_accident_type', 'Unknown')] += 1
+            return dict(accident_types)
+    except Exception as e:
+        logger.error(f"Error in get_accident_type: {e}")
+        return {'Unknown': 0}
+
+# New function get_road_condition
+def get_road_condition(time_filter, barangay=None, municipality=None):
+    try:
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            road_conditions = Counter()
+            from AlertNow import today_responses
+            for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
+                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type', '') == 'Road Accident':
+                    if (barangay is None or response.get('barangay', '').lower() == barangay.lower()) or \
+                       (municipality is None or response.get('municipality', '').lower() == municipality.lower()):
+                        road_conditions[response.get('road_condition', 'Unknown')] += 1
+            return dict(road_conditions)
+        else:
+            mock_data = generate_mock_data(time_filter, 'road')
+            road_conditions = Counter()
+            for record in mock_data:
+                if isinstance(record, str):
+                    try:
+                        record = json.loads(record)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON record: {record}")
+                        continue
+                if record.get('emergency_type', '') == 'Road Accident':
+                    if (barangay is None or record.get('barangay', '').lower() == barangay.lower()) or \
+                       (municipality is None or record.get('municipality', '').lower() == municipality.lower()):
+                        road_conditions[record.get('road_condition', 'Unknown')] += 1
+            return dict(road_conditions)
+    except Exception as e:
+        logger.error(f"Error in get_road_condition: {e}")
+        return {'Unknown': 0}   
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -1470,17 +1577,38 @@ def barangay_analytics():
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
     return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
 
-@app.route('/api/barangay_analytics_data', methods=['GET'])
-def get_barangay_analytics_data():
+@app.route('/api/barangay_analytics_data')
+def barangay_analytics_data():
     try:
-        time_filter = request.args.get('time', 'weekly')
-        unique_id = session.get('unique_id')
-        barangay = unique_id.split('_')[0] if unique_id and '_' in unique_id else 'Unknown'
-        trends = get_barangay_trends(time_filter, barangay=barangay)
-        distribution = get_barangay_distribution(time_filter, barangay=barangay)
-        causes_data = get_barangay_causes(time_filter, barangay=barangay)
-        analytics_data = handle_road_analytics_data(time_filter, 'Unknown', [barangay], 'barangay')
-        fire_analytics_data = handle_fire_analytics_data(time_filter, 'Unknown', [barangay], 'barangay')
+        time_filter = request.args.get('time', 'today')
+        barangay = request.args.get('barangay')
+        trends = get_barangay_trends(time_filter, barangay)
+        distribution = get_barangay_distribution(time_filter, barangay)
+        causes_data = get_barangay_causes(time_filter, barangay)
+        accident_type = get_accident_type(time_filter, barangay)
+        road_condition = get_road_condition(time_filter, barangay)
+        road_data = road_accident_df('road_accident.csv', time_filter) if time_filter != 'today' else today_responses
+        fire_data = fire_incident_df('fire_accident.csv', time_filter) if time_filter != 'today' else today_responses
+        analytics_data = {
+            'weather': Counter(d.get('weather', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'road_conditions': Counter(d.get('road_condition', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'vehicle_types': Counter(d.get('vehicle_type', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'driver_age': Counter(d.get('driver_age', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'driver_gender': Counter(d.get('driver_gender', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'accident_type': accident_type,
+            'accident_cause': causes_data.get('road', {}),
+            'injuries': [0] * 24,
+            'fatalities': [0] * 24
+        }
+        fire_analytics_data = {
+            'weather': Counter(d.get('weather', 'Unknown') for d in fire_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Fire'),
+            'property_types': Counter(d.get('property_type', 'Unknown') for d in fire_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Fire')
+        }
+        for data in road_data:
+            if isinstance(data, dict) and data.get('emergency_type', '') == 'Road Accident':
+                hour = datetime.fromisoformat(data.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila')).hour
+                analytics_data['injuries'][hour] += data.get('injuries', 0)
+                analytics_data['fatalities'][hour] += data.get('fatalities', 0)
         logger.debug(f"Barangay trends type: {type(trends)}, value: {trends}")
         logger.debug(f"Barangay distribution type: {type(distribution)}, value: {distribution}")
         logger.debug(f"Barangay causes_data type: {type(causes_data)}, value: {causes_data}")
@@ -1489,22 +1617,12 @@ def get_barangay_analytics_data():
         return jsonify({
             'trends': trends,
             'distribution': distribution,
-            'causes': causes_data['road'],
-            'fire_causes': causes_data['fire'],
-            'weather': analytics_data['weather'],
-            'road_conditions': analytics_data['road_conditions'],
-            'vehicle_types': analytics_data['vehicle_types'],
-            'driver_age': analytics_data['driver_age'],
-            'driver_gender': analytics_data['driver_gender'],
-            'accident_type': analytics_data['accident_type'],
-            'accident_cause': analytics_data['accident_cause'],
-            'injuries': analytics_data['injuries'],
-            'fatalities': analytics_data['fatalities'],
-            'fire_weather': fire_analytics_data['weather'],
-            'property_types': fire_analytics_data['property_types']
+            'causes': causes_data,
+            'analytics_data': analytics_data,
+            'fire_analytics_data': fire_analytics_data
         })
     except Exception as e:
-        logger.error(f"Error in get_barangay_analytics_data: {e}")
+        logger.error(f"Error in barangay_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/cdrrmo/analytics')
@@ -1539,17 +1657,38 @@ def pnp_analytics():
     barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
 
-@app.route('/api/cdrrmo_analytics_data', methods=['GET'])
-def get_cdrrmo_analytics_data():
+@app.route('/api/cdrrmo_analytics_data')
+def cdrrmo_analytics_data():
     try:
-        time_filter = request.args.get('time', 'weekly')
-        unique_id = session.get('unique_id')
-        municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-        trends = get_cdrrmo_trends(time_filter, municipality=municipality)
-        distribution = get_cdrrmo_distribution(time_filter, municipality=municipality)
-        causes_data = get_cdrrmo_causes(time_filter, municipality=municipality)
-        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
-        fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'cdrrmo')
+        time_filter = request.args.get('time', 'today')
+        municipality = request.args.get('municipality')
+        trends = get_cdrrmo_trends(time_filter, municipality)
+        distribution = get_cdrrmo_distribution(time_filter, municipality)
+        causes_data = get_cdrrmo_causes(time_filter, municipality)
+        accident_type = get_accident_type(time_filter, None, municipality)
+        road_condition = get_road_condition(time_filter, None, municipality)
+        road_data = road_accident_df('road_accident.csv', time_filter) if time_filter != 'today' else today_responses
+        fire_data = fire_incident_df('fire_accident.csv', time_filter) if time_filter != 'today' else today_responses
+        analytics_data = {
+            'weather': Counter(d.get('weather', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'road_conditions': Counter(d.get('road_condition', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'vehicle_types': Counter(d.get('vehicle_type', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'driver_age': Counter(d.get('driver_age', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'driver_gender': Counter(d.get('driver_gender', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'accident_type': accident_type,
+            'accident_cause': causes_data.get('road', {}),
+            'injuries': [0] * 24,
+            'fatalities': [0] * 24
+        }
+        fire_analytics_data = {
+            'weather': Counter(d.get('weather', 'Unknown') for d in fire_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Fire'),
+            'property_types': Counter(d.get('property_type', 'Unknown') for d in fire_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Fire')
+        }
+        for data in road_data:
+            if isinstance(data, dict) and data.get('emergency_type', '') == 'Road Accident':
+                hour = datetime.fromisoformat(data.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila')).hour
+                analytics_data['injuries'][hour] += data.get('injuries', 0)
+                analytics_data['fatalities'][hour] += data.get('fatalities', 0)
         logger.debug(f"CDRRMO trends type: {type(trends)}, value: {trends}")
         logger.debug(f"CDRRMO distribution type: {type(distribution)}, value: {distribution}")
         logger.debug(f"CDRRMO causes_data type: {type(causes_data)}, value: {causes_data}")
@@ -1558,35 +1697,47 @@ def get_cdrrmo_analytics_data():
         return jsonify({
             'trends': trends,
             'distribution': distribution,
-            'causes': causes_data['road'],
-            'fire_causes': causes_data['fire'],
-            'weather': analytics_data['weather'],
-            'road_conditions': analytics_data['road_conditions'],
-            'vehicle_types': analytics_data['vehicle_types'],
-            'driver_age': analytics_data['driver_age'],
-            'driver_gender': analytics_data['driver_gender'],
-            'accident_type': analytics_data['accident_type'],
-            'accident_cause': analytics_data['accident_cause'],
-            'injuries': analytics_data['injuries'],
-            'fatalities': analytics_data['fatalities'],
-            'fire_weather': fire_analytics_data['weather'],
-            'property_types': fire_analytics_data['property_types']
+            'causes': causes_data,
+            'analytics_data': analytics_data,
+            'fire_analytics_data': fire_analytics_data
         })
     except Exception as e:
-        logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
+        logger.error(f"Error in cdrrmo_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/pnp_analytics_data', methods=['GET'])
-def get_pnp_analytics_data():
+# Updated /api/pnp_analytics_data
+@app.route('/api/pnp_analytics_data')
+def pnp_analytics_data():
     try:
-        time_filter = request.args.get('time', 'weekly')
-        unique_id = session.get('unique_id')
-        municipality = unique_id.split('_')[1] if unique_id else 'Unknown'
-        trends = get_pnp_trends(time_filter, municipality=municipality)
-        distribution = get_pnp_distribution(time_filter, municipality=municipality)
-        causes_data = get_pnp_causes(time_filter, municipality=municipality)
-        analytics_data = handle_road_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'pnp')
-        fire_analytics_data = handle_fire_analytics_data(time_filter, municipality, barangay_coords.get(municipality, []), 'pnp')
+        time_filter = request.args.get('time', 'today')
+        municipality = request.args.get('municipality')
+        trends = get_pnp_trends(time_filter, municipality)
+        distribution = get_pnp_distribution(time_filter, municipality)
+        causes_data = get_pnp_causes(time_filter, municipality)
+        accident_type = get_accident_type(time_filter, None, municipality)
+        road_condition = get_road_condition(time_filter, None, municipality)
+        road_data = road_accident_df('road_accident.csv', time_filter) if time_filter != 'today' else today_responses
+        fire_data = fire_incident_df('fire_accident.csv', time_filter) if time_filter != 'today' else today_responses
+        analytics_data = {
+            'weather': Counter(d.get('weather', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'road_conditions': Counter(d.get('road_condition', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'vehicle_types': Counter(d.get('vehicle_type', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'driver_age': Counter(d.get('driver_age', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'driver_gender': Counter(d.get('driver_gender', 'Unknown') for d in road_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Road Accident'),
+            'accident_type': accident_type,
+            'accident_cause': causes_data.get('road', {}),
+            'injuries': [0] * 24,
+            'fatalities': [0] * 24
+        }
+        fire_analytics_data = {
+            'weather': Counter(d.get('weather', 'Unknown') for d in fire_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Fire'),
+            'property_types': Counter(d.get('property_type', 'Unknown') for d in fire_data if isinstance(d, dict) and d.get('emergency_type', '') == 'Fire')
+        }
+        for data in road_data:
+            if isinstance(data, dict) and data.get('emergency_type', '') == 'Road Accident':
+                hour = datetime.fromisoformat(data.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila')).hour
+                analytics_data['injuries'][hour] += data.get('injuries', 0)
+                analytics_data['fatalities'][hour] += data.get('fatalities', 0)
         logger.debug(f"PNP trends type: {type(trends)}, value: {trends}")
         logger.debug(f"PNP distribution type: {type(distribution)}, value: {distribution}")
         logger.debug(f"PNP causes_data type: {type(causes_data)}, value: {causes_data}")
@@ -1595,22 +1746,12 @@ def get_pnp_analytics_data():
         return jsonify({
             'trends': trends,
             'distribution': distribution,
-            'causes': causes_data['road'],
-            'fire_causes': causes_data['fire'],
-            'weather': analytics_data['weather'],
-            'road_conditions': analytics_data['road_conditions'],
-            'vehicle_types': analytics_data['vehicle_types'],
-            'driver_age': analytics_data['driver_age'],
-            'driver_gender': analytics_data['driver_gender'],
-            'accident_type': analytics_data['accident_type'],
-            'accident_cause': analytics_data['accident_cause'],
-            'injuries': analytics_data['injuries'],
-            'fatalities': analytics_data['fatalities'],
-            'fire_weather': fire_analytics_data['weather'],
-            'property_types': fire_analytics_data['property_types']
+            'causes': causes_data,
+            'analytics_data': analytics_data,
+            'fire_analytics_data': fire_analytics_data
         })
     except Exception as e:
-        logger.error(f"Error in get_pnp_analytics_data: {e}")
+        logger.error(f"Error in pnp_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
 
 

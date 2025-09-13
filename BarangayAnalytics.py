@@ -212,6 +212,82 @@ def get_barangay_causes(time_filter, barangay=None):
         logger.error(f"Error in get_barangay_causes: {e}")
         return {'road': {'Unknown': 0}, 'fire': {'Unknown': 0}}
 
+def get_accident_type(time_filter, barangay=None):
+    try:
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            accident_types = Counter()
+            from AlertNow import today_responses
+            for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
+                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type', '') == 'Road Accident' and \
+                   (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and \
+                   response.get('role', '').lower() == 'barangay':
+                    accident_types[response.get('road_accident_type', 'Unknown')] += 1
+            return dict(accident_types)
+        else:
+            mock_data = generate_mock_data(time_filter, 'road')
+            accident_types = Counter()
+            for record in mock_data:
+                if isinstance(record, str):
+                    try:
+                        record = json.loads(record)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON record: {record}")
+                        continue
+                if record.get('emergency_type', '') == 'Road Accident' and \
+                   (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and \
+                   record.get('role', '').lower() == 'barangay':
+                    accident_types[record.get('road_accident_type', 'Unknown')] += 1
+            return dict(accident_types)
+    except Exception as e:
+        logger.error(f"Error in get_accident_type: {e}")
+        return {'Unknown': 0}
+
+def get_road_condition(time_filter, barangay=None):
+    try:
+        if time_filter == 'today':
+            today = datetime.now(pytz.timezone('Asia/Manila')).date()
+            road_conditions = Counter()
+            from AlertNow import today_responses
+            for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
+                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+                if response_time.date() == today and response.get('emergency_type', '') == 'Road Accident' and \
+                   (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and \
+                   response.get('role', '').lower() == 'barangay':
+                    road_conditions[response.get('road_condition', 'Unknown')] += 1
+            return dict(road_conditions)
+        else:
+            mock_data = generate_mock_data(time_filter, 'road')
+            road_conditions = Counter()
+            for record in mock_data:
+                if isinstance(record, str):
+                    try:
+                        record = json.loads(record)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON record: {record}")
+                        continue
+                if record.get('emergency_type', '') == 'Road Accident' and \
+                   (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and \
+                   record.get('role', '').lower() == 'barangay':
+                    road_conditions[record.get('road_condition', 'Unknown')] += 1
+            return dict(road_conditions)
+    except Exception as e:
+        logger.error(f"Error in get_road_condition: {e}")
+        return {'Unknown': 0}
+
 def load_csv_data_road(file_path, time_filter):
     try:
         file_path_full = os.path.join('dataset', file_path)
