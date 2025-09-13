@@ -6,6 +6,7 @@ import os
 import logging
 import random
 from models import lr_road, lr_fire
+import json
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -90,6 +91,12 @@ def get_pnp_trends(time_filter, municipality=None):
             total = [0] * 24
             responded = [0] * 24
             for record in mock_data:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
                 if record.get('municipality', '').lower() == municipality.lower() and record.get('role', '').lower() == 'pnp':
                     record_time = datetime.fromisoformat(record.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
                     hour = record_time.hour
@@ -137,6 +144,12 @@ def get_pnp_causes(time_filter, municipality=None):
             road_causes = Counter()
             fire_causes = Counter()
             for record in mock_data:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
                 if record.get('municipality', '').lower() == municipality.lower() and record.get('role', '').lower() == 'pnp':
                     if record.get('emergency_type', '') == 'Road Accident':
                         cause = record.get('cause', 'Unknown')
