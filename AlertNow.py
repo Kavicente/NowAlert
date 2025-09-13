@@ -387,7 +387,7 @@ def handle_forward_alert(data):
 def handle_barangay_response_submitted(data):
     logger.info(f"Barangay response received: {data}")
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
-    barangay = data.get('barangay', '')
+    
     response = {}
     # Check if response is today for analytics
     response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
@@ -470,13 +470,16 @@ def handle_barangay_response_submitted(data):
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
     
+    barangay = data.get('barangay', '')
+    response = {**data, 'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()}
+    responses.append(response)
+    today_responses.append(response) if response.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d')) else None
     socketio.emit('stats_update', {
         'total_alerts': len(alerts),
         'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
         'today_responses': len(today_responses)
     }, room=f'barangay_{barangay}')
-    socketio.emit('analytics_update', response, room=f'barangay_analytics_{barangay}')  # Added
-    logger.info(f"Barangay response processed and emitted to barangay_{barangay}")
+    socketio.emit('analytics_update', {'role': 'barangay', 'barangay': barangay, 'data': response}, room=f'barangay_analytics_{barangay}')
 
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
@@ -583,13 +586,15 @@ def handle_cdrrmo_response_submitted(data):
     except Exception as e:
         logger.error(f"Error processing CDRRMO response: {e}")
         
-        socketio.emit('stats_update', {
+        response = {**data, 'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()}
+    responses.append(response)
+    today_responses.append(response) if response.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d')) else None
+    socketio.emit('stats_update', {
         'total_alerts': len(alerts),
         'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
         'today_responses': len(today_responses)
     }, room=f'cdrrmo_{municipality}')
-    socketio.emit('analytics_update', response, room=f'cdrrmo_analytics_{municipality}')  # Added
-    logger.info(f"CDRRMO response processed and emitted to cdrrmo_{municipality}")
+    socketio.emit('analytics_update', {'role': 'cdrrmo', 'municipality': municipality, 'data': response}, room=f'cdrrmo_analytics_{municipality}')
 
 # Updated handle_pnp_response_submitted
 @socketio.on('pnp_response')
@@ -697,13 +702,15 @@ def handle_pnp_response_submitted(data):
     except Exception as e:
         logger.error(f"Error processing PNP response: {e}")
         
-        socketio.emit('stats_update', {
+        response = {**data, 'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()}
+    responses.append(response)
+    today_responses.append(response) if response.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d')) else None
+    socketio.emit('stats_update', {
         'total_alerts': len(alerts),
         'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
         'today_responses': len(today_responses)
-    }, room=f'pnp_{municipality}')
-    socketio.emit('analytics_update', response, room=f'pnp_analytics_{municipality}')  # Added
-    logger.info(f"PNP response processed and emitted to pnp_{municipality}")
+    }, room=f'cdrrmo_{municipality}')
+    socketio.emit('analytics_update', {'role': 'cdrrmo', 'municipality': municipality, 'data': response}, room=f'cdrrmo_analytics_{municipality}')
 
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
