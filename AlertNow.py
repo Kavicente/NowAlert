@@ -1510,6 +1510,9 @@ def get_cdrrmo_analytics_data():
         logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+
+
 @app.route('/api/pnp_analytics_data', methods=['GET'])
 def get_pnp_analytics_data():
     try:

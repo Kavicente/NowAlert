@@ -88,7 +88,7 @@ def load_csv_data_road(file_path, time_filter):
         column_mapping = {
             'Date': 'Date', 'Time': 'Time', 'Barangay': 'Barangay', 'Weather': 'Weather',
             'Road_Condition': 'Road_Condition', 'Vehicle_Type': 'Vehicle_Type',
-            'Accident_Type': 'Accident_Type', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
+            'Accident_Cause': 'Accident_Cause', 'Road_Accident_Type': 'Road_Accident_Type', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
             'Day_of_Week': 'Day_of_Week', 'Injuries': 'Injuries', 'Fatalities': 'Fatalities',
             'Driver_Age': 'Driver_Age', 'Driver_Gender': 'Driver_Gender'
         }

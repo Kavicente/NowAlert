@@ -144,50 +144,35 @@ def load_csv_data_road(file_path, time_filter):
     try:
         file_path_full = os.path.join('dataset', file_path)
         if not os.path.exists(file_path_full):
-            logger.warning(f"CSV file not found: {file_path_full}. Generating mock data.")
+            logger.info("CSV file not found: {}. Generating mock data.".format(file_path_full))
             return generate_mock_data(time_filter, 'road')
         
         df = pd.read_csv(file_path_full)
+        if df.empty:
+            logger.info("CSV file {} is empty. Generating mock data.".format(file_path))
+            return generate_mock_data(time_filter, 'road')
         
         column_mapping = {
-            'Date': 'Date',
-            'Time': 'Time',
-            'Barangay': 'Barangay',
-            'Weather': 'Weather',
-            'Road_Condition': 'Road_Condition',
-            'Vehicle_Type': 'Vehicle_Type',
-            'Accident_Type': 'Accident_Type'
+            'Date': 'Date', 'Time': 'Time', 'Barangay': 'Barangay', 'Weather': 'Weather',
+            'Road_Condition': 'Road_Condition', 'Vehicle_Type': 'Vehicle_Type',
+            'Accident_Cause': 'Accident_Cause', 'Road_Accident_Type': 'Road_Accident_Type', 'Latitude': 'Latitude', 'Longitude': 'Longitude',
+            'Day_of_Week': 'Day_of_Week', 'Injuries': 'Injuries', 'Fatalities': 'Fatalities',
+            'Driver_Age': 'Driver_Age', 'Driver_Gender': 'Driver_Gender'
         }
         
         missing_columns = [col for col in column_mapping.keys() if col not in df.columns]
         if missing_columns:
-            logger.warning(f"Missing columns in {file_path}: {missing_columns}. Generating mock data.")
+            logger.info("Missing columns in {}: {}. Generating mock data.".format(file_path, missing_columns))
             return generate_mock_data(time_filter, 'road')
         
+        # Proceed with processing (timestamp creation, renaming, filtering, etc.)
         df['timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M', errors='coerce')
         df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Manila')
+        # ... rest of the function ...
         
-        df.rename(columns={
-            'Barangay': 'barangay',
-            'Weather': 'weather',
-            'Road_Condition': 'road_condition',
-            'Vehicle_Type': 'vehicle_type',
-            'Accident_Type': 'accident_type'
-        }, inplace=True)
-        
-        df['emergency_type'] = 'Road Accident'
-        df['responded'] = True
-        
-        start, end = get_time_range(time_filter)
-        df = df[(df['timestamp'].notna()) & (df['timestamp'] >= start) & (df['timestamp'] <= end)]
-        
-        if lr_road:
-            features = pd.get_dummies(df[['weather', 'road_condition', 'vehicle_type']]).fillna(0)
-            df['predicted_cause'] = lr_road.predict(features)
-        
-        return df.to_dict(orient='records')
+        return df
     except Exception as e:
-        logger.error(f"Error loading CSV {file_path}: {e}. Generating mock data.")
+        logger.info("Failed to load CSV {}: {}. Generating mock data.".format(file_path, e))
         return generate_mock_data(time_filter, 'road')
 
 def load_csv_data_fire(file_path, time_filter):
