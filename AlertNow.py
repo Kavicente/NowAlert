@@ -18,9 +18,9 @@ from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
-from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes, generate_mock_data
-from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes
-from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes
+from BarangayAnalytics import get_barangay_trends, get_barangay_distribution, get_barangay_causes, get_barangay_analytics_data, generate_mock_data
+from CDRRMOAnalytics import get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes, get_cdrrmo_analytics_data
+from PNPAnalytics import get_pnp_trends, get_pnp_distribution, get_pnp_causes, get_pnp_analytics_data
 from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
 import random
 
