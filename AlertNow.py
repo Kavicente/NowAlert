@@ -234,6 +234,15 @@ def admin_delete_user(contact_no):
     logger.info(f"User deleted with contact_no: {contact_no}")
     return jsonify({'message': 'User deleted successfully'})
 
+def add_response(data):
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            logger.warning(f"Invalid JSON response: {data}")
+            return
+    today_responses.append(data)
+
 @socketio.on('disconnect')
 def handle_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
@@ -444,8 +453,6 @@ def handle_barangay_response_submitted(data):
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
 
-# Updated handle_cdrrmo_response_submitted
-# Updated handle_cdrrmo_response_submitted
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
     try:
