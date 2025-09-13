@@ -470,17 +470,7 @@ def handle_barangay_response_submitted(data):
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
     
-    barangay = data.get('barangay', '')
-    response = {**data, 'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()}
-    responses.append(response)
-    today_responses.append(response) if response.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d')) else None
-    socketio.emit('stats_update', {
-        'total_alerts': len(alerts),
-        'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
-        'today_responses': len(today_responses)
-    }, room=f'barangay_{barangay}')
-    socketio.emit('analytics_update', {'role': 'barangay', 'barangay': barangay, 'data': response}, room=f'barangay_analytics_{barangay}')
-
+    
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
     try:
@@ -586,16 +576,7 @@ def handle_cdrrmo_response_submitted(data):
     except Exception as e:
         logger.error(f"Error processing CDRRMO response: {e}")
         
-        response = {**data, 'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()}
-    responses.append(response)
-    today_responses.append(response) if response.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d')) else None
-    socketio.emit('stats_update', {
-        'total_alerts': len(alerts),
-        'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
-        'today_responses': len(today_responses)
-    }, room=f'cdrrmo_{municipality}')
-    socketio.emit('analytics_update', {'role': 'cdrrmo', 'municipality': municipality, 'data': response}, room=f'cdrrmo_analytics_{municipality}')
-
+        
 # Updated handle_pnp_response_submitted
 @socketio.on('pnp_response')
 def handle_pnp_response_submitted(data):
@@ -702,16 +683,7 @@ def handle_pnp_response_submitted(data):
     except Exception as e:
         logger.error(f"Error processing PNP response: {e}")
         
-        response = {**data, 'timestamp': datetime.now(pytz.timezone('Asia/Manila')).isoformat()}
-    responses.append(response)
-    today_responses.append(response) if response.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d')) else None
-    socketio.emit('stats_update', {
-        'total_alerts': len(alerts),
-        'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
-        'today_responses': len(today_responses)
-    }, room=f'cdrrmo_{municipality}')
-    socketio.emit('analytics_update', {'role': 'cdrrmo', 'municipality': municipality, 'data': response}, room=f'cdrrmo_analytics_{municipality}')
-
+        
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
     logger.info(f"Received fire response: {data}")
@@ -810,6 +782,73 @@ def handle_fire_analytics_data(time_filter, municipality, barangays, role='baran
             'weather': {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0},
             'property_types': {'Residential': 0, 'Commercial': 0, 'Industrial': 0, 'Other': 0}
         }
+
+
+@socketio.on('submit_barangay_data')
+def submit_barangay_data(data):
+    try:
+        barangay = data.get('barangay', '')
+        response = {
+            'timestamp': data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).isoformat()),
+            'emergency_type': data.get('emergency_type', 'unknown'),
+            'role': 'barangay',
+            'barangay': barangay,
+            **{k: v for k, v in data.items() if k not in ['timestamp', 'emergency_type', 'role', 'barangay']}
+        }
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('INSERT INTO responses (data) VALUES (?)', (json.dumps(response),))
+        conn.commit()
+        conn.close()
+        responses.append(response)
+        socketio.emit('analytics_update', {'role': 'barangay', 'barangay': barangay, 'data': response}, room=f'barangay_analytics_{barangay}')
+    except Exception as e:
+        logger.error(f"Error in submit_barangay_data: {e}")
+
+@socketio.on('submit_cdrrmo_data')
+def submit_cdrrmo_data(data):
+    try:
+        municipality = data.get('municipality', '')
+        response = {
+            'timestamp': data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).isoformat()),
+            'emergency_type': data.get('emergency_type', 'unknown'),
+            'role': 'cdrrmo',
+            'municipality': municipality,
+            **{k: v for k, v in data.items() if k not in ['timestamp', 'emergency_type', 'role', 'municipality']}
+        }
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('INSERT INTO responses (data) VALUES (?)', (json.dumps(response),))
+        conn.commit()
+        conn.close()
+        responses.append(response)
+        socketio.emit('analytics_update', {'role': 'cdrrmo', 'municipality': municipality, 'data': response}, room=f'cdrrmo_analytics_{municipality}')
+    except Exception as e:
+        logger.error(f"Error in submit_cdrrmo_data: {e}")
+
+@socketio.on('submit_pnp_data')
+def submit_pnp_data(data):
+    try:
+        municipality = data.get('municipality', '')
+        response = {
+            'timestamp': data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).isoformat()),
+            'emergency_type': data.get('emergency_type', 'unknown'),
+            'role': 'pnp',
+            'municipality': municipality,
+            **{k: v for k, v in data.items() if k not in ['timestamp', 'emergency_type', 'role', 'municipality']}
+        }
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('INSERT INTO responses (data) VALUES (?)', (json.dumps(response),))
+        conn.commit()
+        conn.close()
+        responses.append(response)
+        socketio.emit('analytics_update', {'role': 'pnp', 'municipality': municipality, 'data': response}, room=f'pnp_analytics_{municipality}')
+    except Exception as e:
+        logger.error(f"Error in submit_pnp_data: {e}")
 
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', 'AIzaSyBSXRZPDX1x1d91Ck-pskiwGA8Y2-5gDVs')
 barangay_coords = {}
