@@ -1,381 +1,256 @@
+from flask import Flask, request, jsonify
+import pandas as pd
+import logging
 from collections import Counter
 from datetime import datetime, timedelta
 import pytz
-import pandas as pd
-import os
-import logging
-import random
-import json
-from models import lr_road, lr_fire
+from AlertNow import responses, road_accident_df, fire_incident_df
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 logger = logging.getLogger(__name__)
 
-def get_time_range(time_filter):
-    manila_tz = pytz.timezone('Asia/Manila')
-    now = datetime.now(manila_tz)
-    if time_filter == 'today':
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-    elif time_filter == 'daily':
-        start = now - timedelta(days=1)
-        end = now
-    elif time_filter == 'weekly':
-        start = now - timedelta(days=7)
-        end = now
-    elif time_filter == 'monthly':
-        start = now - timedelta(days=30)
-        end = now
-    else:  # yearly
-        start = now - timedelta(days=365)
-        end = now
-    return start, end
-
-def generate_mock_data(time_filter, emergency_type):
+def load_csv_data(file_name, time_filter, incident_type=None):
     try:
-        start, end = get_time_range(time_filter)
-        num_records = {'today': 10, 'daily': 50, 'weekly': 100, 'monthly': 300, 'yearly': 1000}.get(time_filter, 10)
-        data = []
-        for _ in range(num_records):
-            random_seconds = random.randint(0, int((end - start).total_seconds()))
-            timestamp = start + timedelta(seconds=random_seconds)
-            record = {
-                'timestamp': timestamp.isoformat(),
-                'emergency_type': emergency_type,
-                'barangay': random.choice(['Barangay 1', 'Barangay 2', 'Barangay 3']),
-                'municipality': 'Unknown',
-                'role': 'barangay',
-                'responded': random.choice([True, False])
-            }
-            if emergency_type == 'road':
-                record.update({
-                    'weather': random.choice(['Sunny', 'Rainy', 'Foggy', 'Cloudy']),
-                    'road_condition': random.choice(['Dry', 'Wet', 'Icy', 'Snowy']),
-                    'vehicle_type': random.choice(['Car', 'Motorcycle', 'Truck', 'Bus']),
-                    'driver_age': random.choice(['18-25', '26-35', '36-50', '51+']),
-                    'driver_gender': random.choice(['Male', 'Female']),
-                    'road_accident_type': random.choice(['Head-on collision', 'Rear-end collision', 'Side-impact collision', 'Single vehicle accident', 'Pedestrian accident']),
-                    'cause': random.choice(['Overspeeding', 'Drunk Driving', 'Reckless Driving', 'Overloading', 'Fatigue', 'Distracted Driving', 'Poor Maintenance', 'Mechanical Failure', 'Inexperience']),
-                    'injuries': random.randint(0, 5),
-                    'fatalities': random.randint(0, 2)
-                })
-            elif emergency_type == 'fire':
-                record.update({
-                    'weather': random.choice(['Sunny', 'Rainy', 'Foggy', 'Cloudy']),
-                    'property_type': random.choice(['Residential', 'Commercial', 'Industrial', 'Other']),
-                    'cause': random.choice(['Electrical', 'Arson', 'Accidental', 'Unknown'])
-                })
-            data.append(record)
-        return data
+        df = road_accident_df if incident_type == 'road' else fire_incident_df
+        if df.empty:
+            logger.warning(f"{file_name} is empty or not loaded")
+            return pd.DataFrame()
+        
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            
+            if 'timestamp' in df.columns:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        
+        return df
     except Exception as e:
-        logger.error(f"Error generating mock data: {e}")
-        return []
+        logger.error(f"Error in load_csv_data for {file_name}: {e}")
+        return pd.DataFrame()
 
-def get_barangay_trends(time_filter, barangay=None):
+def get_barangay_trends(time_filter, barangay=''):
     try:
+        road_df = load_csv_data('road_accident.csv', time_filter, incident_type='road')
+        if barangay and 'barangay' in road_df.columns:
+            road_df = road_df[road_df['barangay'] == barangay]
+        
+        labels = []
+        total = []
         if time_filter == 'today':
-            today = datetime.now(pytz.timezone('Asia/Manila')).date()
-            hours = [f"{i:02d}:00" for i in range(24)]
-            total = [0] * 24
-            responded = [0] * 24
-            from AlertNow import today_responses
-            for response in today_responses:
-                if isinstance(response, str):
-                    try:
-                        response = json.loads(response)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
-                        continue
-                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and response.get('role', '').lower() == 'barangay':
-                    hour = response_time.hour
-                    total[hour] += 1
-                    if response.get('responded', False):
-                        responded[hour] += 1
-            return {'labels': hours, 'total': total, 'responded': responded}
-        else:
-            mock_data = generate_mock_data(time_filter, 'road') + generate_mock_data(time_filter, 'fire')
-            hours = [f"{i:02d}:00" for i in range(24)]
-            total = [0] * 24
-            responded = [0] * 24
-            for record in mock_data:
-                if isinstance(record, str):
-                    try:
-                        record = json.loads(record)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON record: {record}")
-                        continue
-                if (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and record.get('role', '').lower() == 'barangay':
-                    record_time = datetime.fromisoformat(record.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                    hour = record_time.hour
-                    total[hour] += 1
-                    if record.get('responded', False):
-                        responded[hour] += 1
-            return {'labels': hours, 'total': total, 'responded': responded}
+            labels = [datetime.now(pytz.timezone('Asia/Manila')).strftime('%H:%M')]
+            total = [len(road_df)]
+        elif time_filter in ['daily', 'weekly', 'monthly', 'yearly']:
+            if time_filter == 'daily':
+                freq = 'H'
+                periods = 24
+            elif time_filter == 'weekly':
+                freq = 'D'
+                periods = 7
+            elif time_filter == 'monthly':
+                freq = 'D'
+                periods = 30
+            elif time_filter == 'yearly':
+                freq = 'M'
+                periods = 12
+            date_range = pd.date_range(end=datetime.now(pytz.timezone('Asia/Manila')), periods=periods, freq=freq)
+            labels = [d.strftime('%Y-%m-%d') if time_filter in ['daily', 'weekly', 'monthly'] else d.strftime('%Y-%m') for d in date_range]
+            total = [len(road_df[road_df['timestamp'].dt.date == d.date()]) if time_filter in ['daily', 'weekly', 'monthly'] else len(road_df[road_df['timestamp'].dt.to_period('M') == d.to_period('M')]) for d in date_range]
+        
+        return {'labels': labels, 'total': total}
     except Exception as e:
         logger.error(f"Error in get_barangay_trends: {e}")
-        return {'labels': [f"{i:02d}:00" for i in range(24)], 'total': [0] * 24, 'responded': [0] * 24}
+        return {'labels': [], 'total': []}
 
-def get_barangay_distribution(time_filter, barangay=None):
+def get_barangay_distribution(time_filter, barangay=''):
     try:
-        if time_filter == 'today':
-            from AlertNow import today_responses
-            distribution = Counter()
-            for response in today_responses:
-                if isinstance(response, str):
-                    try:
-                        response = json.loads(response)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
-                        continue
-                if (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and response.get('role', '').lower() == 'barangay':
-                    distribution[response.get('emergency_type', 'Unknown')] += 1
-            return {k: {'total': v, 'responded': sum(1 for r in today_responses
-                                                    if (isinstance(r, dict) and r.get('emergency_type', '') == k and
-                                                        (barangay is None or r.get('barangay', '').lower() == barangay.lower()) and
-                                                        r.get('role', '').lower() == 'barangay' and
-                                                        r.get('responded', False)) or
-                                                       (isinstance(r, str) and json.loads(r).get('emergency_type', '') == k and
-                                                        (barangay is None or json.loads(r).get('barangay', '').lower() == barangay.lower()) and
-                                                        json.loads(r).get('role', '').lower() == 'barangay' and
-                                                        json.loads(r).get('responded', False)))}
-                    for k, v in distribution.items()}
-        else:
-            mock_data = generate_mock_data(time_filter, 'road') + generate_mock_data(time_filter, 'fire')
-            distribution = Counter()
-            for record in mock_data:
-                if isinstance(record, str):
-                    try:
-                        record = json.loads(record)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON record: {record}")
-                        continue
-                if (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and record.get('role', '').lower() == 'barangay':
-                    distribution[record.get('emergency_type', 'Unknown')] += 1
-            return {k: {'total': v, 'responded': sum(1 for r in mock_data
-                                                    if (isinstance(r, dict) and r.get('emergency_type', '') == k and
-                                                        (barangay is None or r.get('barangay', '').lower() == barangay.lower()) and
-                                                        r.get('role', '').lower() == 'barangay' and
-                                                        r.get('responded', False)) or
-                                                       (isinstance(r, str) and json.loads(r).get('emergency_type', '') == k and
-                                                        (barangay is None or json.loads(r).get('barangay', '').lower() == barangay.lower()) and
-                                                        json.loads(r).get('role', '').lower() == 'barangay' and
-                                                        json.loads(r).get('responded', False)))}
-                    for k, v in distribution.items()}
+        road_df = load_csv_data('road_accident.csv', time_filter, incident_type='road')
+        if barangay and 'barangay' in road_df.columns:
+            road_df = road_df[road_df['barangay'] == barangay]
+        distribution = Counter(road_df['emergency_type'])
+        return {k: {'total': v, 'responded': len(road_df[(road_df['emergency_type'] == k) & (road_df['responded'] == True)])} 
+                for k, v in distribution.items()}
     except Exception as e:
         logger.error(f"Error in get_barangay_distribution: {e}")
         return {'Unknown': {'total': 0, 'responded': 0}}
 
-def get_barangay_causes(time_filter, barangay=None):
+def get_barangay_causes(time_filter, barangay=''):
     try:
-        if time_filter == 'today':
-            today = datetime.now(pytz.timezone('Asia/Manila')).date()
-            road_causes = Counter()
-            fire_causes = Counter()
-            from AlertNow import today_responses
-            for response in today_responses:
-                if isinstance(response, str):
-                    try:
-                        response = json.loads(response)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
-                        continue
-                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and response.get('role', '').lower() == 'barangay':
-                    if response.get('emergency_type', '') == 'Road Accident':
-                        cause = response.get('cause', 'Unknown')
-                        road_causes[cause] += 1
-                    elif response.get('emergency_type', '') == 'Fire':
-                        cause = response.get('cause', 'Unknown')
-                        fire_causes[cause] += 1
-            return {'road': dict(road_causes), 'fire': dict(fire_causes)}
-        else:
-            mock_data = generate_mock_data(time_filter, 'road') + generate_mock_data(time_filter, 'fire')
-            road_causes = Counter()
-            fire_causes = Counter()
-            for record in mock_data:
-                if isinstance(record, str):
-                    try:
-                        record = json.loads(record)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON record: {record}")
-                        continue
-                if (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and record.get('role', '').lower() == 'barangay':
-                    if record.get('emergency_type', '') == 'Road Accident':
-                        cause = record.get('cause', 'Unknown')
-                        road_causes[cause] += 1
-                    elif record.get('emergency_type', '') == 'Fire':
-                        cause = record.get('cause', 'Unknown')
-                        fire_causes[cause] += 1
-            return {'road': dict(road_causes), 'fire': dict(fire_causes)}
+        road_df = load_csv_data('road_accident.csv', time_filter, incident_type='road')
+        if barangay and 'barangay' in road_df.columns:
+            road_df = road_df[road_df['barangay'] == barangay]
+        road_causes = Counter(road_df['predicted_cause'] if 'predicted_cause' in road_df else road_df['cause'])
+        return {'road': dict(road_causes)}
     except Exception as e:
         logger.error(f"Error in get_barangay_causes: {e}")
-        return {'road': {'Unknown': 0}, 'fire': {'Unknown': 0}}
+        return {'road': {'Unknown': 0}}
 
-def get_accident_type(time_filter, barangay=None):
+def get_barangay_accident_types(time_filter, barangay=''):
     try:
-        if time_filter == 'today':
-            today = datetime.now(pytz.timezone('Asia/Manila')).date()
-            accident_types = Counter()
-            from AlertNow import today_responses
-            for response in today_responses:
-                if isinstance(response, str):
-                    try:
-                        response = json.loads(response)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
-                        continue
-                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and response.get('emergency_type', '') == 'Road Accident' and \
-                   (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and \
-                   response.get('role', '').lower() == 'barangay':
-                    accident_types[response.get('road_accident_type', 'Unknown')] += 1
-            return dict(accident_types)
-        else:
-            mock_data = generate_mock_data(time_filter, 'road')
-            accident_types = Counter()
-            for record in mock_data:
-                if isinstance(record, str):
-                    try:
-                        record = json.loads(record)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON record: {record}")
-                        continue
-                if record.get('emergency_type', '') == 'Road Accident' and \
-                   (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and \
-                   record.get('role', '').lower() == 'barangay':
-                    accident_types[record.get('road_accident_type', 'Unknown')] += 1
-            return dict(accident_types)
+        response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
+        df = pd.DataFrame(response_data)
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        accident_types = Counter(df['road_accident_type'] if 'road_accident_type' in df else df['accident_type'])
+        return dict(accident_types)
     except Exception as e:
-        logger.error(f"Error in get_accident_type: {e}")
+        logger.error(f"Error in get_barangay_accident_types: {e}")
         return {'Unknown': 0}
 
-def get_road_condition(time_filter, barangay=None):
+def get_barangay_road_conditions(time_filter, barangay=''):
     try:
-        if time_filter == 'today':
-            today = datetime.now(pytz.timezone('Asia/Manila')).date()
-            road_conditions = Counter()
-            from AlertNow import today_responses
-            for response in today_responses:
-                if isinstance(response, str):
-                    try:
-                        response = json.loads(response)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
-                        continue
-                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and response.get('emergency_type', '') == 'Road Accident' and \
-                   (barangay is None or response.get('barangay', '').lower() == barangay.lower()) and \
-                   response.get('role', '').lower() == 'barangay':
-                    road_conditions[response.get('road_condition', 'Unknown')] += 1
-            return dict(road_conditions)
-        else:
-            mock_data = generate_mock_data(time_filter, 'road')
-            road_conditions = Counter()
-            for record in mock_data:
-                if isinstance(record, str):
-                    try:
-                        record = json.loads(record)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON record: {record}")
-                        continue
-                if record.get('emergency_type', '') == 'Road Accident' and \
-                   (barangay is None or record.get('barangay', '').lower() == barangay.lower()) and \
-                   record.get('role', '').lower() == 'barangay':
-                    road_conditions[record.get('road_condition', 'Unknown')] += 1
-            return dict(road_conditions)
+        response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
+        df = pd.DataFrame(response_data)
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        road_conditions = Counter(df['road_condition'])
+        return dict(road_conditions)
     except Exception as e:
-        logger.error(f"Error in get_road_condition: {e}")
+        logger.error(f"Error in get_barangay_road_conditions: {e}")
         return {'Unknown': 0}
 
-def load_csv_data_road(file_path, time_filter):
+def get_barangay_weather(time_filter, barangay=''):
     try:
-        file_path_full = os.path.join('dataset', file_path)
-        if not os.path.exists(file_path_full):
-            logger.info(f"CSV file not found: {file_path_full}. Generating mock data.")
-            return generate_mock_data(time_filter, 'road')
-        df = pd.read_csv(file_path_full)
-        if df.empty:
-            logger.info(f"CSV file {file_path} is empty. Generating mock data.")
-            return generate_mock_data(time_filter, 'road')
-        column_mapping = {
-            'Date': 'Date', 'Time': 'Time', 'Barangay': 'Barangay', 'Weather': 'Weather',
-            'Road_Condition': 'Road_Condition', 'Vehicle_Type': 'Vehicle_Type',
-            'Accident_Cause': 'Accident_Cause', 'Road_Accident_Type': 'Road_Accident_Type',
-            'Latitude': 'Latitude', 'Longitude': 'Longitude',
-            'Day_of_Week': 'Day_of_Week', 'Injuries': 'Injuries', 'Fatalities': 'Fatalities',
-            'Driver_Age': 'Driver_Age', 'Driver_Gender': 'Driver_Gender'
-        }
-        missing_columns = [col for col in column_mapping.keys() if col not in df.columns]
-        if missing_columns:
-            logger.info(f"Missing columns in {file_path}: {missing_columns}. Generating mock data.")
-            return generate_mock_data(time_filter, 'road')
-        df['timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M', errors='coerce')
-        df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Manila')
-        df.rename(columns={
-            'Barangay': 'barangay',
-            'Weather': 'weather',
-            'Road_Condition': 'road_condition',
-            'Vehicle_Type': 'vehicle_type',
-            'Accident_Cause': 'cause',
-            'Road_Accident_Type': 'road_accident_type',
-            'Latitude': 'latitude',
-            'Longitude': 'longitude',
-            'Day_of_Week': 'day_of_week',
-            'Injuries': 'injuries',
-            'Fatalities': 'fatalities',
-            'Driver_Age': 'driver_age',
-            'Driver_Gender': 'driver_gender'
-        }, inplace=True)
-        df['emergency_type'] = 'Road Accident'
-        df['role'] = 'barangay'
-        df['responded'] = True
-        start, end = get_time_range(time_filter)
-        df = df[(df['timestamp'].notna()) & (df['timestamp'] >= start) & (df['timestamp'] <= end)]
-        if lr_road:
-            features = pd.get_dummies(df[['weather', 'road_condition', 'vehicle_type', 'driver_age', 'driver_gender']]).fillna(0)
-            df['predicted_cause'] = lr_road.predict(features)
-        return df.to_dict(orient='records')
+        response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
+        df = pd.DataFrame(response_data)
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        weather = Counter(df['weather'])
+        return dict(weather)
     except Exception as e:
-        logger.info(f"Failed to load CSV {file_path}: {e}. Generating mock data.")
-        return generate_mock_data(time_filter, 'road')
+        logger.error(f"Error in get_barangay_weather: {e}")
+        return {'Unknown': 0}
 
-def load_csv_data_fire(file_path, time_filter):
+def get_barangay_vehicle_types(time_filter, barangay=''):
     try:
-        file_path_full = os.path.join('dataset', file_path)
-        if not os.path.exists(file_path_full):
-            logger.warning(f"CSV file not found: {file_path_full}. Generating mock data.")
-            return generate_mock_data(time_filter, 'fire')
-        df = pd.read_csv(file_path_full)
-        column_mapping = {
-            'Date': 'Date',
-            'Time': 'Time',
-            'Barangay': 'Barangay',
-            'Weather': 'Weather',
-            'Property_Type': 'Property_Type',
-            'Fire_Cause': 'Fire_Cause'
-        }
-        missing_columns = [col for col in column_mapping.keys() if col not in df.columns]
-        if missing_columns:
-            logger.warning(f"Missing columns in {file_path}: {missing_columns}. Generating mock data.")
-            return generate_mock_data(time_filter, 'fire')
-        df['timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M', errors='coerce')
-        df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Manila')
-        df.rename(columns={
-            'Barangay': 'barangay',
-            'Weather': 'weather',
-            'Property_Type': 'property_type',
-            'Fire_Cause': 'cause'
-        }, inplace=True)
-        df['emergency_type'] = 'Fire'
-        df['role'] = 'barangay'
-        df['responded'] = True
-        start, end = get_time_range(time_filter)
-        df = df[(df['timestamp'].notna()) & (df['timestamp'] >= start) & (df['timestamp'] <= end)]
-        if lr_fire:
-            features = pd.get_dummies(df[['weather', 'property_type']]).fillna(0)
-            df['predicted_cause'] = lr_fire.predict(features)
-        return df.to_dict(orient='records')
+        response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
+        df = pd.DataFrame(response_data)
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        vehicle_types = Counter(df['vehicle_type'])
+        return dict(vehicle_types)
     except Exception as e:
-        logger.error(f"Error loading CSV {file_path}: {e}. Generating mock data.")
-        return generate_mock_data(time_filter, 'fire')
+        logger.error(f"Error in get_barangay_vehicle_types: {e}")
+        return {'Unknown': 0}
+
+def get_barangay_driver_age(time_filter, barangay=''):
+    try:
+        response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
+        df = pd.DataFrame(response_data)
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        driver_age = Counter(df['driver_age'])
+        return dict(driver_age)
+    except Exception as e:
+        logger.error(f"Error in get_barangay_driver_age: {e}")
+        return {'Unknown': 0}
+
+def get_barangay_driver_gender(time_filter, barangay=''):
+    try:
+        response_data = [r for r in responses if r.get('role') == 'barangay' and (not barangay or r.get('barangay', '').lower() == barangay.lower())]
+        df = pd.DataFrame(response_data)
+        if time_filter != 'yearly':
+            end_date = datetime.now(pytz.timezone('Asia/Manila'))
+            if time_filter == 'today':
+                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_filter == 'daily':
+                start_date = end_date - timedelta(days=1)
+            elif time_filter == 'weekly':
+                start_date = end_date - timedelta(days=7)
+            elif time_filter == 'monthly':
+                start_date = end_date - timedelta(days=30)
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        driver_gender = Counter(df['driver_gender'])
+        return dict(driver_gender)
+    except Exception as e:
+        logger.error(f"Error in get_barangay_driver_gender: {e}")
+        return {'Unknown': 0}
+
+def get_barangay_analytics_data():
+    try:
+        time_filter = request.args.get('time', 'weekly')
+        barangay = request.args.get('barangay', '')
+        trends = get_barangay_trends(time_filter, barangay)
+        distribution = get_barangay_distribution(time_filter, barangay)
+        causes = get_barangay_causes(time_filter, barangay)
+        accident_types = get_barangay_accident_types(time_filter, barangay)
+        road_conditions = get_barangay_road_conditions(time_filter, barangay)
+        weather = get_barangay_weather(time_filter, barangay)
+        vehicle_types = get_barangay_vehicle_types(time_filter, barangay)
+        driver_age = get_barangay_driver_age(time_filter, barangay)
+        driver_gender = get_barangay_driver_gender(time_filter, barangay)
+        responded = {k: v['responded'] for k, v in distribution.items()}
+        
+        return jsonify({
+            'trends': trends,
+            'distribution': distribution,
+            'causes': causes,
+            'accident_types': accident_types,
+            'road_conditions': road_conditions,
+            'weather': weather,
+            'vehicle_types': vehicle_types,
+            'driver_age': driver_age,
+            'driver_gender': driver_gender,
+            'responded': responded
+        })
+    except Exception as e:
+        logger.error(f"Error in get_barangay_analytics_data: {e}")
+        return jsonify({'error': 'Failed to retrieve analytics data'}), 500
