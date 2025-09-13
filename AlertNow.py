@@ -444,6 +444,7 @@ def handle_barangay_response_submitted(data):
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
 
+# Updated handle_cdrrmo_response_submitted
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
     try:
@@ -472,30 +473,35 @@ def handle_cdrrmo_response_submitted(data):
         }
         if road_accident_predictor:
             try:
-                features = pd.DataFrame([{
-                    'Weather': response['weather'],
-                    'Road_Condition': response['road_condition'],
-                    'Vehicle_Type': response['vehicle_type'],
-                    'Driver_Age': response['driver_age'],
-                    'Driver_Gender': response['driver_gender'],
-                    'Road_Accident_Type': response['road_accident_type'],
-                    'Accident_Cause': response['cause'],
-                    'Barangay': response['barangay'],
-                    'Year': datetime.now().year
-                }])
-                features = pd.get_dummies(features)
-                expected_columns = road_accident_df.drop(columns=['road_condition']).columns
-                for col in expected_columns:
-                    if col not in features.columns:
-                        features[col] = 0
-                features = features[expected_columns]
-                prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
+                weather_map = {'Sunny': 0, 'Rainy': 1, 'Foggy': 2, 'Cloudy': 3}
+                road_condition_map = {'Dry': 0, 'Wet': 1, 'Icy': 2, 'Snowy': 3}
+                vehicle_type_map = {'Car': 0, 'Motorcycle': 1, 'Truck': 2, 'Bus': 3}
+                driver_age_map = {'18-25': 0, '26-35': 1, '36-50': 2, '51+': 3}
+                driver_gender_map = {'Male': 0, 'Female': 1}
+                accident_type_map = {
+                    'Overspeeding': 0, 'Drunk Driving': 1, 'Reckless Driving': 2, 'Overloading': 3,
+                    'Fatigue': 4, 'Distracted Driving': 5, 'Poor Maintenance': 6, 'Mechanical Failure': 7, 'Inexperience': 8
+                }
+                cause_map = {
+                    'Head-on collision': 0, 'Rear-end collision': 1, 'Side-impact collision': 2,
+                    'Single vehicle accident': 3, 'Pedestrian accident': 4
+                }
+                features = [
+                    weather_map.get(response['weather'], 0),
+                    road_condition_map.get(response['road_condition'], 0),
+                    vehicle_type_map.get(response['vehicle_type'], 0),
+                    driver_age_map.get(response['driver_age'], 0),
+                    driver_gender_map.get(response['driver_gender'], 0),
+                    accident_type_map.get(response['road_accident_type'], 0),
+                    cause_map.get(response['cause'], 0)
+                ]
+                prediction = road_accident_predictor.predict_proba([features])[0][1] * 100
                 response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
             except Exception as e:
                 logger.error(f"Prediction error for CDRRMO response: {e}")
-                response['prediction'] = 'Prediction unavailable'
+                response['prediction'] = 'prediction_error'
         else:
-            response['prediction'] = 'Prediction unavailable'
+            response['prediction'] = 'prediction_error'
         responses.append(response)
         today_responses.append(response)
         socketio.emit('cdrrmo_response', response, room=f'cdrrmo_{municipality}')
@@ -537,30 +543,35 @@ def handle_pnp_response_submitted(data):
         }
         if road_accident_predictor:
             try:
-                features = pd.DataFrame([{
-                    'Weather': response['weather'],
-                    'Road_Condition': response['road_condition'],
-                    'Vehicle_Type': response['vehicle_type'],
-                    'Driver_Age': response['driver_age'],
-                    'Driver_Gender': response['driver_gender'],
-                    'Road_Accident_Type': response['road_accident_type'],
-                    'Accident_Cause': response['cause'],
-                    'Barangay': response['barangay'],
-                    'Year': datetime.now().year
-                }])
-                features = pd.get_dummies(features)
-                expected_columns = road_accident_df.drop(columns=['road_condition']).columns
-                for col in expected_columns:
-                    if col not in features.columns:
-                        features[col] = 0
-                features = features[expected_columns]
-                prediction = road_accident_predictor.predict_proba(features)[0][1] * 100
+                weather_map = {'Sunny': 0, 'Rainy': 1, 'Foggy': 2, 'Cloudy': 3}
+                road_condition_map = {'Dry': 0, 'Wet': 1, 'Icy': 2, 'Snowy': 3}
+                vehicle_type_map = {'Car': 0, 'Motorcycle': 1, 'Truck': 2, 'Bus': 3}
+                driver_age_map = {'18-25': 0, '26-35': 1, '36-50': 2, '51+': 3}
+                driver_gender_map = {'Male': 0, 'Female': 1}
+                accident_type_map = {
+                    'Overspeeding': 0, 'Drunk Driving': 1, 'Reckless Driving': 2, 'Overloading': 3,
+                    'Fatigue': 4, 'Distracted Driving': 5, 'Poor Maintenance': 6, 'Mechanical Failure': 7, 'Inexperience': 8
+                }
+                cause_map = {
+                    'Head-on collision': 0, 'Rear-end collision': 1, 'Side-impact collision': 2,
+                    'Single vehicle accident': 3, 'Pedestrian accident': 4
+                }
+                features = [
+                    weather_map.get(response['weather'], 0),
+                    road_condition_map.get(response['road_condition'], 0),
+                    vehicle_type_map.get(response['vehicle_type'], 0),
+                    driver_age_map.get(response['driver_age'], 0),
+                    driver_gender_map.get(response['driver_gender'], 0),
+                    accident_type_map.get(response['road_accident_type'], 0),
+                    cause_map.get(response['cause'], 0)
+                ]
+                prediction = road_accident_predictor.predict_proba([features])[0][1] * 100
                 response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
             except Exception as e:
                 logger.error(f"Prediction error for PNP response: {e}")
-                response['prediction'] = 'Prediction unavailable'
+                response['prediction'] = 'prediction_error'
         else:
-            response['prediction'] = 'Prediction unavailable'
+            response['prediction'] = 'prediction_error'
         responses.append(response)
         today_responses.append(response)
         socketio.emit('pnp_response', response, room=f'pnp_{municipality}')

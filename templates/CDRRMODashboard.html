@@ -146,8 +146,8 @@
                     const predictionDiv = document.createElement('div');
                     predictionDiv.className = 'prediction';
                     const predictionText = data.prediction || 'N/A';
-                    let formattedPrediction = 'Prediction unavailable';
-                    if (predictionText !== 'N/A' && predictionText !== 'Prediction unavailable') {
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
                         const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
                         if (match) {
                             const percentage = match[1];
