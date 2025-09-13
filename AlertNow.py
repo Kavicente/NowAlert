@@ -1391,7 +1391,19 @@ def bfp_dashboard():
 
 
 
-
+@app.route('/barangay/analytics')
+def barangay_analytics():
+    if 'role' not in session or session['role'] != 'barangay':
+        logger.warning("Unauthorized access to barangay_analytics")
+        return redirect(url_for('login'))
+    unique_id = session.get('unique_id')
+    conn = get_db_connection()
+    user = conn.execute('SELECT barangay FROM users WHERE barangay = ? AND contact_no = ?',
+                        (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
+    conn.close()
+    barangay = user['barangay'] if user else "Unknown"
+    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
+    return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
 
 @app.route('/bfp/analytics')
 def bfp_analytics():
@@ -1407,6 +1419,39 @@ def bfp_analytics():
     current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
     barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
     return render_template('BFPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
+
+@app.route('/cdrrmo/analytics')
+def cdrrmo_analytics():
+    if 'role' not in session or session['role'] != 'cdrrmo':
+        logger.warning("Unauthorized access to cdrrmo_analytics")
+        return redirect(url_for('login_cdrrmo_pnp_bfp'))
+    unique_id = session.get('unique_id')
+    conn = get_db_connection()
+    user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
+                        ('cdrrmo', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+    conn.close()
+    municipality = user['assigned_municipality'] if user else "Unknown"
+    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
+    return render_template('CDRRMOAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
+
+
+
+@app.route('/pnp/analytics')
+def pnp_analytics():
+    if 'role' not in session or session['role'] != 'pnp':
+        logger.warning("Unauthorized access to pnp_analytics")
+        return redirect(url_for('login_cdrrmo_pnp_bfp'))
+    unique_id = session.get('unique_id')
+    conn = get_db_connection()
+    user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
+                        ('pnp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+    conn.close()
+    municipality = user['assigned_municipality'] if user else "Unknown"
+    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
+    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
+    return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
+
 
 @app.route('/api/bfp_analytics_data', methods=['GET'])
 def get_bfp_analytics_data():
