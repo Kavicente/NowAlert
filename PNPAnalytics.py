@@ -140,6 +140,56 @@ def get_pnp_causes(time_filter, barangay=None):
         logger.error(f"Error in get_pnp_causes: {e}")
         return {'road': {'Unknown': 0}, 'fire': {'Unknown': 0}}
 
+def load_csv_data_road(file_path, time_filter):
+    try:
+        file_path_full = os.path.join('dataset', file_path)
+        if not os.path.exists(file_path_full):
+            logger.warning(f"CSV file not found: {file_path_full}. Generating mock data.")
+            return generate_mock_data(time_filter, 'road')
+        
+        df = pd.read_csv(file_path_full)
+        
+        column_mapping = {
+            'Date': 'Date',
+            'Time': 'Time',
+            'Barangay': 'Barangay',
+            'Weather': 'Weather',
+            'Road_Condition': 'Road_Condition',
+            'Vehicle_Type': 'Vehicle_Type',
+            'Accident_Type': 'Accident_Type'
+        }
+        
+        missing_columns = [col for col in column_mapping.keys() if col not in df.columns]
+        if missing_columns:
+            logger.warning(f"Missing columns in {file_path}: {missing_columns}. Generating mock data.")
+            return generate_mock_data(time_filter, 'road')
+        
+        df['timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M', errors='coerce')
+        df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Manila')
+        
+        df.rename(columns={
+            'Barangay': 'barangay',
+            'Weather': 'weather',
+            'Road_Condition': 'road_condition',
+            'Vehicle_Type': 'vehicle_type',
+            'Accident_Type': 'accident_type'
+        }, inplace=True)
+        
+        df['emergency_type'] = 'Road Accident'
+        df['responded'] = True
+        
+        start, end = get_time_range(time_filter)
+        df = df[(df['timestamp'].notna()) & (df['timestamp'] >= start) & (df['timestamp'] <= end)]
+        
+        if lr_road:
+            features = pd.get_dummies(df[['weather', 'road_condition', 'vehicle_type']]).fillna(0)
+            df['predicted_cause'] = lr_road.predict(features)
+        
+        return df.to_dict(orient='records')
+    except Exception as e:
+        logger.error(f"Error loading CSV {file_path}: {e}. Generating mock data.")
+        return generate_mock_data(time_filter, 'road')
+
 def load_csv_data_fire(file_path, time_filter):
     try:
         file_path_full = os.path.join('dataset', file_path)

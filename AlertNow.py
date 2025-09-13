@@ -540,6 +540,8 @@ def handle_cdrrmo_response_submitted(data):
             logger.error(f"Prediction error for CDRRMO response: {e}")
         responses.append(response)
         socketio.emit('cdrrmo_response', response, room=f'cdrrmo_{municipality}')
+        socketio.emit('update_analytics', response, room=f'cdrrmo_{municipality}')
+        logger.info(f"Analytics update emitted to cdrrmo_{municipality}")
         socketio.emit('stats_update', {
             'total_alerts': len(alerts),
             'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
@@ -644,6 +646,8 @@ def handle_pnp_response_submitted(data):
             logger.error(f"Prediction error for PNP response: {e}")
         responses.append(response)
         socketio.emit('pnp_response', response, room=f'pnp_{municipality}')
+        socketio.emit('update_analytics', response, room=f'pnp_{municipality}')
+        logger.info(f"Analytics update emitted to pnp_{municipality}")
         socketio.emit('stats_update', {
             'total_alerts': len(alerts),
             'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
