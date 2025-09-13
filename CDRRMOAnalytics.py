@@ -5,8 +5,8 @@ import pandas as pd
 import os
 import logging
 import random
-from models import lr_road, lr_fire
 import json
+from models import lr_road, lr_fire
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -37,8 +37,10 @@ def generate_mock_data(time_filter, emergency_type):
         num_records = {'today': 10, 'daily': 50, 'weekly': 100, 'monthly': 300, 'yearly': 1000}.get(time_filter, 10)
         data = []
         for _ in range(num_records):
+            random_seconds = random.randint(0, int((end - start).total_seconds()))
+            timestamp = start + timedelta(seconds=random_seconds)
             record = {
-                'timestamp': (start + timedelta(seconds=random.randint(0, int((end - start).total_seconds())))).isoformat(),
+                'timestamp': timestamp.isoformat(),
                 'emergency_type': emergency_type,
                 'barangay': random.choice(['Barangay 1', 'Barangay 2', 'Barangay 3']),
                 'municipality': 'Unknown',
@@ -78,8 +80,14 @@ def get_cdrrmo_trends(time_filter, municipality=None):
             responded = [0] * 24
             from AlertNow import today_responses
             for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
                 response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and response.get('municipality', '').lower() == municipality.lower() and response.get('role', '').lower() == 'cdrrmo':
+                if response_time.date() == today and (municipality is None or response.get('municipality', '').lower() == municipality.lower()) and response.get('role', '').lower() == 'cdrrmo':
                     hour = response_time.hour
                     total[hour] += 1
                     if response.get('responded', False):
@@ -91,13 +99,13 @@ def get_cdrrmo_trends(time_filter, municipality=None):
             total = [0] * 24
             responded = [0] * 24
             for record in mock_data:
-                if isinstance(response, str):
+                if isinstance(record, str):
                     try:
-                        response = json.loads(response)
+                        record = json.loads(record)
                     except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        logger.warning(f"Skipping invalid JSON record: {record}")
                         continue
-                if record.get('municipality', '').lower() == municipality.lower() and record.get('role', '').lower() == 'cdrrmo':
+                if (municipality is None or record.get('municipality', '').lower() == municipality.lower()) and record.get('role', '').lower() == 'cdrrmo':
                     record_time = datetime.fromisoformat(record.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
                     hour = record_time.hour
                     total[hour] += 1
@@ -112,12 +120,48 @@ def get_cdrrmo_distribution(time_filter, municipality=None):
     try:
         if time_filter == 'today':
             from AlertNow import today_responses
-            distribution = Counter(response.get('emergency_type', 'Unknown') for response in today_responses if response.get('municipality', '').lower() == municipality.lower() and response.get('role', '').lower() == 'cdrrmo')
-            return {k: {'total': v, 'responded': sum(1 for r in today_responses if r.get('emergency_type', '') == k and r.get('municipality', '').lower() == municipality.lower() and r.get('role', '').lower() == 'cdrrmo' and r.get('responded', False))} for k, v in distribution.items()}
+            distribution = Counter()
+            for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
+                if (municipality is None or response.get('municipality', '').lower() == municipality.lower()) and response.get('role', '').lower() == 'cdrrmo':
+                    distribution[response.get('emergency_type', 'Unknown')] += 1
+            return {k: {'total': v, 'responded': sum(1 for r in today_responses
+                                                    if (isinstance(r, dict) and r.get('emergency_type', '') == k and
+                                                        (municipality is None or r.get('municipality', '').lower() == municipality.lower()) and
+                                                        r.get('role', '').lower() == 'cdrrmo' and
+                                                        r.get('responded', False)) or
+                                                       (isinstance(r, str) and json.loads(r).get('emergency_type', '') == k and
+                                                        (municipality is None or json.loads(r).get('municipality', '').lower() == municipality.lower()) and
+                                                        json.loads(r).get('role', '').lower() == 'cdrrmo' and
+                                                        json.loads(r).get('responded', False)))}
+                    for k, v in distribution.items()}
         else:
             mock_data = generate_mock_data(time_filter, 'road') + generate_mock_data(time_filter, 'fire')
-            distribution = Counter(record.get('emergency_type', 'Unknown') for record in mock_data if record.get('municipality', '').lower() == municipality.lower() and record.get('role', '').lower() == 'cdrrmo')
-            return {k: {'total': v, 'responded': sum(1 for r in mock_data if r.get('emergency_type', '') == k and r.get('municipality', '').lower() == municipality.lower() and r.get('role', '').lower() == 'cdrrmo' and r.get('responded', False))} for k, v in distribution.items()}
+            distribution = Counter()
+            for record in mock_data:
+                if isinstance(record, str):
+                    try:
+                        record = json.loads(record)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON record: {record}")
+                        continue
+                if (municipality is None or record.get('municipality', '').lower() == municipality.lower()) and record.get('role', '').lower() == 'cdrrmo':
+                    distribution[record.get('emergency_type', 'Unknown')] += 1
+            return {k: {'total': v, 'responded': sum(1 for r in mock_data
+                                                    if (isinstance(r, dict) and r.get('emergency_type', '') == k and
+                                                        (municipality is None or r.get('municipality', '').lower() == municipality.lower()) and
+                                                        r.get('role', '').lower() == 'cdrrmo' and
+                                                        r.get('responded', False)) or
+                                                       (isinstance(r, str) and json.loads(r).get('emergency_type', '') == k and
+                                                        (municipality is None or json.loads(r).get('municipality', '').lower() == municipality.lower()) and
+                                                        json.loads(r).get('role', '').lower() == 'cdrrmo' and
+                                                        json.loads(r).get('responded', False)))}
+                    for k, v in distribution.items()}
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_distribution: {e}")
         return {'Unknown': {'total': 0, 'responded': 0}}
@@ -130,8 +174,14 @@ def get_cdrrmo_causes(time_filter, municipality=None):
             fire_causes = Counter()
             from AlertNow import today_responses
             for response in today_responses:
+                if isinstance(response, str):
+                    try:
+                        response = json.loads(response)
+                    except json.JSONDecodeError:
+                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        continue
                 response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if response_time.date() == today and response.get('municipality', '').lower() == municipality.lower() and response.get('role', '').lower() == 'cdrrmo':
+                if response_time.date() == today and (municipality is None or response.get('municipality', '').lower() == municipality.lower()) and response.get('role', '').lower() == 'cdrrmo':
                     if response.get('emergency_type', '') == 'Road Accident':
                         cause = response.get('cause', 'Unknown')
                         road_causes[cause] += 1
@@ -144,13 +194,13 @@ def get_cdrrmo_causes(time_filter, municipality=None):
             road_causes = Counter()
             fire_causes = Counter()
             for record in mock_data:
-                if isinstance(response, str):
+                if isinstance(record, str):
                     try:
-                        response = json.loads(response)
+                        record = json.loads(record)
                     except json.JSONDecodeError:
-                        logger.warning(f"Skipping invalid JSON response: {response}")
+                        logger.warning(f"Skipping invalid JSON record: {record}")
                         continue
-                if record.get('municipality', '').lower() == municipality.lower() and record.get('role', '').lower() == 'cdrrmo':
+                if (municipality is None or record.get('municipality', '').lower() == municipality.lower()) and record.get('role', '').lower() == 'cdrrmo':
                     if record.get('emergency_type', '') == 'Road Accident':
                         cause = record.get('cause', 'Unknown')
                         road_causes[cause] += 1
@@ -168,12 +218,10 @@ def load_csv_data_road(file_path, time_filter):
         if not os.path.exists(file_path_full):
             logger.info(f"CSV file not found: {file_path_full}. Generating mock data.")
             return generate_mock_data(time_filter, 'road')
-        
         df = pd.read_csv(file_path_full)
         if df.empty:
             logger.info(f"CSV file {file_path} is empty. Generating mock data.")
             return generate_mock_data(time_filter, 'road')
-        
         column_mapping = {
             'Date': 'Date', 'Time': 'Time', 'Barangay': 'Barangay', 'Weather': 'Weather',
             'Road_Condition': 'Road_Condition', 'Vehicle_Type': 'Vehicle_Type',
@@ -182,15 +230,12 @@ def load_csv_data_road(file_path, time_filter):
             'Day_of_Week': 'Day_of_Week', 'Injuries': 'Injuries', 'Fatalities': 'Fatalities',
             'Driver_Age': 'Driver_Age', 'Driver_Gender': 'Driver_Gender'
         }
-        
         missing_columns = [col for col in column_mapping.keys() if col not in df.columns]
         if missing_columns:
             logger.info(f"Missing columns in {file_path}: {missing_columns}. Generating mock data.")
             return generate_mock_data(time_filter, 'road')
-        
         df['timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M', errors='coerce')
         df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Manila')
-        
         df.rename(columns={
             'Barangay': 'barangay',
             'Weather': 'weather',
@@ -206,17 +251,14 @@ def load_csv_data_road(file_path, time_filter):
             'Driver_Age': 'driver_age',
             'Driver_Gender': 'driver_gender'
         }, inplace=True)
-        
         df['emergency_type'] = 'Road Accident'
+        df['role'] = 'cdrrmo'
         df['responded'] = True
-        
         start, end = get_time_range(time_filter)
         df = df[(df['timestamp'].notna()) & (df['timestamp'] >= start) & (df['timestamp'] <= end)]
-        
         if lr_road:
             features = pd.get_dummies(df[['weather', 'road_condition', 'vehicle_type', 'driver_age', 'driver_gender']]).fillna(0)
             df['predicted_cause'] = lr_road.predict(features)
-        
         return df.to_dict(orient='records')
     except Exception as e:
         logger.info(f"Failed to load CSV {file_path}: {e}. Generating mock data.")
@@ -228,9 +270,7 @@ def load_csv_data_fire(file_path, time_filter):
         if not os.path.exists(file_path_full):
             logger.warning(f"CSV file not found: {file_path_full}. Generating mock data.")
             return generate_mock_data(time_filter, 'fire')
-        
         df = pd.read_csv(file_path_full)
-        
         column_mapping = {
             'Date': 'Date',
             'Time': 'Time',
@@ -239,32 +279,26 @@ def load_csv_data_fire(file_path, time_filter):
             'Property_Type': 'Property_Type',
             'Fire_Cause': 'Fire_Cause'
         }
-        
         missing_columns = [col for col in column_mapping.keys() if col not in df.columns]
         if missing_columns:
             logger.warning(f"Missing columns in {file_path}: {missing_columns}. Generating mock data.")
             return generate_mock_data(time_filter, 'fire')
-        
         df['timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], format='%d/%m/%Y %H:%M', errors='coerce')
         df['timestamp'] = df['timestamp'].dt.tz_localize('Asia/Manila')
-        
         df.rename(columns={
             'Barangay': 'barangay',
             'Weather': 'weather',
             'Property_Type': 'property_type',
             'Fire_Cause': 'cause'
         }, inplace=True)
-        
         df['emergency_type'] = 'Fire'
+        df['role'] = 'cdrrmo'
         df['responded'] = True
-        
         start, end = get_time_range(time_filter)
         df = df[(df['timestamp'].notna()) & (df['timestamp'] >= start) & (df['timestamp'] <= end)]
-        
         if lr_fire:
             features = pd.get_dummies(df[['weather', 'property_type']]).fillna(0)
             df['predicted_cause'] = lr_fire.predict(features)
-        
         return df.to_dict(orient='records')
     except Exception as e:
         logger.error(f"Error loading CSV {file_path}: {e}. Generating mock data.")
