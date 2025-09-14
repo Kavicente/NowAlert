@@ -388,7 +388,28 @@ def handle_barangay_response_submitted(data):
     logger.info(f"Barangay response received: {data}")
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
-    response = {}
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO barangay_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), data['timestamp']
+        ))
+        conn.commit()
+        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing barangay response: {e}")
+    finally:
+        conn.close()
+    
+    
     # Check if response is today for analytics
     response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
     today = datetime.now(pytz.timezone('Asia/Manila')).date()
@@ -497,6 +518,28 @@ def handle_cdrrmo_response_submitted(data):
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A')
         }
+        
+        conn = get_db_connection()
+        try:
+            conn.execute('''
+                INSERT INTO cdrrmo_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, 
+                    road_condition, vehicle_type, driver_age, driver_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), data['timestamp']
+            ))
+            conn.commit()
+            logger.info(f"Stored cdrrmo response for alert_id: {data.get('alert_id')}")
+        except Exception as e:
+            logger.error(f"Error storing cdrrmo response: {e}")
+        finally:
+            conn.close()
+        
         # Check if response is today for analytics
         response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
         today = datetime.now(pytz.timezone('Asia/Manila')).date()
@@ -604,6 +647,28 @@ def handle_pnp_response_submitted(data):
             'house_no': data.get('house_no', 'N/A'),
             'street_no': data.get('street_no', 'N/A')
         }
+        
+        conn = get_db_connection()
+        try:
+            conn.execute('''
+                INSERT INTO pnp_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, 
+                    road_condition, vehicle_type, driver_age, driver_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), data['timestamp']
+            ))
+            conn.commit()
+            logger.info(f"Stored pnp response for alert_id: {data.get('alert_id')}")
+        except Exception as e:
+            logger.error(f"Error storing pnp response: {e}")
+        finally:
+            conn.close()
+        
         # Check if response is today for analytics
         response_time = datetime.fromisoformat(response['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
         today = datetime.now(pytz.timezone('Asia/Manila')).date()
@@ -1600,6 +1665,69 @@ def get_bfp_stats():
         return Counter()
 
 if __name__ == '__main__':
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS barangay_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                road_accident_cause TEXT,
+                road_accident_type TEXT,
+                weather TEXT,
+                road_condition TEXT,
+                vehicle_type TEXT,
+                driver_age TEXT,
+                driver_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS cdrrmo_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                road_accident_cause TEXT,
+                road_accident_type TEXT,
+                weather TEXT,
+                road_condition TEXT,
+                vehicle_type TEXT,
+                driver_age TEXT,
+                driver_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS pnp_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                road_accident_cause TEXT,
+                road_accident_type TEXT,
+                weather TEXT,
+                road_condition TEXT,
+                vehicle_type TEXT,
+                driver_age TEXT,
+                driver_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Response tables initialized successfully in users_web.db")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     try:
         conn = sqlite3.connect(db_path)
