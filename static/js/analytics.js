@@ -1,3 +1,58 @@
+// Shared JavaScript functions for analytics pages
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+    sidebar.classList.toggle('active');
+    mainContent.classList.toggle('shifted');
+}
+
+function showSection(type) {
+    const roadHeader = document.getElementById('letterR');
+    const roadSection = document.getElementById('roadSection');
+    const fireHeader = document.getElementById('letterF');
+    const fireSection = document.getElementById('fireSection');
+
+    if (type === 'road') {
+        roadHeader.classList.remove('hidden');
+        roadSection.classList.remove('hidden');
+        fireHeader.classList.add('hidden');
+        fireSection.classList.add('hidden');
+    } else if (type === 'fire') {
+        roadHeader.classList.add('hidden');
+        roadSection.classList.add('hidden');
+        fireHeader.classList.remove('hidden');
+        fireSection.classList.remove('hidden');
+    }
+
+    // Trigger data refresh for the active time period
+    const activeTab = document.querySelector('.tab.active');
+    if (activeTab) {
+        filterData(activeTab.textContent.toLowerCase());
+    }
+}
+
+function setActiveTab(tabElement) {
+    document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+    tabElement.classList.add('active');
+}
+
+// Ensure tabs trigger data refresh
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        setActiveTab(tab);
+        filterData(tab.textContent.toLowerCase());
+    });
+});
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', () => {
+    // Set default tab
+    const defaultTab = document.querySelector('.tab');
+    if (defaultTab) {
+        defaultTab.classList.add('active');
+        filterData('today');
+    }
+});
 // Initial load and update charts
 function updateCharts(timeFilter, submittedData = null) {
     const role = window.location.pathname.includes('bfp') ? 'bfp' :

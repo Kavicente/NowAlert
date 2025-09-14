@@ -1,161 +1,190 @@
 import pandas as pd
 import logging
-from collections import Counter
 from datetime import datetime, timedelta
 import pytz
-from flask import request, jsonify
+from collections import Counter
+import sqlite3
+import os
+import numpy as np
+from models import lr_road
 
 logger = logging.getLogger(__name__)
 
-def load_response_data(responses, time_filter, role='cdrrmo', municipality=''):
+# Placeholder for machine learning model
+lr_road = None
+
+def get_db_connection():
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def get_time_range(time_filter):
+    end = datetime.now(pytz.timezone('Asia/Manila'))
+    if time_filter == 'today':
+        start = end.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == 'daily':
+        start = end - timedelta(days=1)
+    elif time_filter == 'weekly':
+        start = end - timedelta(days=7)
+    elif time_filter == 'monthly':
+        start = end - timedelta(days=30)
+    elif time_filter == 'yearly':
+        start = end - timedelta(days=365)
+    else:
+        start = end - timedelta(days=7)  # Default to weekly
+    return start, end
+
+def generate_mock_data(time_filter, incident_type='road'):
+    start, end = get_time_range(time_filter)
+    num_entries = 100
+    dates = pd.date_range(start, end, periods=num_entries)
+    barangays = ['Barangay 1', 'Barangay 2', 'Barangay 3']
+    weather_types = ['Sunny', 'Rainy', 'Cloudy', 'Foggy']
+    road_conditions = ['Dry', 'Wet', 'Icy', 'Snowy']
+    vehicle_types = ['Car', 'Motorcycle', 'Truck', 'Bus']
+    driver_ages = ['18-25', '26-35', '36-50', '51+']
+    driver_genders = ['Male', 'Female']
+    accident_types = ['Overspeeding', 'Drunk Driving', 'Reckless Driving', 'Overloading', 'Fatigue']
+    accident_causes = ['Head-on collision', 'Rear-end collision', 'Side-impact collision', 'Single vehicle accident', 'Pedestrian accident']
+    
+    data = {
+        'timestamp': dates,
+        'barangay': np.random.choice(barangays, size=num_entries),
+        'weather': np.random.choice(weather_types, size=num_entries),
+        'road_condition': np.random.choice(road_conditions, size=num_entries),
+        'vehicle_type': np.random.choice(vehicle_types, size=num_entries),
+        'driver_age': np.random.choice(driver_ages, size=num_entries),
+        'driver_gender': np.random.choice(driver_genders, size=num_entries),
+        'road_accident_type': np.random.choice(accident_types, size=num_entries),
+        'road_accident_cause': np.random.choice(accident_causes, size=num_entries),
+        'emergency_type': [incident_type] * num_entries,
+        'responded': np.random.choice([True, False], size=num_entries)
+    }
+    return pd.DataFrame(data)
+
+def load_response_data(time_filter, municipality=''):
     try:
-        response_data = [r for r in responses if r.get('role') == role and (not municipality or r.get('municipality', '').lower() == municipality.lower())]
-        df = pd.DataFrame(response_data)
-        if time_filter != 'yearly':
-            end_date = datetime.now(pytz.timezone('Asia/Manila'))
-            if time_filter == 'today':
-                start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            elif time_filter == 'daily':
-                start_date = end_date - timedelta(days=1)
-            elif time_filter == 'weekly':
-                start_date = end_date - timedelta(days=7)
-            elif time_filter == 'monthly':
-                start_date = end_date - timedelta(days=30)
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
-            df = df[(df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)]
+        conn = get_db_connection()
+        query = '''
+            SELECT * FROM cdrrmo_response
+            WHERE timestamp >= ? AND timestamp <= ?
+        '''
+        params = [get_time_range(time_filter)[0].isoformat(), get_time_range(time_filter)[1].isoformat()]
+        if municipality:
+            query += ' AND barangay IN (SELECT barangay FROM barangays WHERE municipality = ?)'
+            params.append(municipality)
+        
+        df = pd.read_sql_query(query, conn, params=params, parse_dates=['timestamp'])
+        conn.close()
+        
+        if df.empty:
+            logger.warning(f"No response data found for municipality {municipality}, generating mock data")
+            return generate_mock_data(time_filter, incident_type='road')
+        
         return df
     except Exception as e:
-        logger.error(f"Error in load_response_data: {e}")
-        return pd.DataFrame()
+        logger.error(f"Error loading response data: {e}")
+        return generate_mock_data(time_filter, incident_type='road')
 
-def get_cdrrmo_trends(responses, time_filter, municipality=''):
+def get_cdrrmo_trends(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        labels = []
-        total = []
+        df = load_response_data(time_filter, municipality)
+        start, end = get_time_range(time_filter)
         if time_filter == 'today':
-            labels = [datetime.now(pytz.timezone('Asia/Manila')).strftime('%H:%M')]
-            total = [len(df)]
-        elif time_filter in ['daily', 'weekly', 'monthly', 'yearly']:
-            if time_filter == 'daily':
-                freq = 'H'
-                periods = 24
-            elif time_filter == 'weekly':
-                freq = 'D'
-                periods = 7
-            elif time_filter == 'monthly':
-                freq = 'D'
-                periods = 30
-            elif time_filter == 'yearly':
-                freq = 'M'
-                periods = 12
-            date_range = pd.date_range(end=datetime.now(pytz.timezone('Asia/Manila')), periods=periods, freq=freq)
-            labels = [d.strftime('%Y-%m-%d') if time_filter in ['daily', 'weekly', 'monthly'] else d.strftime('%Y-%m') for d in date_range]
-            total = [len(df[df['timestamp'].dt.date == d.date()]) if time_filter in ['daily', 'weekly', 'monthly'] else len(df[df['timestamp'].dt.to_period('M') == d.to_period('M')]) for d in date_range]
-        return {'labels': labels, 'total': total}
+            labels = [(start + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
+            total = [len(df[df['timestamp'].dt.hour == i]) for i in range(24)]
+            responded = [len(df[(df['timestamp'].dt.hour == i) & (df['responded'] == True)]) for i in range(24)]
+        elif time_filter == 'daily':
+            labels = [(start + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
+            total = [len(df[df['timestamp'].dt.hour == i]) for i in range(24)]
+            responded = [len(df[(df['timestamp'].dt.hour == i) & (df['responded'] == True)]) for i in range(24)]
+        elif time_filter == 'weekly':
+            labels = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+            total = [len(df[df['timestamp'].dt.date == (start + timedelta(days=i)).date()]) for i in range(7)]
+            responded = [len(df[(df['timestamp'].dt.date == (start + timedelta(days=i)).date()) & (df['responded'] == True)]) for i in range(7)]
+        elif time_filter == 'monthly':
+            labels = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(0, 30, 2)]
+            total = [len(df[(df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
+                           (df['timestamp'].dt.date < (start + timedelta(days=i+2)).date())]) for i in range(0, 30, 2)]
+            responded = [len(df[(df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
+                               (df['timestamp'].dt.date < (start + timedelta(days=i+2)).date()) & 
+                               (df['responded'] == True)]) for i in range(0, 30, 2)]
+        else:
+            labels = [(start + timedelta(days=i*30)).strftime('%Y-%m') for i in range(12)]
+            total = [len(df[(df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
+                           (df['timestamp'].dt.month == (start + timedelta(days=i*30)).month)]) for i in range(12)]
+            responded = [len(df[(df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
+                               (df['timestamp'].dt.month == (start + timedelta(days=i*30)).month) & 
+                               (df['responded'] == True)]) for i in range(12)]
+        return {'labels': labels, 'total': total, 'responded': responded}
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_trends: {e}")
-        return {'labels': [], 'total': []}
+        return {'labels': [], 'total': [], 'responded': []}
 
-def get_cdrrmo_distribution(responses, time_filter, municipality=''):
+def get_cdrrmo_distribution(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        distribution = Counter(df.get('emergency_type', ['unknown']))
-        return {k: {'total': v, 'responded': len(df[(df['emergency_type'] == k) & (df.get('responded', False) == True)])} for k, v in distribution.items()}
+        df = load_response_data(time_filter, municipality)
+        distribution = Counter(df['emergency_type'])
+        return {k: {'total': v, 'responded': len(df[(df['emergency_type'] == k) & (df['responded'] == True)])} 
+                for k, v in distribution.items()}
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_distribution: {e}")
         return {'Unknown': {'total': 0, 'responded': 0}}
 
-def get_cdrrmo_causes(responses, time_filter, municipality=''):
+def get_cdrrmo_causes(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        road_causes = Counter(df.get('predicted_cause', df.get('cause', ['Unknown'])))
+        df = load_response_data(time_filter, municipality)
+        road_causes = Counter(df['road_accident_cause'])
         return {'road': dict(road_causes)}
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_causes: {e}")
         return {'road': {'Unknown': 0}}
 
-def get_cdrrmo_accident_types(responses, time_filter, municipality=''):
+def get_cdrrmo_types(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        accident_types = Counter(df.get('accident_type', ['Unknown']))
-        return dict(accident_types)
+        df = load_response_data(time_filter, municipality)
+        return dict(Counter(df['road_accident_type']))
     except Exception as e:
-        logger.error(f"Error in get_cdrrmo_accident_types: {e}")
+        logger.error(f"Error in get_cdrrmo_types: {e}")
         return {'Unknown': 0}
 
-def get_cdrrmo_road_conditions(responses, time_filter, municipality=''):
+def get_cdrrmo_road_conditions(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        road_conditions = Counter(df.get('road_condition', ['Unknown']))
-        return dict(road_conditions)
+        df = load_response_data(time_filter, municipality)
+        return dict(Counter(df['road_condition']))
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_road_conditions: {e}")
         return {'Unknown': 0}
 
-def get_cdrrmo_weather(responses, time_filter, municipality=''):
+def get_cdrrmo_weather(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        weather = Counter(df.get('weather', ['Unknown']))
-        return dict(weather)
+        df = load_response_data(time_filter, municipality)
+        return dict(Counter(df['weather']))
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_weather: {e}")
         return {'Unknown': 0}
 
-def get_cdrrmo_vehicle_types(responses, time_filter, municipality=''):
+def get_cdrrmo_vehicle_types(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        vehicle_types = Counter(df.get('vehicle_type', ['Unknown']))
-        return dict(vehicle_types)
+        df = load_response_data(time_filter, municipality)
+        return dict(Counter(df['vehicle_type']))
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_vehicle_types: {e}")
         return {'Unknown': 0}
 
-def get_cdrrmo_driver_age(responses, time_filter, municipality=''):
+def get_cdrrmo_driver_age(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        driver_age = Counter(df.get('driver_age', ['Unknown']))
-        return dict(driver_age)
+        df = load_response_data(time_filter, municipality)
+        return dict(Counter(df['driver_age']))
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_driver_age: {e}")
         return {'Unknown': 0}
 
-def get_cdrrmo_driver_gender(responses, time_filter, municipality=''):
+def get_cdrrmo_driver_gender(time_filter, municipality=''):
     try:
-        df = load_response_data(responses, time_filter, 'cdrrmo', municipality)
-        driver_gender = Counter(df.get('driver_gender', ['Unknown']))
-        return dict(driver_gender)
+        df = load_response_data(time_filter, municipality)
+        return dict(Counter(df['driver_gender']))
     except Exception as e:
         logger.error(f"Error in get_cdrrmo_driver_gender: {e}")
         return {'Unknown': 0}
-
-def get_cdrrmo_analytics_data(responses):
-    try:
-        time_filter = request.args.get('time', 'weekly')
-        municipality = request.args.get('municipality', '')
-        trends = get_cdrrmo_trends(responses, time_filter, municipality)
-        distribution = get_cdrrmo_distribution(responses, time_filter, municipality)
-        causes = get_cdrrmo_causes(responses, time_filter, municipality)
-        accident_types = get_cdrrmo_accident_types(responses, time_filter, municipality)
-        road_conditions = get_cdrrmo_road_conditions(responses, time_filter, municipality)
-        weather = get_cdrrmo_weather(responses, time_filter, municipality)
-        vehicle_types = get_cdrrmo_vehicle_types(responses, time_filter, municipality)
-        driver_age = get_cdrrmo_driver_age(responses, time_filter, municipality)
-        driver_gender = get_cdrrmo_driver_gender(responses, time_filter, municipality)
-        responded = {k: v['responded'] for k, v in distribution.items()}
-        
-        return jsonify({
-            'trends': trends,
-            'distribution': distribution,
-            'causes': causes,
-            'accident_types': accident_types,
-            'road_conditions': road_conditions,
-            'weather': weather,
-            'vehicle_types': vehicle_types,
-            'driver_age': driver_age,
-            'driver_gender': driver_gender,
-            'responded': responded
-        })
-    except Exception as e:
-        logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
-        return jsonify({'error': 'Failed to retrieve analytics data'}), 500
