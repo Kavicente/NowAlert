@@ -87,6 +87,25 @@ def load_response_data(time_filter, barangay=''):
         logger.error(f"Error loading response data: {e}")
         return generate_mock_data(time_filter, incident_type='road')
 
+
+def get_barangay_analytics_data(time_filter, barangay=''):
+    try:
+        data = {
+            'trends': get_barangay_trends(time_filter, barangay),
+            'distribution': get_barangay_distribution(time_filter, barangay),
+            'causes': get_barangay_causes(time_filter, barangay),
+            'types': get_barangay_types(time_filter, barangay),
+            'road_conditions': get_barangay_road_conditions(time_filter, barangay),
+            'weather': get_barangay_weather(time_filter, barangay),
+            'vehicle_types': get_barangay_vehicle_types(time_filter, barangay),
+            'driver_age': get_barangay_driver_age(time_filter, barangay),
+            'driver_gender': get_barangay_driver_gender(time_filter, barangay)
+        }
+        return data
+    except Exception as e:
+        logger.error(f"Error in get_barangay_analytics_data: {e}")
+        return {'error': str(e)}
+
 def get_barangay_trends(time_filter, barangay=''):
     try:
         df = load_response_data(time_filter, barangay)

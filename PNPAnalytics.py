@@ -87,6 +87,26 @@ def load_response_data(time_filter, municipality=''):
         logger.error(f"Error loading response data: {e}")
         return generate_mock_data(time_filter, incident_type='road')
 
+
+# Add this function to PNPAnalytics.py
+def get_pnp_analytics_data(time_filter, municipality=''):
+    try:
+        data = {
+            'trends': get_pnp_trends(time_filter, municipality),
+            'distribution': get_pnp_distribution(time_filter, municipality),
+            'causes': get_pnp_causes(time_filter, municipality),
+            'types': get_pnp_types(time_filter, municipality),
+            'road_conditions': get_pnp_road_conditions(time_filter, municipality),
+            'weather': get_pnp_weather(time_filter, municipality),
+            'vehicle_types': get_pnp_vehicle_types(time_filter, municipality),
+            'driver_age': get_pnp_driver_age(time_filter, municipality),
+            'driver_gender': get_pnp_driver_gender(time_filter, municipality)
+        }
+        return data
+    except Exception as e:
+        logger.error(f"Error in get_pnp_analytics_data: {e}")
+        return {'error': str(e)}
+
 def get_pnp_trends(time_filter, municipality=''):
     try:
         df = load_response_data(time_filter, municipality)

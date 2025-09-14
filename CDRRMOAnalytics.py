@@ -87,6 +87,24 @@ def load_response_data(time_filter, municipality=''):
         logger.error(f"Error loading response data: {e}")
         return generate_mock_data(time_filter, incident_type='road')
 
+def get_cdrrmo_analytics_data(time_filter, municipality=''):
+    try:
+        data = {
+            'trends': get_cdrrmo_trends(time_filter, municipality),
+            'distribution': get_cdrrmo_distribution(time_filter, municipality),
+            'causes': get_cdrrmo_causes(time_filter, municipality),
+            'types': get_cdrrmo_types(time_filter, municipality),
+            'road_conditions': get_cdrrmo_road_conditions(time_filter, municipality),
+            'weather': get_cdrrmo_weather(time_filter, municipality),
+            'vehicle_types': get_cdrrmo_vehicle_types(time_filter, municipality),
+            'driver_age': get_cdrrmo_driver_age(time_filter, municipality),
+            'driver_gender': get_cdrrmo_driver_gender(time_filter, municipality)
+        }
+        return data
+    except Exception as e:
+        logger.error(f"Error in get_cdrrmo_analytics_data: {e}")
+        return {'error': str(e)}
+
 def get_cdrrmo_trends(time_filter, municipality=''):
     try:
         df = load_response_data(time_filter, municipality)
