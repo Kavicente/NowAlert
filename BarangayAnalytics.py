@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 from datetime import datetime, timedelta
 from collections import Counter
+import pytz
 import sqlite3
 import os
 
@@ -41,51 +42,113 @@ def load_response_data(time_filter, barangay, date=None, week_start=None):
         logger.error(f"Error in load_response_data: {e}")
         return pd.DataFrame()
 
-def get_barangay_analytics_data(responses, time_filter='today', barangay='', date=None, week_start=None):
+def get_barangay_analytics_data(time_filter, barangay):
     try:
-        df = load_response_data(time_filter, barangay, date, week_start)
-        if time_filter == 'weekly' and week_start:
-            start = pd.to_datetime(week_start)
-            dates = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-            summary = {
-                'total_alerts': len(df),
-                'total_responded': len(df[df['responded'] == True]),
-                'total_road_accidents': len(df[df['emergency_type'] == 'road_accident']),
-                'most_common_accident_type': Counter(df['road_accident_type']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
-                'most_common_cause': Counter(df['road_accident_cause']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
-                'most_common_weather': Counter(df['weather']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
-                'most_common_road_condition': Counter(df['road_condition']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
-                'most_common_vehicle_type': Counter(df['vehicle_type']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
-                'most_common_driver_age': Counter(df['driver_age']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
-                'most_common_driver_gender': Counter(df['driver_gender']).most_common(1)[0][0] if len(df) > 0 else 'N/A'
-            }
-            return {
-                'trends': get_barangay_trends(time_filter, barangay, date, week_start),
-                'distribution': get_barangay_distribution(time_filter, barangay, date, week_start),
-                'causes': get_barangay_causes(time_filter, barangay, date, week_start),
-                'types': get_barangay_types(time_filter, barangay, date, week_start),
-                'road_conditions': get_barangay_road_conditions(time_filter, barangay, date, week_start),
-                'weather': get_barangay_weather(time_filter, barangay, date, week_start),
-                'vehicle_types': get_barangay_vehicle_types(time_filter, barangay, date, week_start),
-                'driver_age': get_barangay_driver_age(time_filter, barangay, date, week_start),
-                'driver_gender': get_barangay_driver_gender(time_filter, barangay, date, week_start),
-                'dates': dates,
-                'summary': summary
-            }
-        return {
-            'trends': get_barangay_trends(time_filter, barangay, date, week_start),
-            'distribution': get_barangay_distribution(time_filter, barangay, date, week_start),
-            'causes': get_barangay_causes(time_filter, barangay, date, week_start),
-            'types': get_barangay_types(time_filter, barangay, date, week_start),
-            'road_conditions': get_barangay_road_conditions(time_filter, barangay, date, week_start),
-            'weather': get_barangay_weather(time_filter, barangay, date, week_start),
-            'vehicle_types': get_barangay_vehicle_types(time_filter, barangay, date, week_start),
-            'driver_age': get_barangay_driver_age(time_filter, barangay, date, week_start),
-            'driver_gender': get_barangay_driver_gender(time_filter, barangay, date, week_start)
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # Define date range for 'today'
+        today = datetime.now(pytz.timezone('Asia/Manila')).date()
+        start_time = datetime.combine(today, datetime.min.time()).astimezone(pytz.timezone('Asia/Manila')).isoformat()
+        end_time = datetime.combine(today, datetime.max.time()).astimezone(pytz.timezone('Asia/Manila')).isoformat()
+        
+        query = '''
+            SELECT road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, timestamp
+            FROM barangay_response
+            WHERE barangay = ? AND emergency_type = 'road' AND timestamp BETWEEN ? AND ? AND responded = 1
+        '''
+        params = (barangay.lower(), start_time, end_time)
+        
+        if time_filter == 'daily':
+            query = query.replace('timestamp BETWEEN ? AND ?', 'DATE(timestamp) = DATE(?)')
+            params = (barangay.lower(), start_time)
+        elif time_filter == 'weekly':
+            start_time = (today - timedelta(days=today.weekday())).isoformat()
+            query = query.replace('timestamp BETWEEN ? AND ?', 'timestamp >= ?')
+            params = (barangay.lower(), start_time)
+        elif time_filter == 'monthly':
+            start_time = today.replace(day=1).isoformat()
+            query = query.replace('timestamp BETWEEN ? AND ?', 'timestamp >= ?')
+            params = (barangay.lower(), start_time)
+        elif time_filter == 'yearly':
+            start_time = today.replace(month=1, day=1).isoformat()
+            query = query.replace('timestamp BETWEEN ? AND ?', 'timestamp >= ?')
+            params = (barangay.lower(), start_time)
+
+        c.execute(query, params)
+        responses = c.fetchall()
+        conn.close()
+
+        # Initialize data structure
+        data = {
+            'trends': {'labels': [], 'total': [], 'responded': []},
+            'distribution': {},
+            'causes': {'road': {}, 'fire': {}},
+            'types': {},
+            'road_conditions': {},
+            'weather': {},
+            'vehicle_types': {},
+            'driver_age': {},
+            'driver_gender': {}
         }
+
+        if not responses:
+            return data
+
+        # Process responses
+        timestamps = [datetime.fromisoformat(row['timestamp']) for row in responses]
+        causes = Counter(row['road_accident_cause'] or 'Unknown' for row in responses)
+        types = Counter(row['road_accident_type'] or 'Unknown' for row in responses)
+        road_conditions = Counter(row['road_condition'] or 'Unknown' for row in responses)
+        weather = Counter(row['weather'] or 'Unknown' for row in responses)
+        vehicle_types = Counter(row['vehicle_type'] or 'Unknown' for row in responses)
+        driver_age = Counter(row['driver_age'] or 'Unknown' for row in responses)
+        driver_gender = Counter(row['driver_gender'] or 'Unknown' for row in responses)
+
+        # Trends (assuming hourly for today, daily for others)
+        if time_filter == 'today':
+            labels = [f"{h:02d}:00" for h in range(24)]
+            total_counts = [0] * 24
+            responded_counts = [0] * 24
+            for ts in timestamps:
+                hour = ts.hour
+                total_counts[hour] += 1
+                responded_counts[hour] += 1  # All responses are marked as responded
+        else:
+            # For daily, weekly, monthly, yearly, use dates as labels
+            dates = sorted(set(ts.date().isoformat() for ts in timestamps))
+            labels = dates
+            total_counts = [sum(1 for ts in timestamps if ts.date().isoformat() == date) for date in dates]
+            responded_counts = total_counts  # All responses are marked as responded
+
+        data['trends'] = {
+            'labels': labels,
+            'total': total_counts,
+            'responded': responded_counts
+        }
+        data['distribution'] = {key: {'total': value, 'responded': value} for key, value in causes.items()}
+        data['causes']['road'] = dict(causes)
+        data['types'] = dict(types)
+        data['road_conditions'] = dict(road_conditions)
+        data['weather'] = dict(weather)
+        data['vehicle_types'] = dict(vehicle_types)
+        data['driver_age'] = dict(driver_age)
+        data['driver_gender'] = dict(driver_gender)
+
+        return data
     except Exception as e:
-        logger.error(f"Error in get_barangay_analytics_data: {e}")
-        return {'error': str(e)}
+        print(f"Error in get_barangay_analytics_data: {e}")
+        return {
+            'trends': {'labels': [], 'total': [], 'responded': []},
+            'distribution': {},
+            'causes': {'road': {}, 'fire': {}},
+            'types': {},
+            'road_conditions': {},
+            'weather': {},
+            'vehicle_types': {},
+            'driver_age': {},
+            'driver_gender': {}
+        }
 
 def get_barangay_trends(time_filter, barangay='', date=None, week_start=None):
     try:
