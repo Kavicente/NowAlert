@@ -1,17 +1,12 @@
 import pandas as pd
 import logging
 from datetime import datetime, timedelta
-import pytz
 from collections import Counter
 import sqlite3
 import os
-import numpy as np
-from models import lr_road
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# Placeholder for machine learning model
-lr_road = None
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -19,98 +14,84 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_time_range(time_filter):
-    end = datetime.now(pytz.timezone('Asia/Manila'))
-    if time_filter == 'today':
-        start = end.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif time_filter == 'daily':
-        start = end - timedelta(days=1)
-    elif time_filter == 'weekly':
-        start = end - timedelta(days=7)
-    elif time_filter == 'monthly':
-        start = end - timedelta(days=30)
-    elif time_filter == 'yearly':
-        start = end - timedelta(days=365)
-    else:
-        start = end - timedelta(days=7)  # Default to weekly
-    return start, end
-
-def generate_mock_data(time_filter, incident_type='road'):
-    start, end = get_time_range(time_filter)
-    num_entries = 100
-    dates = pd.date_range(start, end, periods=num_entries)
-    barangays = ['Barangay 1', 'Barangay 2', 'Barangay 3']
-    weather_types = ['Sunny', 'Rainy', 'Cloudy', 'Foggy']
-    road_conditions = ['Dry', 'Wet', 'Icy', 'Snowy']
-    vehicle_types = ['Car', 'Motorcycle', 'Truck', 'Bus']
-    driver_ages = ['18-25', '26-35', '36-50', '51+']
-    driver_genders = ['Male', 'Female']
-    accident_types = ['Overspeeding', 'Drunk Driving', 'Reckless Driving', 'Overloading', 'Fatigue']
-    accident_causes = ['Head-on collision', 'Rear-end collision', 'Side-impact collision', 'Single vehicle accident', 'Pedestrian accident']
-    
-    data = {
-        'timestamp': dates,
-        'barangay': np.random.choice(barangays, size=num_entries),
-        'weather': np.random.choice(weather_types, size=num_entries),
-        'road_condition': np.random.choice(road_conditions, size=num_entries),
-        'vehicle_type': np.random.choice(vehicle_types, size=num_entries),
-        'driver_age': np.random.choice(driver_ages, size=num_entries),
-        'driver_gender': np.random.choice(driver_genders, size=num_entries),
-        'road_accident_type': np.random.choice(accident_types, size=num_entries),
-        'road_accident_cause': np.random.choice(accident_causes, size=num_entries),
-        'emergency_type': [incident_type] * num_entries,
-        'responded': np.random.choice([True, False], size=num_entries)
-    }
-    return pd.DataFrame(data)
-
-def load_response_data(time_filter, municipality=''):
+def load_response_data(time_filter, municipality, date=None, week_start=None):
     try:
         conn = get_db_connection()
-        query = '''
-            SELECT * FROM pnp_response
-            WHERE timestamp >= ? AND timestamp <= ?
-        '''
-        params = [get_time_range(time_filter)[0].isoformat(), get_time_range(time_filter)[1].isoformat()]
-        if municipality:
-            query += ' AND barangay IN (SELECT barangay FROM barangays WHERE municipality = ?)'
-            params.append(municipality)
+        query = "SELECT * FROM pnp_response WHERE barangay IN (SELECT barangay FROM users WHERE assigned_municipality = ?)"
+        params = [municipality]
         
-        df = pd.read_sql_query(query, conn, params=params, parse_dates=['timestamp'])
+        if time_filter == 'today':
+            query += " AND date(timestamp) = date('now')"
+        elif time_filter == 'daily' and date:
+            query += " AND date(timestamp) = ?"
+            params.append(date)
+        elif time_filter == 'weekly' and week_start:
+            query += " AND date(timestamp) >= ? AND date(timestamp) < date(?, '+7 days')"
+            params.extend([week_start, week_start])
+        elif time_filter == 'monthly':
+            query += " AND date(timestamp) >= date('now', '-30 days')"
+        elif time_filter == 'yearly':
+            query += " AND date(timestamp) >= date('now', '-1 year')"
+
+        df = pd.read_sql_query(query, conn, params=params)
         conn.close()
-        
-        if df.empty:
-            logger.warning(f"No response data found for municipality {municipality}, generating mock data")
-            return generate_mock_data(time_filter, incident_type='road')
-        
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
         return df
     except Exception as e:
-        logger.error(f"Error loading response data: {e}")
-        return generate_mock_data(time_filter, incident_type='road')
+        logger.error(f"Error in load_response_data: {e}")
+        return pd.DataFrame()
 
-
-# Add this function to PNPAnalytics.py
-def get_pnp_analytics_data(time_filter, municipality=''):
+def get_pnp_analytics_data(responses, time_filter='today', municipality='', date=None, week_start=None):
     try:
-        data = {
-            'trends': get_pnp_trends(time_filter, municipality),
-            'distribution': get_pnp_distribution(time_filter, municipality),
-            'causes': get_pnp_causes(time_filter, municipality),
-            'types': get_pnp_types(time_filter, municipality),
-            'road_conditions': get_pnp_road_conditions(time_filter, municipality),
-            'weather': get_pnp_weather(time_filter, municipality),
-            'vehicle_types': get_pnp_vehicle_types(time_filter, municipality),
-            'driver_age': get_pnp_driver_age(time_filter, municipality),
-            'driver_gender': get_pnp_driver_gender(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
+        if time_filter == 'weekly' and week_start:
+            start = pd.to_datetime(week_start)
+            dates = [(start + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+            summary = {
+                'total_alerts': len(df),
+                'total_responded': len(df[df['responded'] == True]),
+                'most_common_barangay': Counter(df['barangay']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'total_road_accidents': len(df[df['emergency_type'] == 'road_accident']),
+                'most_common_accident_type': Counter(df['road_accident_type']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'most_common_cause': Counter(df['road_accident_cause']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'most_common_weather': Counter(df['weather']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'most_common_road_condition': Counter(df['road_condition']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'most_common_vehicle_type': Counter(df['vehicle_type']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'most_common_driver_age': Counter(df['driver_age']).most_common(1)[0][0] if len(df) > 0 else 'N/A',
+                'most_common_driver_gender': Counter(df['driver_gender']).most_common(1)[0][0] if len(df) > 0 else 'N/A'
+            }
+            return {
+                'trends': get_pnp_trends(time_filter, municipality, date, week_start),
+                'distribution': get_pnp_distribution(time_filter, municipality, date, week_start),
+                'causes': get_pnp_causes(time_filter, municipality, date, week_start),
+                'types': get_pnp_types(time_filter, municipality, date, week_start),
+                'road_conditions': get_pnp_road_conditions(time_filter, municipality, date, week_start),
+                'weather': get_pnp_weather(time_filter, municipality, date, week_start),
+                'vehicle_types': get_pnp_vehicle_types(time_filter, municipality, date, week_start),
+                'driver_age': get_pnp_driver_age(time_filter, municipality, date, week_start),
+                'driver_gender': get_pnp_driver_gender(time_filter, municipality, date, week_start),
+                'dates': dates,
+                'summary': summary
+            }
+        return {
+            'trends': get_pnp_trends(time_filter, municipality, date, week_start),
+            'distribution': get_pnp_distribution(time_filter, municipality, date, week_start),
+            'causes': get_pnp_causes(time_filter, municipality, date, week_start),
+            'types': get_pnp_types(time_filter, municipality, date, week_start),
+            'road_conditions': get_pnp_road_conditions(time_filter, municipality, date, week_start),
+            'weather': get_pnp_weather(time_filter, municipality, date, week_start),
+            'vehicle_types': get_pnp_vehicle_types(time_filter, municipality, date, week_start),
+            'driver_age': get_pnp_driver_age(time_filter, municipality, date, week_start),
+            'driver_gender': get_pnp_driver_gender(time_filter, municipality, date, week_start)
         }
-        return data
     except Exception as e:
         logger.error(f"Error in get_pnp_analytics_data: {e}")
         return {'error': str(e)}
 
-def get_pnp_trends(time_filter, municipality=''):
+def get_pnp_trends(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
-        start, end = get_time_range(time_filter)
+        df = load_response_data(time_filter, municipality, date, week_start)
+        start = pd.to_datetime(date if date else week_start if week_start else datetime.now())
         if time_filter == 'today':
             labels = [(start + timedelta(hours=i)).strftime('%H:%M') for i in range(24)]
             total = [len(df[df['timestamp'].dt.hour == i]) for i in range(24)]
@@ -130,7 +111,7 @@ def get_pnp_trends(time_filter, municipality=''):
             responded = [len(df[(df['timestamp'].dt.date >= (start + timedelta(days=i)).date()) & 
                                (df['timestamp'].dt.date < (start + timedelta(days=i+2)).date()) & 
                                (df['responded'] == True)]) for i in range(0, 30, 2)]
-        else:
+        else:  # yearly
             labels = [(start + timedelta(days=i*30)).strftime('%Y-%m') for i in range(12)]
             total = [len(df[(df['timestamp'].dt.year == (start + timedelta(days=i*30)).year) & 
                            (df['timestamp'].dt.month == (start + timedelta(days=i*30)).month)]) for i in range(12)]
@@ -142,9 +123,9 @@ def get_pnp_trends(time_filter, municipality=''):
         logger.error(f"Error in get_pnp_trends: {e}")
         return {'labels': [], 'total': [], 'responded': []}
 
-def get_pnp_distribution(time_filter, municipality=''):
+def get_pnp_distribution(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         distribution = Counter(df['emergency_type'])
         return {k: {'total': v, 'responded': len(df[(df['emergency_type'] == k) & (df['responded'] == True)])} 
                 for k, v in distribution.items()}
@@ -152,58 +133,58 @@ def get_pnp_distribution(time_filter, municipality=''):
         logger.error(f"Error in get_pnp_distribution: {e}")
         return {'Unknown': {'total': 0, 'responded': 0}}
 
-def get_pnp_causes(time_filter, municipality=''):
+def get_pnp_causes(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         road_causes = Counter(df['road_accident_cause'])
         return {'road': dict(road_causes)}
     except Exception as e:
         logger.error(f"Error in get_pnp_causes: {e}")
         return {'road': {'Unknown': 0}}
 
-def get_pnp_types(time_filter, municipality=''):
+def get_pnp_types(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         return dict(Counter(df['road_accident_type']))
     except Exception as e:
         logger.error(f"Error in get_pnp_types: {e}")
         return {'Unknown': 0}
 
-def get_pnp_road_conditions(time_filter, municipality=''):
+def get_pnp_road_conditions(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         return dict(Counter(df['road_condition']))
     except Exception as e:
         logger.error(f"Error in get_pnp_road_conditions: {e}")
         return {'Unknown': 0}
 
-def get_pnp_weather(time_filter, municipality=''):
+def get_pnp_weather(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         return dict(Counter(df['weather']))
     except Exception as e:
         logger.error(f"Error in get_pnp_weather: {e}")
         return {'Unknown': 0}
 
-def get_pnp_vehicle_types(time_filter, municipality=''):
+def get_pnp_vehicle_types(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         return dict(Counter(df['vehicle_type']))
     except Exception as e:
         logger.error(f"Error in get_pnp_vehicle_types: {e}")
         return {'Unknown': 0}
 
-def get_pnp_driver_age(time_filter, municipality=''):
+def get_pnp_driver_age(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         return dict(Counter(df['driver_age']))
     except Exception as e:
         logger.error(f"Error in get_pnp_driver_age: {e}")
         return {'Unknown': 0}
 
-def get_pnp_driver_gender(time_filter, municipality=''):
+def get_pnp_driver_gender(time_filter, municipality='', date=None, week_start=None):
     try:
-        df = load_response_data(time_filter, municipality)
+        df = load_response_data(time_filter, municipality, date, week_start)
         return dict(Counter(df['driver_gender']))
     except Exception as e:
         logger.error(f"Error in get_pnp_driver_gender: {e}")
