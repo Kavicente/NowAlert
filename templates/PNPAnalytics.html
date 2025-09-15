@@ -72,8 +72,8 @@
             <header class="header2" id="letterC" class="section hidden">Crime Incident Reports</header>
             <div class="chart-container"><h2>Incident Trends</h2><canvas id="crimeIncidentTrendsChart"></canvas></div>
             <div class="chart-container"><h2>Incident Distribution</h2><canvas id="crimeIncidentDistributionChart"></canvas></div>
-            <div class="chart-container"><h2>Responded Alerts</h2><canvas id="crimeRespondedAlertsChart"></canvas></div>
             <div class="chart-container"><h2>Crime Type Analysis</h2><canvas id="crimeTypeAnalysisChart"></canvas></div>
+            <div class="chart-container"><h2>Responded Alerts</h2><canvas id="crimeRespondedAlertsChart"></canvas></div>
         </div>
     </main>
 
@@ -121,6 +121,284 @@
 
             filterData(document.querySelector('.tab.active').textContent.toLowerCase());
         }
+
+        function filterData(timePeriod) {
+            document.getElementById('dailySelector').style.display = 'none';
+            document.getElementById('weekSelector').style.display = 'none';
+            fetch(`/api/pnp_analytics_data?time=${timePeriod}&municipality={{ municipality | lower }}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching data:', data.error);
+                        alert('Failed to load analytics data');
+                        return;
+                    }
+                    updateCharts(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    alert('Failed to load analytics data');
+                });
+        }
+
+        function filterDaily() {
+            document.getElementById('dailySelector').style.display = 'block';
+            document.getElementById('weekSelector').style.display = 'none';
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const dateStr = yesterday.toISOString().split('T')[0];
+            document.getElementById('yesterdayDate').textContent = dateStr;
+            fetch(`/api/pnp_analytics_data?time=daily&municipality={{ municipality | lower }}&date=${dateStr}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching data:', data.error);
+                        alert('Failed to load analytics data');
+                        return;
+                    }
+                    updateCharts(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    alert('Failed to load analytics data');
+                });
+        }
+
+        function filterWeekly() {
+            document.getElementById('dailySelector').style.display = 'none';
+            document.getElementById('weekSelector').style.display = 'block';
+            const today = new Date();
+            const weeks = [];
+            for (let i = 0; i < 4; i++) {
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - today.getDay() - (i * 7));
+                weeks.push(weekStart.toISOString().split('T')[0]);
+            }
+            const weekButtons = document.getElementById('weekButtons');
+            weekButtons.innerHTML = '';
+            weeks.forEach((week, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = `Week ${index + 1}`;
+                btn.onclick = () => loadWeek(week);
+                weekButtons.appendChild(btn);
+            });
+            loadWeek(weeks[0]);
+        }
+
+        function loadWeek(weekStart) {
+            document.getElementById('dateButtons').style.display = 'block';
+            fetch(`/api/pnp_analytics_data?time=weekly&municipality={{ municipality | lower }}&week_start=${weekStart}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching weekly data:', data.error);
+                        alert('Failed to load weekly data');
+                        return;
+                    }
+                    const dateButtons = document.getElementById('dateButtons');
+                    dateButtons.innerHTML = '';
+                    data.dates.forEach(date => {
+                        const btn = document.createElement('button');
+                        btn.textContent = date;
+                        btn.onclick = () => {
+                            fetch(`/api/pnp_analytics_data?time=daily&municipality={{ municipality | lower }}&date=${date}`)
+                                .then(response => response.json())
+                                .then(dayData => {
+                                    if (dayData.error) {
+                                        console.error('Error fetching daily data:', dayData.error);
+                                        alert('Failed to load daily data');
+                                        return;
+                                    }
+                                    updateCharts(dayData);
+                                });
+                        };
+                        dateButtons.appendChild(btn);
+                    });
+                    const summaryDiv = document.getElementById('weeklySummary');
+                    summaryDiv.innerHTML = `
+                        <h3>Week Summary</h3>
+                        <p>Total Alerts Received: ${data.summary.total_alerts}</p>
+                        <p>Total Responded Alerts: ${data.summary.total_responded}</p>
+                        <p>Most Common Barangay: ${data.summary.most_common_barangay}</p>
+                        <p>Total Road Accidents: ${data.summary.total_road_accidents}</p>
+                        <p>Most Common Accident Type: ${data.summary.most_common_accident_type}</p>
+                        <p>Most Common Cause: ${data.summary.most_common_cause}</p>
+                        <p>Most Common Weather: ${data.summary.most_common_weather}</p>
+                        <p>Most Common Road Condition: ${data.summary.most_common_road_condition}</p>
+                        <p>Most Common Vehicle Type: ${data.summary.most_common_vehicle_type}</p>
+                        <p>Most Common Driver Age: ${data.summary.most_common_driver_age}</p>
+                        <p>Most Common Driver Gender: ${data.summary.most_common_driver_gender}</p>
+                    `;
+                    if (data.dates.length > 0) {
+                        fetch(`/api/pnp_analytics_data?time=daily&municipality={{ municipality | lower }}&date=${data.dates[0]}`)
+                            .then(response => response.json())
+                            .then(dayData => {
+                                if (dayData.error) {
+                                    console.error('Error fetching daily data:', dayData.error);
+                                    alert('Failed to load daily data');
+                                    return;
+                                }
+                                updateCharts(dayData);
+                            });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching weekly data:', error);
+                    alert('Failed to load weekly data');
+                });
+        }
+
+        function updateCharts(data) {
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            charts.roadIncidentTrendsChart = new Chart(document.getElementById('roadIncidentTrendsChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: data.trends.labels,
+                    datasets: [
+                        {
+                            label: 'Total Incidents',
+                            data: data.trends.total,
+                            borderColor: '#36A2EB',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: true
+                        },
+                        {
+                            label: 'Responded Incidents',
+                            data: data.trends.responded,
+                            borderColor: '#FF6384',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            charts.roadAccidentDistributionChart = new Chart(document.getElementById('roadAccidentDistributionChart').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.distribution),
+                    datasets: [{
+                        data: Object.values(data.distribution).map(d => d.total),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadRespondedAlertsChart = new Chart(document.getElementById('roadRespondedAlertsChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.distribution),
+                    datasets: [{
+                        label: 'Responded Alerts',
+                        data: Object.values(data.distribution).map(d => d.responded),
+                        backgroundColor: '#FF6384'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadCauseAnalysisChart = new Chart(document.getElementById('roadCauseAnalysisChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.causes.road || {}),
+                    datasets: [{
+                        label: 'Accident Causes',
+                        data: Object.values(data.causes.road || {}),
+                        backgroundColor: '#36A2EB'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadAccidentTypeChart = new Chart(document.getElementById('roadAccidentTypeChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.types || {}),
+                    datasets: [{
+                        label: 'Accident Types',
+                        data: Object.values(data.types || {}),
+                        backgroundColor: '#4BC0C0'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadConditionChart = new Chart(document.getElementById('roadConditionChart').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.road_conditions || {}),
+                    datasets: [{
+                        data: Object.values(data.road_conditions || {}),
+                        backgroundColor: ['#FF9F40', '#9966FF', '#4BC0C0']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadWeatherChart = new Chart(document.getElementById('roadWeatherChart').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.weather || {}),
+                    datasets: [{
+                        data: Object.values(data.weather || {}),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadVehicleTypesChart = new Chart(document.getElementById('roadVehicleTypesChart').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.vehicle_types || {}),
+                    datasets: [{
+                        data: Object.values(data.vehicle_types || {}),
+                        backgroundColor: ['#FF9F40', '#9966FF', '#4BC0C0']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadDriverAgeChart = new Chart(document.getElementById('roadDriverAgeChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(data.driver_age || {}),
+                    datasets: [{
+                        label: 'Driver Age Groups',
+                        data: Object.values(data.driver_age || {}),
+                        backgroundColor: '#36A2EB'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            charts.roadDriverGenderChart = new Chart(document.getElementById('roadDriverGenderChart').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data.driver_gender || {}),
+                    datasets: [{
+                        data: Object.values(data.driver_gender || {}),
+                        backgroundColor: ['#FF6384', '#36A2EB']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // Initialize with today's data
+        document.addEventListener('DOMContentLoaded', () => {
+            filterData('today');
+        });
     </script>
 </body>
 </html>
