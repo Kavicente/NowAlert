@@ -45,6 +45,16 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
+
+image_classifier = None
+try:
+    image_classifier = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'image_classifier_dt.pkl'))
+    logger.info("image_classifier_dt.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("image_classifier_dt.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading image_classifier_dt.pkl: {e}")
+
 road_accident_df = pd.DataFrame()
 try:
     road_accident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'road_accident.csv'))
@@ -90,25 +100,89 @@ def get_municipality_from_barangay(barangay):
             return municipality
     return None
 
-def classify_image(base64_image):
+
+def classify_image_barangay(base64_image):
     try:
         import base64
         img_data = base64.b64decode(base64_image)
         nparr = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
         if img is None:
-            logger.error("Failed to decode image")
+            logger.error("Failed to decode image for barangay")
             return 'unknown'
         img = cv2.resize(img, (64, 64))
         features = img.flatten().reshape(1, -1)
-        if road_accident_predictor:
-            prediction = road_accident_predictor.predict(features)[0]
-            logger.debug(f"Image classified as: {prediction}")
+        if image_classifier:
+            prediction = image_classifier.predict(features)[0]
+            logger.debug(f"Barangay image classified as: {prediction}")
             return prediction
         return 'unknown'
     except Exception as e:
-        logger.error(f"Image classification failed: {e}")
+        logger.error(f"Barangay image classification failed: {e}")
         return 'unknown'
+
+def classify_image_bfp(base64_image):
+    try:
+        import base64
+        img_data = base64.b64decode(base64_image)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            logger.error("Failed to decode image for BFP")
+            return 'unknown'
+        img = cv2.resize(img, (64, 64))
+        features = img.flatten().reshape(1, -1)
+        if image_classifier:
+            prediction = image_classifier.predict(features)[0]
+            logger.debug(f"BFP image classified as: {prediction}")
+            return 'unknown' if prediction not in ['Road Accident', 'Fire'] else prediction
+        return 'unknown'
+    except Exception as e:
+        logger.error(f"BFP image classification failed: {e}")
+        return 'unknown'
+
+def classify_image_cdrrmo(base64_image):
+    try:
+        import base64
+        img_data = base64.b64decode(base64_image)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            logger.error("Failed to decode image for CDRRMO")
+            return 'unknown'
+        img = cv2.resize(img, (64, 64))
+        features = img.flatten().reshape(1, -1)
+        if image_classifier:
+            prediction = image_classifier.predict(features)[0]
+            logger.debug(f"CDRRMO image classified as: {prediction}")
+            return prediction
+        return 'unknown'
+    except Exception as e:
+        logger.error(f"CDRRMO image classification failed: {e}")
+        return 'unknown'
+
+def classify_image_pnp(base64_image):
+    try:
+        import base64
+        img_data = base64.b64decode(base64_image)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            logger.error("Failed to decode image for PNP")
+            return 'unknown'
+        img = cv2.resize(img, (64, 64))
+        features = img.flatten().reshape(1, -1)
+        if image_classifier:
+            prediction = image_classifier.predict(features)[0]
+            logger.debug(f"PNP image classified as: {prediction}")
+            return prediction
+        return 'unknown'
+    except Exception as e:
+        logger.error(f"PNP image classification failed: {e}")
+        return 'unknown'
+
+def classify_image(base64_image):
+    return classify_image_barangay(base64_image)
 
 @app.route('/api/android_signup', methods=['POST'])
 def android_signup():
@@ -460,6 +534,8 @@ def handle_register_role(data):
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
 
+
+
 @socketio.on('alert')
 def handle_new_alert(data):
     logger.info(f"New alert received: {data}")
@@ -467,17 +543,16 @@ def handle_new_alert(data):
     data['alert_id'] = alert_id
     data['timestamp'] = datetime.utcnow().isoformat()
     data['resident_barangay'] = data.get('barangay', 'Unknown')
+    data['image_classification'] = 'no_image'
     
     # Classify image if present
-    image_classification = 'no_image'
-    if 'image' in data:
-        try:
-            image_classification = classify_image(data['image'])
-        except Exception as e:
-            logger.error(f"Image classification failed: {e}")
-            image_classification = 'classification_error'
-    data['image_classification'] = image_classification
-
+    if 'image' in data and data['image']:
+            # Classify image for each role
+            data['image_classification_barangay'] = classify_image_barangay(data['image'])
+            data['image_classification_bfp'] = classify_image_bfp(data['image'])
+            data['image_classification_cdrrmo'] = classify_image_cdrrmo(data['image'])
+            data['image_classification_pnp'] = classify_image_pnp(data['image'])
+            data['image_classification'] = data['image_classification_barangay']
     alerts.append(data)
 
     # Emit to relevant rooms

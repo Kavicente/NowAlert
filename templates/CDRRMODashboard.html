@@ -211,6 +211,7 @@
                         <p><strong>Emergency:</strong> ${data.emergency_type || 'N/A'}</p>
                         <p><strong>Location:</strong> ${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}</p>
                         <p><strong>Time:</strong> ${displayTime}</p>
+                        ${data.image_classification_cdrrmo !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification_cdrrmo}</p>` : ''}
                     `;
                     if (data.image) {
                         const img = document.createElement('img');
