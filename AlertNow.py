@@ -250,10 +250,78 @@ def add_response(data):
         except json.JSONDecodeError:
             logger.warning(f"Invalid JSON response: {data}")
             return
+    # Populate road_accident_cause and road_accident_type for cdrrmo
+    if data.get('role') == 'cdrrmo' and 'image' in data:
+        try:
+            image_classification = classify_image(data['image'])
+            data['road_accident_cause'] = image_classification if image_classification != 'unknown' else data.get('road_accident_cause', 'Unknown')
+            data['road_accident_type'] = image_classification if image_classification != 'unknown' else data.get('road_accident_type', 'Unknown')
+        except Exception as e:
+            logger.error(f"Image classification failed in add_response: {e}")
+            data['road_accident_cause'] = data.get('road_accident_cause', 'Unknown')
+            data['road_accident_type'] = data.get('road_accident_type', 'Unknown')
     today_responses.append(data)
 
 
-    
+@socketio.on('new_response')
+def handle_new_response(data):
+    logger.info(f"New response received: {data}")
+    try:
+        role = data.get('role', '').lower()
+        alert_id = data.get('alert_id', str(uuid.uuid4()))
+        emergency_type = data.get('emergency_type', 'unknown')
+        barangay = data.get('barangay', '').lower()
+        timestamp = datetime.utcnow().isoformat()
+        lat = float(data.get('lat', 0.0))
+        lon = float(data.get('lon', 0.0))
+        road_accident_cause = data.get('road_accident_cause', 'unknown')
+        road_accident_type = data.get('road_accident_type', 'unknown')
+        weather = data.get('weather', 'unknown')
+        road_condition = data.get('road_condition', 'unknown')
+        vehicle_type = data.get('vehicle_type', 'unknown')
+        driver_age = data.get('driver_age', 'unknown')
+        driver_gender = data.get('driver_gender', 'unknown')
+        responded = data.get('responded', True)
+
+        conn = get_db_connection()
+        if role == 'barangay':
+            conn.execute('''
+                INSERT INTO barangay_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
+                    vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
+                    timestamp, responded
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
+                  vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
+                  timestamp, responded))
+        elif role == 'cdrrmo':
+            conn.execute('''
+                INSERT INTO cdrrmo_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
+                    vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
+                    timestamp, responded
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
+                  vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
+                  timestamp, responded))
+        elif role == 'pnp':
+            conn.execute('''
+                INSERT INTO pnp_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
+                    vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
+                    timestamp, responded
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
+                  vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
+                  timestamp, responded))
+        conn.commit()
+        conn.close()
+
+        add_response(data)
+        emit('update_response', data, broadcast=True)
+        logger.info(f"Response stored and broadcasted for role {role}, alert_id {alert_id}")
+    except Exception as e:
+        logger.error(f"Error handling new response: {e}")    
 
 
 # New function get_road_condition
@@ -1590,17 +1658,29 @@ def pnp_analytics():
 @app.route('/api/barangay_analytics_data')
 def barangay_analytics_data():
     from BarangayAnalytics import get_barangay_analytics_data
-    return get_barangay_analytics_data(responses)
+    time_filter = request.args.get('time', 'today')
+    barangay = request.args.get('barangay', '')
+    date = request.args.get('date')
+    week_start = request.args.get('week_start')
+    return get_barangay_analytics_data(responses, time_filter, barangay, date, week_start)
 
 @app.route('/api/cdrrmo_analytics_data')
 def cdrrmo_analytics_data():
     from CDRRMOAnalytics import get_cdrrmo_analytics_data
-    return get_cdrrmo_analytics_data(responses)
+    time_filter = request.args.get('time', 'today')
+    municipality = request.args.get('municipality', '')
+    date = request.args.get('date')
+    week_start = request.args.get('week_start')
+    return get_cdrrmo_analytics_data(responses, time_filter, municipality, date, week_start)
 
 @app.route('/api/pnp_analytics_data')
 def pnp_analytics_data():
     from PNPAnalytics import get_pnp_analytics_data
-    return get_pnp_analytics_data(responses)
+    time_filter = request.args.get('time', 'today')
+    municipality = request.args.get('municipality', '')
+    date = request.args.get('date')
+    week_start = request.args.get('week_start')
+    return get_pnp_analytics_data(responses, time_filter, municipality, date, week_start)
 
 @app.route('/api/bfp_analytics_data', methods=['GET'])
 def get_bfp_analytics_data():
@@ -1684,7 +1764,8 @@ if __name__ == '__main__':
                 lon REAL,
                 barangay TEXT,
                 emergency_type TEXT,
-                timestamp TEXT
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
             )
         ''')
         c.execute('''
@@ -1702,7 +1783,8 @@ if __name__ == '__main__':
                 lon REAL,
                 barangay TEXT,
                 emergency_type TEXT,
-                timestamp TEXT
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
             )
         ''')
         c.execute('''
@@ -1720,7 +1802,8 @@ if __name__ == '__main__':
                 lon REAL,
                 barangay TEXT,
                 emergency_type TEXT,
-                timestamp TEXT
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
             )
         ''')
         conn.commit()
