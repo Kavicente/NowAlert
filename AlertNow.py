@@ -263,69 +263,171 @@ def add_response(data):
     today_responses.append(data)
 
 
-@socketio.on('new_response')
-def handle_new_response(data):
-    logger.info(f"New response received: {data}")
+@socketio.on('submit_response')
+def handle_submit_response(data):
     try:
-        role = data.get('role', '').lower()
         alert_id = data.get('alert_id', str(uuid.uuid4()))
+        role = data.get('role', '').lower()
+        barangay = data.get('barangay', '')
+        municipality = get_municipality_from_barangay(barangay) or data.get('municipality', '')
         emergency_type = data.get('emergency_type', 'unknown')
-        barangay = data.get('barangay', '').lower()
-        timestamp = datetime.utcnow().isoformat()
-        lat = float(data.get('lat', 0.0))
-        lon = float(data.get('lon', 0.0))
-        road_accident_cause = data.get('road_accident_cause', 'unknown')
-        road_accident_type = data.get('road_accident_type', 'unknown')
-        weather = data.get('weather', 'unknown')
-        road_condition = data.get('road_condition', 'unknown')
-        vehicle_type = data.get('vehicle_type', 'unknown')
-        driver_age = data.get('driver_age', 'unknown')
-        driver_gender = data.get('driver_gender', 'unknown')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        lat = float(data.get('lat', 0))
+        lon = float(data.get('lon', 0))
         responded = data.get('responded', True)
-
+        
+        # Road accident fields
+        road_accident_cause = data.get('road_accident_cause', 'Unknown')
+        road_accident_type = data.get('road_accident_type', 'Unknown')
+        weather = data.get('weather', 'Unknown')
+        road_condition = data.get('road_condition', 'Unknown')
+        vehicle_type = data.get('vehicle_type', 'Unknown')
+        driver_age = data.get('driver_age', 'Unknown')
+        driver_gender = data.get('driver_gender', 'Unknown')
+        
+        # Fire incident fields
+        cause = data.get('cause', 'Unknown')
+        property_type = data.get('property_type', 'Unknown')
+        
         conn = get_db_connection()
+        table = f"{role}_response" if role in ['barangay', 'cdrrmo', 'pnp', 'bfp'] else 'barangay_response'
+        if role == 'bfp':
+            conn.execute(f'''
+                INSERT INTO {table} (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded))
+        else:
+            conn.execute(f'''
+                INSERT INTO {table} (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+        conn.commit()
+        conn.close()
+        
+        response_data = {
+            'alert_id': alert_id,
+            'emergency_type': emergency_type,
+            'timestamp': timestamp,
+            'lat': lat,
+            'lon': lon,
+            'barangay': barangay,
+            'responded': responded
+        }
+        if role == 'bfp':
+            response_data.update({
+                'cause': cause,
+                'weather': weather,
+                'property_type': property_type
+            })
+        else:
+            response_data.update({
+                'road_accident_cause': road_accident_cause,
+                'road_accident_type': road_accident_type,
+                'weather': weather,
+                'road_condition': road_condition,
+                'vehicle_type': vehicle_type,
+                'driver_age': driver_age,
+                'driver_gender': driver_gender
+            })
+        
+        global today_responses
+        today_responses.append(response_data)
+        
+        room = f"{role}_{barangay if role == 'barangay' or role == 'bfp' else municipality}"
+        socketio.emit('update_response', response_data, room=room)
+        logger.info(f"Response submitted for {role} in {barangay or municipality}")
+        emit('response_submitted', {'message': 'Response submitted successfully'})
+    except Exception as e:
+        logger.error(f"Error submitting response: {e}")
+        emit('response_error', {'error': str(e)}) 
+
+
+@app.route('/api/submit_response', methods=['POST'])
+def submit_response():
+    data = request.json
+    role = data.get('role')
+    alert_id = data.get('alert_id')
+    barangay = data.get('barangay')
+    municipality = get_municipality_from_barangay(barangay) if barangay else data.get('municipality')
+    emergency_type = data.get('emergency_type')
+    road_accident_cause = data.get('road_accident_cause', 'Unknown')
+    road_accident_type = data.get('road_accident_type', 'Unknown')
+    weather = data.get('weather', 'Unknown')
+    road_condition = data.get('road_condition', 'Unknown')
+    vehicle_type = data.get('vehicle_type', 'Unknown')
+    driver_age = data.get('driver_age', 'Unknown')
+    driver_gender = data.get('driver_gender', 'Unknown')
+    property_type = data.get('property_type', 'Unknown') if role == 'bfp' else None
+    lat = data.get('lat')
+    lon = data.get('lon')
+    timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
         if role == 'barangay':
-            conn.execute('''
-                INSERT INTO barangay_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
-                    vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
-                    timestamp, responded
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
-                  vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
-                  timestamp, responded))
+            c.execute('''
+                INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, True))
         elif role == 'cdrrmo':
-            conn.execute('''
-                INSERT INTO cdrrmo_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
-                    vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
-                    timestamp, responded
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
-                  vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
-                  timestamp, responded))
+            c.execute('''
+                INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, True))
         elif role == 'pnp':
-            conn.execute('''
-                INSERT INTO pnp_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
-                    vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
-                    timestamp, responded
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, 
-                  vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, 
-                  timestamp, responded))
+            c.execute('''
+                INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, True))
+        elif role == 'bfp':
+            c.execute('''
+                INSERT INTO bfp_response (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, road_accident_cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, True))
         conn.commit()
         conn.close()
 
-        add_response(data)
-        emit('update_response', data, broadcast=True)
-        logger.info(f"Response stored and broadcasted for role {role}, alert_id {alert_id}")
+        # Update global responses and emit Socket.IO event
+        response_data = {
+            'alert_id': alert_id,
+            'role': role,
+            'barangay': barangay,
+            'municipality': municipality,
+            'emergency_type': emergency_type,
+            'road_accident_cause': road_accident_cause,
+            'road_accident_type': road_accident_type,
+            'weather': weather,
+            'road_condition': road_condition,
+            'vehicle_type': vehicle_type,
+            'driver_age': driver_age,
+            'driver_gender': driver_gender,
+            'property_type': property_type,
+            'lat': lat,
+            'lon': lon,
+            'timestamp': timestamp
+        }
+        responses.append(response_data)
+        today_responses.append(response_data)
+        socketio.emit('update_response', response_data, room=f"{role}_{barangay or municipality}")
+        logger.info(f"Response submitted by {role} for alert_id: {alert_id}")
+        return jsonify({'message': 'Response submitted successfully'})
     except Exception as e:
-        logger.error(f"Error handling new response: {e}")    
-
+        logger.error(f"Error submitting response: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # New function get_road_condition
-  
+@socketio.on('update_response')
+def handle_update_response(data):
+    logger.info(f"Update response received: {data}")
+    try:
+        role = data.get('role', '').lower()
+        barangay = data.get('barangay', '').lower()
+        municipality = data.get('municipality', '').lower()
+        emit('update_response', data, broadcast=True, include_self=True)
+        logger.info(f"Broadcasted update_response for role {role}")
+    except Exception as e:
+        logger.error(f"Error broadcasting update_response: {e}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -1662,7 +1764,16 @@ def barangay_analytics_data():
     barangay = request.args.get('barangay', '')
     date = request.args.get('date')
     week_start = request.args.get('week_start')
-    return get_barangay_analytics_data(responses, time_filter, barangay, date, week_start)
+    try:
+        data = get_barangay_analytics_data(time_filter, barangay)
+        if date:
+            data = get_barangay_analytics_data('daily', barangay)
+        elif week_start:
+            data = get_barangay_analytics_data('weekly', barangay)
+        return jsonify(data)
+    except Exception as e:
+        logger.error(f"Error in barangay_analytics_data: {e}")
+        return jsonify({'error': 'Failed to fetch analytics data'}), 500
 
 @app.route('/api/cdrrmo_analytics_data')
 def cdrrmo_analytics_data():
@@ -1671,7 +1782,16 @@ def cdrrmo_analytics_data():
     municipality = request.args.get('municipality', '')
     date = request.args.get('date')
     week_start = request.args.get('week_start')
-    return get_cdrrmo_analytics_data(responses, time_filter, municipality, date, week_start)
+    try:
+        data = get_cdrrmo_analytics_data(time_filter, municipality)
+        if date:
+            data = get_cdrrmo_analytics_data('daily', municipality)
+        elif week_start:
+            data = get_cdrrmo_analytics_data('weekly', municipality)
+        return jsonify(data)
+    except Exception as e:
+        logger.error(f"Error in cdrrmo_analytics_data: {e}")
+        return jsonify({'error': 'Failed to fetch analytics data'}), 500
 
 @app.route('/api/pnp_analytics_data')
 def pnp_analytics_data():
@@ -1680,7 +1800,16 @@ def pnp_analytics_data():
     municipality = request.args.get('municipality', '')
     date = request.args.get('date')
     week_start = request.args.get('week_start')
-    return get_pnp_analytics_data(responses, time_filter, municipality, date, week_start)
+    try:
+        data = get_pnp_analytics_data(time_filter, municipality)
+        if date:
+            data = get_pnp_analytics_data('daily', municipality)
+        elif week_start:
+            data = get_pnp_analytics_data('weekly', municipality)
+        return jsonify(data)
+    except Exception as e:
+        logger.error(f"Error in pnp_analytics_data: {e}")
+        return jsonify({'error': 'Failed to fetch analytics data'}), 500
 
 @app.route('/api/bfp_analytics_data', methods=['GET'])
 def get_bfp_analytics_data():

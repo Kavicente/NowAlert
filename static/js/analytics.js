@@ -231,6 +231,7 @@ function loadWeek(weekStart) {
         });
 }
 
+// Update the updateCharts function
 function updateCharts(data) {
     const role = window.location.pathname.includes('bfp') ? 'bfp' :
                  window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
@@ -240,13 +241,28 @@ function updateCharts(data) {
     }
     window.charts = {};
 
-    if (role === 'barangay' || role === 'cdrrmo' || role === 'pnp' || role === 'bfp') {
+    // Ensure data fields exist, provide defaults if missing
+    const defaultData = {
+        trends: { labels: [], total: [], responded: [] },
+        distribution: {},
+        causes: { road: {}, fire: {} },
+        types: {},
+        road_conditions: {},
+        weather: {},
+        vehicle_types: {},
+        driver_age: {},
+        driver_gender: {},
+        property_types: {}
+    };
+    data = { ...defaultData, ...data };
+
+    if (role === 'barangay' || role === 'cdrrmo' || role === 'pnp') {
         renderLine('roadIncidentTrendsChart', data.trends.labels, [
             { label: 'Total Incidents', data: data.trends.total, borderColor: '#36A2EB', backgroundColor: 'rgba(54, 162, 235, 0.2)' },
             { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', backgroundColor: 'rgba(255, 99, 132, 0.2)' }
         ], 'Incident Trends');
         renderPie('roadAccidentDistributionChart', Object.keys(data.distribution).reduce((acc, k) => ({ ...acc, [k]: data.distribution[k].total }), {}), 'Accident Distribution');
-        renderBar('roadRespondedAlertsChart', Object.keys(data.distribution), Object.values(data.distribution).map(d => d.responded), 'Responded Alerts');
+        renderBar('roadRespondedAlertsChart', Object.keys(data.distribution), Object.values(data.distribution).map(d => d.responded || 0), 'Responded Alerts');
         renderBar('roadCauseAnalysisChart', data.causes.road, 'Accident Cause');
         renderBar('roadAccidentTypeChart', data.types, 'Accident Type');
         renderPie('roadConditionChart', data.road_conditions, 'Road Condition');
@@ -262,10 +278,10 @@ function updateCharts(data) {
             { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', backgroundColor: 'rgba(255, 99, 132, 0.2)' }
         ], 'Incident Trends');
         renderPie('fireIncidentDistributionChart', Object.keys(data.distribution).reduce((acc, k) => ({ ...acc, [k]: data.distribution[k].total }), {}), 'Incident Distribution');
-        renderBar('fireRespondedAlertsChart', Object.keys(data.distribution), Object.values(data.distribution).map(d => d.responded), 'Responded Alerts');
+        renderBar('fireRespondedAlertsChart', Object.keys(data.distribution), Object.values(data.distribution).map(d => d.responded || 0), 'Responded Alerts');
         renderBar('fireCauseAnalysisChart', data.causes.fire, 'Fire Cause Analysis');
         renderPie('fireWeatherChart', data.weather, 'Weather Impact');
-        renderPie('firePropertyTypeChart', data.property_types || {}, 'Property Type');
+        renderPie('firePropertyTypeChart', data.property_types, 'Property Type');
         renderBar('fireCauseChart', data.causes.fire, 'Fire Cause');
     }
 
@@ -275,7 +291,7 @@ function updateCharts(data) {
             { label: 'Responded Incidents', data: data.trends.responded, borderColor: '#FF6384', backgroundColor: 'rgba(255, 99, 132, 0.2)' }
         ], 'Incident Trends');
         renderPie('crimeIncidentDistributionChart', Object.keys(data.distribution).reduce((acc, k) => ({ ...acc, [k]: data.distribution[k].total }), {}), 'Incident Distribution');
-        renderBar('crimeRespondedAlertsChart', Object.keys(data.distribution), Object.values(data.distribution).map(d => d.responded), 'Responded Alerts');
+        renderBar('crimeRespondedAlertsChart', Object.keys(data.distribution), Object.values(data.distribution).map(d => d.responded || 0), 'Responded Alerts');
         renderBar('crimeTypeAnalysisChart', data.causes.road, 'Crime Type Analysis');
     }
 }
