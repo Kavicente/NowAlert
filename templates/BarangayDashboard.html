@@ -186,7 +186,7 @@
                         <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
                         <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
-                        ${data.image_classification !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification}</p>` : ''}
+                        ${data.image_classification_barangay !== 'no_image' ? `<p><strong>Image Classification:</strong> ${data.image_classification_barangay}</p>` : ''}
                     `;
                     feed.prepend(alertDiv);
 
