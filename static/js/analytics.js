@@ -11,41 +11,23 @@ function showSection(type) {
     const roadSection = document.getElementById('roadSection');
     const fireHeader = document.getElementById('letterF');
     const fireSection = document.getElementById('fireSection');
-    const crimeHeader = document.getElementById('letterC');
-    const crimeSection = document.getElementById('crimeSection');
 
     if (type === 'road') {
-        roadHeader?.classList.remove('hidden');
-        roadSection?.classList.remove('hidden');
-        fireHeader?.classList.add('hidden');
-        fireSection?.classList.add('hidden');
-        crimeHeader?.classList.add('hidden');
-        crimeSection?.classList.add('hidden');
+        roadHeader.classList.remove('hidden');
+        roadSection.classList.remove('hidden');
+        fireHeader.classList.add('hidden');
+        fireSection.classList.add('hidden');
     } else if (type === 'fire') {
-        roadHeader?.classList.add('hidden');
-        roadSection?.classList.add('hidden');
-        fireHeader?.classList.remove('hidden');
-        fireSection?.classList.remove('hidden');
-        crimeHeader?.classList.add('hidden');
-        crimeSection?.classList.add('hidden');
-    } else if (type === 'crime') {
-        roadHeader?.classList.add('hidden');
-        roadSection?.classList.add('hidden');
-        fireHeader?.classList.add('hidden');
-        fireSection?.classList.add('hidden');
-        crimeHeader?.classList.remove('hidden');
-        crimeSection?.classList.remove('hidden');
+        roadHeader.classList.add('hidden');
+        roadSection.classList.add('hidden');
+        fireHeader.classList.remove('hidden');
+        fireSection.classList.remove('hidden');
     }
 
+    // Trigger data refresh for the active time period
     const activeTab = document.querySelector('.tab.active');
     if (activeTab) {
-        if (activeTab.textContent.toLowerCase() === 'daily') {
-            filterDaily();
-        } else if (activeTab.textContent.toLowerCase() === 'weekly') {
-            filterWeekly();
-        } else {
-            filterData(activeTab.textContent.toLowerCase());
-        }
+        filterData(activeTab.textContent.toLowerCase());
     }
 }
 
@@ -54,184 +36,6 @@ function setActiveTab(tabElement) {
     tabElement.classList.add('active');
 }
 
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        setActiveTab(tab);
-        if (tab.textContent.toLowerCase() === 'daily') {
-            filterDaily();
-        } else if (tab.textContent.toLowerCase() === 'weekly') {
-            filterWeekly();
-        } else {
-            filterData(tab.textContent.toLowerCase());
-        }
-    });
-});
-
-function filterData(timeFilter) {
-    const role = window.location.pathname.includes('bfp') ? 'bfp' :
-                 window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
-                 window.location.pathname.includes('pnp') ? 'pnp' : 'barangay';
-    const location = role === 'barangay' || role === 'bfp' ? '{{ barangay }}'.toLowerCase() :
-                     '{{ municipality }}'.toLowerCase();
-    const url = `/api/${role}_analytics_data?time=${timeFilter}&${role === 'barangay' || role === 'bfp' ? 'barangay' : 'municipality'}=${location}`;
-
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.error('Error fetching data:', data.error);
-                alert('Failed to load analytics data');
-                return;
-            }
-            updateCharts(data);
-        })
-        .catch(err => {
-            console.error('Analytics load error:', err);
-            alert('Failed to load analytics data');
-        });
-}
-
-function filterDaily() {
-    const role = window.location.pathname.includes('bfp') ? 'bfp' :
-                 window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
-                 window.location.pathname.includes('pnp') ? 'pnp' : 'barangay';
-    const location = role === 'barangay' || role === 'bfp' ? '{{ barangay }}'.toLowerCase() :
-                     '{{ municipality }}'.toLowerCase();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const dateStr = yesterday.toISOString().split('T')[0];
-    document.getElementById('dailySelector').style.display = 'block';
-    document.getElementById('weekSelector').style.display = 'none';
-    document.getElementById('yesterdayDate').textContent = dateStr;
-
-    const url = `/api/${role}_analytics_data?time=daily&${role === 'barangay' || role === 'bfp' ? 'barangay' : 'municipality'}=${location}&date=${dateStr}`;
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.error('Error fetching data:', data.error);
-                alert('Failed to load analytics data');
-                return;
-            }
-            updateCharts(data);
-        })
-        .catch(err => {
-            console.error('Analytics load error:', err);
-            alert('Failed to load analytics data');
-        });
-}
-
-function filterWeekly() {
-    const role = window.location.pathname.includes('bfp') ? 'bfp' :
-                 window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
-                 window.location.pathname.includes('pnp') ? 'pnp' : 'barangay';
-    const location = role === 'barangay' || role === 'bfp' ? '{{ barangay }}'.toLowerCase() :
-                     '{{ municipality }}'.toLowerCase();
-    document.getElementById('dailySelector').style.display = 'none';
-    document.getElementById('weekSelector').style.display = 'block';
-    const today = new Date();
-    const weeks = [];
-    for (let i = 0; i < 4; i++) {
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay() - (i * 7));
-        weeks.push(weekStart.toISOString().split('T')[0]);
-    }
-    const weekButtons = document.getElementById('weekButtons');
-    weekButtons.innerHTML = '';
-    weeks.forEach((week, index) => {
-        const btn = document.createElement('button');
-        btn.textContent = `Week ${index + 1}`;
-        btn.onclick = () => loadWeek(week);
-        weekButtons.appendChild(btn);
-    });
-    loadWeek(weeks[0]);
-}
-
-function loadWeek(weekStart) {
-    const role = window.location.pathname.includes('bfp') ? 'bfp' :
-                 window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
-                 window.location.pathname.includes('pnp') ? 'pnp' : 'barangay';
-    const location = role === 'barangay' || role === 'bfp' ? '{{ barangay }}'.toLowerCase() :
-                     '{{ municipality }}'.toLowerCase();
-    const url = `/api/${role}_analytics_data?time=weekly&${role === 'barangay' || role === 'bfp' ? 'barangay' : 'municipality'}=${location}&week_start=${weekStart}`;
-    
-    document.getElementById('dateButtons').style.display = 'block';
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) {
-                console.error('Error fetching weekly data:', data.error);
-                alert('Failed to load weekly data');
-                return;
-            }
-            const dateButtons = document.getElementById('dateButtons');
-            dateButtons.innerHTML = '';
-            data.dates.forEach(date => {
-                const btn = document.createElement('button');
-                btn.textContent = date;
-                btn.onclick = () => {
-                    const dailyUrl = `/api/${role}_analytics_data?time=daily&${role === 'barangay' || role === 'bfp' ? 'barangay' : 'municipality'}=${location}&date=${date}`;
-                    fetch(dailyUrl)
-                        .then(response => response.json())
-                        .then(dayData => {
-                            if (dayData.error) {
-                                console.error('Error fetching daily data:', dayData.error);
-                                alert('Failed to load daily data');
-                                return;
-                            }
-                            updateCharts(dayData);
-                        });
-                };
-                dateButtons.appendChild(btn);
-            });
-            const summaryDiv = document.getElementById('weeklySummary');
-            summaryDiv.innerHTML = role === 'barangay' || role === 'bfp' ? `
-                <h3>Week Summary</h3>
-                <p>Total Alerts Received: ${data.summary.total_alerts}</p>
-                <p>Total Responded Alerts: ${data.summary.total_responded}</p>
-                <p>Total Road Accidents: ${data.summary.total_road_accidents}</p>
-                <p>Most Common Accident Type: ${data.summary.most_common_accident_type}</p>
-                <p>Most Common Cause: ${data.summary.most_common_cause}</p>
-                <p>Most Common Weather: ${data.summary.most_common_weather}</p>
-                <p>Most Common Road Condition: ${data.summary.most_common_road_condition}</p>
-                <p>Most Common Vehicle Type: ${data.summary.most_common_vehicle_type}</p>
-                <p>Most Common Driver Age: ${data.summary.most_common_driver_age}</p>
-                <p>Most Common Driver Gender: ${data.summary.most_common_driver_gender}</p>
-            ` : `
-                <h3>Week Summary</h3>
-                <p>Total Alerts Received: ${data.summary.total_alerts}</p>
-                <p>Total Responded Alerts: ${data.summary.total_responded}</p>
-                <p>Most Common Barangay: ${data.summary.most_common_barangay}</p>
-                <p>Total Road Accidents: ${data.summary.total_road_accidents}</p>
-                <p>Most Common Accident Type: ${data.summary.most_common_accident_type}</p>
-                <p>Most Common Cause: ${data.summary.most_common_cause}</p>
-                <p>Most Common Weather: ${data.summary.most_common_weather}</p>
-                <p>Most Common Road Condition: ${data.summary.most_common_road_condition}</p>
-                <p>Most Common Vehicle Type: ${data.summary.most_common_vehicle_type}</p>
-                <p>Most Common Driver Age: ${data.summary.most_common_driver_age}</p>
-                <p>Most Common Driver Gender: ${data.summary.most_common_driver_gender}</p>
-            `;
-            if (data.dates.length > 0) {
-                const dailyUrl = `/api/${role}_analytics_data?time=daily&${role === 'barangay' || role === 'bfp' ? 'barangay' : 'municipality'}=${location}&date=${data.dates[0]}`;
-                fetch(dailyUrl)
-                    .then(response => response.json())
-                    .then(dayData => {
-                        if (dayData.error) {
-                            console.error('Error fetching daily data:', dayData.error);
-                            alert('Failed to load daily data');
-                            return;
-                        }
-                        updateCharts(dayData);
-                    });
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching weekly data:', error);
-            alert('Failed to load weekly data');
-        });
-}
-
-// Update the updateCharts function
 function updateCharts(data) {
     const role = window.location.pathname.includes('bfp') ? 'bfp' :
                  window.location.pathname.includes('cdrrmo') ? 'cdrrmo' :
