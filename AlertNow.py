@@ -346,10 +346,10 @@ def handle_submit_response(data):
 def submit_response():
     data = request.json
     role = data.get('role')
-    alert_id = data.get('alert_id')
+    alert_id = data.get('alert_id', str(uuid.uuid4()))  # Generate UUID if not provided
     barangay = data.get('barangay')
     municipality = get_municipality_from_barangay(barangay) if barangay else data.get('municipality')
-    emergency_type = data.get('emergency_type')
+    emergency_type = data.get('emergency_type', 'unknown')
     road_accident_cause = data.get('road_accident_cause', 'Unknown')
     road_accident_type = data.get('road_accident_type', 'Unknown')
     weather = data.get('weather', 'Unknown')
@@ -388,7 +388,6 @@ def submit_response():
         conn.commit()
         conn.close()
 
-        # Update global responses and emit Socket.IO event
         response_data = {
             'alert_id': alert_id,
             'role': role,
@@ -415,7 +414,7 @@ def submit_response():
     except Exception as e:
         logger.error(f"Error submitting response: {e}")
         return jsonify({'error': str(e)}), 500
-
+    
 # New function get_road_condition
 @socketio.on('update_response')
 def handle_update_response(data):
