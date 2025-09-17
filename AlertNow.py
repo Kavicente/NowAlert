@@ -110,29 +110,29 @@ def classify_image_barangay(base64_image):
         import base64
         img_data = base64.b64decode(base64_image)
         nparr = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)  # Load as RGB
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             logger.error("Failed to decode image for barangay")
-            return 'unknown'
-        img = cv2.resize(img, (640, 640))  # Resize to 640x640
-        img = img.transpose(2, 0, 1)  # Change to [channels, height, width]
-        img = img[np.newaxis, ...].astype(np.float32) / 255.0  # Add batch dimension and normalize
+            return 'unknown', 0.0
+        img = cv2.resize(img, (640, 640))
+        img = img.transpose(2, 0, 1)
+        img = img[np.newaxis, ...].astype(np.float32) / 255.0
         if image_classifier:
             inputs = {image_classifier.get_inputs()[0].name: img}
             output = image_classifier.run(None, inputs)[0]  # Shape: [1, num_detections, 8]
-            if output.shape[1] > 0:  # Check if there are detections
-                conf_scores = output[0, :, 4]  # Objectness scores
-                class_probs = output[0, :, 5:8]  # Class probabilities [Fire, Normal, Road Accident]
-                # Compute per-class confidence: objectness * class probability
-                fire_conf = conf_scores * class_probs[:, 0]  # Fire (index 0)
-                normal_conf = conf_scores * class_probs[:, 1]  # Normal (index 1)
-                road_conf = conf_scores * class_probs[:, 2]  # Road Accident (index 2)
-                # Get best confidence for each class
+            if output.shape[1] > 0:
+                conf_scores = output[0, :, 4]
+                class_probs = output[0, :, 5:8]  # [Fire, Normal, Road Accident]
+                # Compute per-class confidence for all detections
+                fire_conf = conf_scores * class_probs[:, 0]
+                normal_conf = conf_scores * class_probs[:, 1]
+                road_conf = conf_scores * class_probs[:, 2]
+                # Find max confidence per class across all detections
                 max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
                 max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
                 max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                # Apply class-specific thresholds
-                if max_fire_conf > 0.6:
+                # Apply stricter threshold for Fire
+                if max_fire_conf > 0.7:
                     prediction = "Fire"
                     conf = max_fire_conf
                 elif max_road_conf > 0.5:
@@ -150,11 +150,11 @@ def classify_image_barangay(base64_image):
                 conf = 0.0
                 pred = 1
             logger.debug(f"Barangay image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction
-        return 'unknown'
+            return prediction, conf
+        return 'unknown', 0.0
     except Exception as e:
         logger.error(f"Barangay image classification failed: {e}")
-        return 'unknown'
+        return 'unknown', 0.0
 
 def classify_image_bfp(base64_image):
     try:
@@ -164,7 +164,7 @@ def classify_image_bfp(base64_image):
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             logger.error("Failed to decode image for BFP")
-            return 'unknown'
+            return 'unknown', 0.0
         img = cv2.resize(img, (640, 640))
         img = img.transpose(2, 0, 1)
         img = img[np.newaxis, ...].astype(np.float32) / 255.0
@@ -178,7 +178,7 @@ def classify_image_bfp(base64_image):
                 road_conf = conf_scores * class_probs[:, 2]
                 max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
                 max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                if max_fire_conf > 0.6:
+                if max_fire_conf > 0.7:
                     prediction = "Fire"
                     conf = max_fire_conf
                 elif max_road_conf > 0.5:
@@ -193,11 +193,11 @@ def classify_image_bfp(base64_image):
                 conf = 0.0
                 pred = 1
             logger.debug(f"BFP image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction
-        return 'unknown'
+            return prediction, conf
+        return 'unknown', 0.0
     except Exception as e:
         logger.error(f"BFP image classification failed: {e}")
-        return 'unknown'
+        return 'unknown', 0.0
 
 def classify_image_cdrrmo(base64_image):
     try:
@@ -207,7 +207,7 @@ def classify_image_cdrrmo(base64_image):
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             logger.error("Failed to decode image for CDRRMO")
-            return 'unknown'
+            return 'unknown', 0.0
         img = cv2.resize(img, (640, 640))
         img = img.transpose(2, 0, 1)
         img = img[np.newaxis, ...].astype(np.float32) / 255.0
@@ -223,7 +223,7 @@ def classify_image_cdrrmo(base64_image):
                 max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
                 max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
                 max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                if max_fire_conf > 0.6:
+                if max_fire_conf > 0.7:
                     prediction = "Fire"
                     conf = max_fire_conf
                 elif max_road_conf > 0.5:
@@ -241,11 +241,11 @@ def classify_image_cdrrmo(base64_image):
                 conf = 0.0
                 pred = 1
             logger.debug(f"CDRRMO image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction
-        return 'unknown'
+            return prediction, conf
+        return 'unknown', 0.0
     except Exception as e:
         logger.error(f"CDRRMO image classification failed: {e}")
-        return 'unknown'
+        return 'unknown', 0.0
 
 def classify_image_pnp(base64_image):
     try:
@@ -255,7 +255,7 @@ def classify_image_pnp(base64_image):
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             logger.error("Failed to decode image for PNP")
-            return 'unknown'
+            return 'unknown', 0.0
         img = cv2.resize(img, (640, 640))
         img = img.transpose(2, 0, 1)
         img = img[np.newaxis, ...].astype(np.float32) / 255.0
@@ -271,7 +271,7 @@ def classify_image_pnp(base64_image):
                 max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
                 max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
                 max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                if max_fire_conf > 0.6:
+                if max_fire_conf > 0.7:
                     prediction = "Fire"
                     conf = max_fire_conf
                 elif max_road_conf > 0.5:
@@ -289,11 +289,11 @@ def classify_image_pnp(base64_image):
                 conf = 0.0
                 pred = 1
             logger.debug(f"PNP image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction
-        return 'unknown'
+            return prediction, conf
+        return 'unknown', 0.0
     except Exception as e:
         logger.error(f"PNP image classification failed: {e}")
-        return 'unknown'
+        return 'unknown', 0.0
 
 def classify_image(base64_image):
     return classify_image_barangay(base64_image)
