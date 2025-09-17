@@ -546,49 +546,68 @@ def handle_register_role(data):
 
 @socketio.on('alert')
 def handle_new_alert(data):
-    try:
-        alert_id = str(uuid.uuid4())
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        data['alert_id'] = alert_id
-        data['timestamp'] = timestamp
-        data['image_classification'] = 'no_image'
-
-        if 'image' in data and data['image']:
+    logger.info(f"New alert received: {data}")
+    alert_id = str(uuid.uuid4())
+    data['alert_id'] = alert_id
+    data['timestamp'] = datetime.utcnow().isoformat()
+    data['resident_barangay'] = data.get('barangay', 'Unknown')
+    data['image_classification'] = 'no_image'
+    
+    # Classify image if present
+    if 'image' in data and data['image']:
             # Classify image for each role
             data['image_classification_barangay'] = classify_image_barangay(data['image'])
             data['image_classification_bfp'] = classify_image_bfp(data['image'])
             data['image_classification_cdrrmo'] = classify_image_cdrrmo(data['image'])
             data['image_classification_pnp'] = classify_image_pnp(data['image'])
-            data['image_classification'] = data['image_classification_barangay']  # Default for compatibility
+            data['image_classification'] = data['image_classification_barangay']
+            
+            for key, value in data.items():
+                if isinstance(value, (np.integer, np.floating)):
+                    data[key] = value.item()
+                elif isinstance(value, np.ndarray):
+                    data[key] = value.tolist()
+    
+    alerts.append(data)
+    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+    municipality = get_municipality_from_barangay(data.get('barangay'))
+    if municipality:
+        municipality = municipality.lower()
+        cdrrmo_room = f"cdrrmo_{municipality}"
+        pnp_room = f"pnp_{municipality}"
+        bfp_room = f"bfp_{municipality}"
+    else:
+        logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
+        cdrrmo_room = None
+        pnp_room = None
+        bfp_room = None
+    
+    emit('new_alert', data, room=barangay_room)
+    logger.info(f"Alert emitted to room {barangay_room}")
+    if cdrrmo_room:
+        emit('new_alert', data, room=cdrrmo_room)
+        logger.info(f"Alert emitted to room {cdrrmo_room}")
+    if pnp_room:
+        emit('new_alert', data, room=pnp_room)
+        logger.info(f"Alert emitted to room {pnp_room}")
+    if bfp_room:
+        emit('new_alert', data, room=bfp_room)
+        logger.info(f"Alert emitted to room {bfp_room}")
 
-        # Convert any NumPy types in data to native Python types
-        for key, value in data.items():
-            if isinstance(value, (np.integer, np.floating)):
-                data[key] = value.item()
-            elif isinstance(value, np.ndarray):
-                data[key] = value.tolist()
-
-        alerts.append(data)
-        barangay = data.get('barangay', '').lower()
-        municipality = get_municipality_from_barangay(barangay) or data.get('municipality', '').lower()
-
-        # Emit to barangay room
-        if barangay:
-            barangay_room = f"barangay_{barangay}"
-            socketio.emit('new_alert', data, room=barangay_room)
-            socketio.emit('update_map', data, room=barangay_room)
-        # Emit to municipality rooms (pnp, cdrrmo, bfp)
-        if municipality:
-            for role in ['pnp', 'cdrrmo', 'bfp']:
-                role_room = f"{role}_{municipality}"
-                socketio.emit('new_alert', data, room=role_room)
-                socketio.emit('update_map', data, room=role_room)
-
-        logger.info(f"Alert processed: {alert_id} for {barangay or municipality}")
-    except Exception as e:
-        logger.error(f"Error processing alert: {e}")
-
-
+    # Emit update_map to relevant rooms
+    map_data = {
+        'lat': data.get('lat'),
+        'lon': data.get('lon'),
+        'barangay': data.get('barangay'),
+        'emergency_type': data.get('emergency_type')
+    }
+    emit('update_map', map_data, room=barangay_room)
+    if cdrrmo_room:
+        emit('update_map', map_data, room=cdrrmo_room)
+    if pnp_room:
+        emit('update_map', map_data, room=pnp_room)
+    if bfp_room:
+        emit('update_map', map_data, room=bfp_room)    
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
