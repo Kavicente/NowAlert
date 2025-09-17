@@ -80,6 +80,11 @@ socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_h
 alerts = []
 responses = []
 today_responses = []
+LABEL_MAPPING = {
+    0: "Normal",
+    1: "Road Accident",
+    2: "Fire"
+}
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -114,8 +119,9 @@ def classify_image_barangay(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types
+            # Convert NumPy types to native Python types and map to labels
             prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
+            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
             logger.debug(f"Barangay image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -136,8 +142,9 @@ def classify_image_bfp(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types
+            # Convert NumPy types to native Python types and map to labels
             prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
+            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
             logger.debug(f"BFP image classified as: {prediction}")
             return 'unknown' if prediction not in ['Road Accident', 'Fire'] else prediction
         return 'unknown'
@@ -158,8 +165,9 @@ def classify_image_cdrrmo(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types
+            # Convert NumPy types to native Python types and map to labels
             prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
+            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
             logger.debug(f"CDRRMO image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -180,8 +188,9 @@ def classify_image_pnp(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types
+            # Convert NumPy types to native Python types and map to labels
             prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
+            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
             logger.debug(f"PNP image classified as: {prediction}")
             return prediction
         return 'unknown'
