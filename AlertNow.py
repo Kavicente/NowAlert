@@ -54,6 +54,15 @@ except FileNotFoundError:
     logger.error("image_classifier_dt.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading image_classifier_dt.pkl: {e}")
+    
+label_encoder = None
+try:
+    label_encoder = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'label_encoder.pkl'))
+    logger.info("label_encoder.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("label_encoder.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading label_encoder.pkl: {e}")
 
 road_accident_df = pd.DataFrame()
 try:
@@ -80,11 +89,7 @@ socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_h
 alerts = []
 responses = []
 today_responses = []
-LABEL_MAPPING = {
-    0: "Normal",
-    1: "Road Accident",
-    2: "Fire"
-}
+
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -106,6 +111,7 @@ def get_municipality_from_barangay(barangay):
     return None
 
 
+# Updated classify_image_barangay function
 def classify_image_barangay(base64_image):
     try:
         import base64
@@ -117,11 +123,9 @@ def classify_image_barangay(base64_image):
             return 'unknown'
         img = cv2.resize(img, (64, 64))
         features = img.flatten().reshape(1, -1)
-        if image_classifier:
+        if image_classifier and label_encoder:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types and map to labels
-            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
-            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
+            prediction = label_encoder.inverse_transform([prediction])[0]
             logger.debug(f"Barangay image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -129,6 +133,7 @@ def classify_image_barangay(base64_image):
         logger.error(f"Barangay image classification failed: {e}")
         return 'unknown'
 
+# Updated classify_image_bfp function
 def classify_image_bfp(base64_image):
     try:
         import base64
@@ -140,11 +145,9 @@ def classify_image_bfp(base64_image):
             return 'unknown'
         img = cv2.resize(img, (64, 64))
         features = img.flatten().reshape(1, -1)
-        if image_classifier:
+        if image_classifier and label_encoder:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types and map to labels
-            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
-            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
+            prediction = label_encoder.inverse_transform([prediction])[0]
             logger.debug(f"BFP image classified as: {prediction}")
             return 'unknown' if prediction not in ['Road Accident', 'Fire'] else prediction
         return 'unknown'
@@ -152,6 +155,7 @@ def classify_image_bfp(base64_image):
         logger.error(f"BFP image classification failed: {e}")
         return 'unknown'
 
+# Updated classify_image_cdrrmo function
 def classify_image_cdrrmo(base64_image):
     try:
         import base64
@@ -163,11 +167,9 @@ def classify_image_cdrrmo(base64_image):
             return 'unknown'
         img = cv2.resize(img, (64, 64))
         features = img.flatten().reshape(1, -1)
-        if image_classifier:
+        if image_classifier and label_encoder:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types and map to labels
-            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
-            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
+            prediction = label_encoder.inverse_transform([prediction])[0]
             logger.debug(f"CDRRMO image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -175,6 +177,7 @@ def classify_image_cdrrmo(base64_image):
         logger.error(f"CDRRMO image classification failed: {e}")
         return 'unknown'
 
+# Updated classify_image_pnp function
 def classify_image_pnp(base64_image):
     try:
         import base64
@@ -186,11 +189,9 @@ def classify_image_pnp(base64_image):
             return 'unknown'
         img = cv2.resize(img, (64, 64))
         features = img.flatten().reshape(1, -1)
-        if image_classifier:
+        if image_classifier and label_encoder:
             prediction = image_classifier.predict(features)[0]
-            # Convert NumPy types to native Python types and map to labels
-            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
-            prediction = LABEL_MAPPING.get(int(prediction), "unknown")
+            prediction = label_encoder.inverse_transform([prediction])[0]
             logger.debug(f"PNP image classified as: {prediction}")
             return prediction
         return 'unknown'
