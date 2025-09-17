@@ -57,8 +57,6 @@ except Exception as e:
 
 
 
-
-
 road_accident_df = pd.DataFrame()
 try:
     road_accident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'road_accident.csv'))
@@ -121,18 +119,37 @@ def classify_image_barangay(base64_image):
         img = img[np.newaxis, ...].astype(np.float32) / 255.0  # Add batch dimension and normalize
         if image_classifier:
             inputs = {image_classifier.get_inputs()[0].name: img}
-            output = image_classifier.run(None, inputs)[0]  # Shape: [1, num_detections, 7]
+            output = image_classifier.run(None, inputs)[0]  # Shape: [1, num_detections, 8]
             if output.shape[1] > 0:  # Check if there are detections
                 conf_scores = output[0, :, 4]  # Objectness scores
-                class_probs = output[0, :, 5:7]  # Class probabilities [Road Accident, Fire]
-                best_idx = np.argmax(conf_scores)
-                conf = conf_scores[best_idx]
-                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
-                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
+                class_probs = output[0, :, 5:8]  # Class probabilities [Fire, Normal, Road Accident]
+                # Compute per-class confidence: objectness * class probability
+                fire_conf = conf_scores * class_probs[:, 0]  # Fire (index 0)
+                normal_conf = conf_scores * class_probs[:, 1]  # Normal (index 1)
+                road_conf = conf_scores * class_probs[:, 2]  # Road Accident (index 2)
+                # Get best confidence for each class
+                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
+                max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
+                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
+                # Apply class-specific thresholds
+                if max_fire_conf > 0.6:
+                    prediction = "Fire"
+                    conf = max_fire_conf
+                elif max_road_conf > 0.5:
+                    prediction = "Road Accident"
+                    conf = max_road_conf
+                elif max_normal_conf > 0.5:
+                    prediction = "Normal"
+                    conf = max_normal_conf
+                else:
+                    prediction = "Normal"
+                    conf = max_normal_conf
+                pred = {"Fire": 0, "Normal": 1, "Road Accident": 2}.get(prediction, 1)
             else:
                 prediction = "Normal"
                 conf = 0.0
-            logger.debug(f"Barangay image classified as: {prediction} (Confidence: {conf:.2f})")
+                pred = 1
+            logger.debug(f"Barangay image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
             return prediction
         return 'unknown'
     except Exception as e:
@@ -156,16 +173,26 @@ def classify_image_bfp(base64_image):
             output = image_classifier.run(None, inputs)[0]
             if output.shape[1] > 0:
                 conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:7]
-                best_idx = np.argmax(conf_scores)
-                conf = conf_scores[best_idx]
-                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
-                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
-                prediction = prediction if prediction in ["Road Accident", "Fire"] else "unknown"
+                class_probs = output[0, :, 5:8]
+                fire_conf = conf_scores * class_probs[:, 0]
+                road_conf = conf_scores * class_probs[:, 2]
+                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
+                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
+                if max_fire_conf > 0.6:
+                    prediction = "Fire"
+                    conf = max_fire_conf
+                elif max_road_conf > 0.5:
+                    prediction = "Road Accident"
+                    conf = max_road_conf
+                else:
+                    prediction = "unknown"
+                    conf = 0.0
+                pred = {"Fire": 0, "Road Accident": 2}.get(prediction, 1)
             else:
                 prediction = "unknown"
                 conf = 0.0
-            logger.debug(f"BFP image classified as: {prediction} (Confidence: {conf:.2f})")
+                pred = 1
+            logger.debug(f"BFP image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
             return prediction
         return 'unknown'
     except Exception as e:
@@ -189,15 +216,31 @@ def classify_image_cdrrmo(base64_image):
             output = image_classifier.run(None, inputs)[0]
             if output.shape[1] > 0:
                 conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:7]
-                best_idx = np.argmax(conf_scores)
-                conf = conf_scores[best_idx]
-                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
-                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
+                class_probs = output[0, :, 5:8]
+                fire_conf = conf_scores * class_probs[:, 0]
+                normal_conf = conf_scores * class_probs[:, 1]
+                road_conf = conf_scores * class_probs[:, 2]
+                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
+                max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
+                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
+                if max_fire_conf > 0.6:
+                    prediction = "Fire"
+                    conf = max_fire_conf
+                elif max_road_conf > 0.5:
+                    prediction = "Road Accident"
+                    conf = max_road_conf
+                elif max_normal_conf > 0.5:
+                    prediction = "Normal"
+                    conf = max_normal_conf
+                else:
+                    prediction = "Normal"
+                    conf = max_normal_conf
+                pred = {"Fire": 0, "Normal": 1, "Road Accident": 2}.get(prediction, 1)
             else:
                 prediction = "Normal"
                 conf = 0.0
-            logger.debug(f"CDRRMO image classified as: {prediction} (Confidence: {conf:.2f})")
+                pred = 1
+            logger.debug(f"CDRRMO image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
             return prediction
         return 'unknown'
     except Exception as e:
@@ -221,15 +264,31 @@ def classify_image_pnp(base64_image):
             output = image_classifier.run(None, inputs)[0]
             if output.shape[1] > 0:
                 conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:7]
-                best_idx = np.argmax(conf_scores)
-                conf = conf_scores[best_idx]
-                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
-                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
+                class_probs = output[0, :, 5:8]
+                fire_conf = conf_scores * class_probs[:, 0]
+                normal_conf = conf_scores * class_probs[:, 1]
+                road_conf = conf_scores * class_probs[:, 2]
+                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
+                max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
+                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
+                if max_fire_conf > 0.6:
+                    prediction = "Fire"
+                    conf = max_fire_conf
+                elif max_road_conf > 0.5:
+                    prediction = "Road Accident"
+                    conf = max_road_conf
+                elif max_normal_conf > 0.5:
+                    prediction = "Normal"
+                    conf = max_normal_conf
+                else:
+                    prediction = "Normal"
+                    conf = max_normal_conf
+                pred = {"Fire": 0, "Normal": 1, "Road Accident": 2}.get(prediction, 1)
             else:
                 prediction = "Normal"
                 conf = 0.0
-            logger.debug(f"PNP image classified as: {prediction} (Confidence: {conf:.2f})")
+                pred = 1
+            logger.debug(f"PNP image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
             return prediction
         return 'unknown'
     except Exception as e:
