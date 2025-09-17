@@ -190,7 +190,6 @@
                     `;
                     feed.prepend(alertDiv);
 
-                    // Added click event for images
                     if (data.image) {
                         const img = alertDiv.querySelector('.clickable-img');
                         img.addEventListener('click', () => {
@@ -201,16 +200,17 @@
                         });
                     }
 
-                if (data.lat && data.lon) {
-                    const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
-                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                    ).openPopup();
-                    if (feed.children.length === 1) {
-                        barangayMap.setView([data.lat, data.lon], 15);
+                    if (data.lat && data.lon) {
+                        const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
+                            `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                        ).openPopup();
+                        if (feed.children.length === 1) {
+                            barangayMap.setView([data.lat, data.lon], 15);
+                        }
                     }
-                }
 
-                updateStats();
+                    updateStats();
+                }
             }
 
             function showResponseForm(alertId, lat, lon, barangay, type) {
