@@ -46,23 +46,14 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
-fire_classifier = None
+image_classifier = None
 try:
-    fire_classifier = ort.InferenceSession(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'fire_classifier.onnx'))
-    logger.info("fire_classifier.onnx loaded successfully.")
+    image_classifier = ort.InferenceSession(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'image_classifier.onnx'))
+    logger.info("image_classifier.onnx loaded successfully.")
 except FileNotFoundError:
-    logger.error("fire_classifier.onnx not found.")
+    logger.error("image_classifier.onnx not found.")
 except Exception as e:
-    logger.error(f"Error loading fire_classifier.onnx: {e}")
-
-road_classifier = None
-try:
-    road_classifier = ort.InferenceSession(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'road_classifier.onnx'))
-    logger.info("road_classifier.onnx loaded successfully.")
-except FileNotFoundError:
-    logger.error("road_classifier.onnx not found.")
-except Exception as e:
-    logger.error(f"Error loading road_classifier.onnx: {e}")
+    logger.error(f"Error loading image_classifier.onnx: {e}")
 
 
 
@@ -128,39 +119,20 @@ def classify_image_barangay(base64_image):
         img = cv2.resize(img, (640, 640))  # Resize to 640x640
         img = img.transpose(2, 0, 1)  # Change to [channels, height, width]
         img = img[np.newaxis, ...].astype(np.float32) / 255.0  # Add batch dimension and normalize
-        if fire_classifier and road_classifier:
-            # Run fire classifier
-            fire_inputs = {fire_classifier.get_inputs()[0].name: img}
-            fire_output = fire_classifier.run(None, fire_inputs)[0]  # Shape: [1, num_detections, 7]
-            if fire_output.shape[1] > 0:  # Check if there are detections
-                fire_conf_scores = fire_output[0, :, 4]  # Objectness scores
-                fire_class_probs = fire_output[0, :, 5:7]  # Class probabilities [Non-Fire, Fire]
-                fire_best_idx = np.argmax(fire_conf_scores)  # Select highest objectness score
-                fire_conf = fire_conf_scores[fire_best_idx]
-                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
-            else:
-                fire_conf = 0.0
-                fire_pred = 0
-            # Run road classifier
-            road_inputs = {road_classifier.get_inputs()[0].name: img}
-            road_output = road_classifier.run(None, road_inputs)[0]  # Shape: [1, num_detections, 7]
-            if road_output.shape[1] > 0:
-                road_conf_scores = road_output[0, :, 4]
-                road_class_probs = road_output[0, :, 5:7]  # Class probabilities [Non-Road Accident, Road Accident]
-                road_best_idx = np.argmax(road_conf_scores)
-                road_conf = road_conf_scores[road_best_idx]
-                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
-            else:
-                road_conf = 0.0
-                road_pred = 0
-            # Determine classification
-            if fire_pred == 1 and fire_conf > 0.5:
-                prediction = "Fire"
-            elif road_pred == 1 and road_conf > 0.5:
-                prediction = "Road Accident"
+        if image_classifier:
+            inputs = {image_classifier.get_inputs()[0].name: img}
+            output = image_classifier.run(None, inputs)[0]  # Shape: [1, num_detections, 7]
+            if output.shape[1] > 0:  # Check if there are detections
+                conf_scores = output[0, :, 4]  # Objectness scores
+                class_probs = output[0, :, 5:7]  # Class probabilities [Road Accident, Fire]
+                best_idx = np.argmax(conf_scores)
+                conf = conf_scores[best_idx]
+                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
+                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
             else:
                 prediction = "Normal"
-            logger.debug(f"Barangay image classified as: {prediction} (Fire conf: {fire_conf:.2f}, Road conf: {road_conf:.2f})")
+                conf = 0.0
+            logger.debug(f"Barangay image classified as: {prediction} (Confidence: {conf:.2f})")
             return prediction
         return 'unknown'
     except Exception as e:
@@ -179,36 +151,21 @@ def classify_image_bfp(base64_image):
         img = cv2.resize(img, (640, 640))
         img = img.transpose(2, 0, 1)
         img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if fire_classifier and road_classifier:
-            fire_inputs = {fire_classifier.get_inputs()[0].name: img}
-            fire_output = fire_classifier.run(None, fire_inputs)[0]
-            if fire_output.shape[1] > 0:
-                fire_conf_scores = fire_output[0, :, 4]
-                fire_class_probs = fire_output[0, :, 5:7]
-                fire_best_idx = np.argmax(fire_conf_scores)
-                fire_conf = fire_conf_scores[fire_best_idx]
-                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
+        if image_classifier:
+            inputs = {image_classifier.get_inputs()[0].name: img}
+            output = image_classifier.run(None, inputs)[0]
+            if output.shape[1] > 0:
+                conf_scores = output[0, :, 4]
+                class_probs = output[0, :, 5:7]
+                best_idx = np.argmax(conf_scores)
+                conf = conf_scores[best_idx]
+                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
+                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
+                prediction = prediction if prediction in ["Road Accident", "Fire"] else "unknown"
             else:
-                fire_conf = 0.0
-                fire_pred = 0
-            road_inputs = {road_classifier.get_inputs()[0].name: img}
-            road_output = road_classifier.run(None, road_inputs)[0]
-            if road_output.shape[1] > 0:
-                road_conf_scores = road_output[0, :, 4]
-                road_class_probs = road_output[0, :, 5:7]
-                road_best_idx = np.argmax(road_conf_scores)
-                road_conf = road_conf_scores[road_best_idx]
-                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
-            else:
-                road_conf = 0.0
-                road_pred = 0
-            if fire_pred == 1 and fire_conf > 0.5:
-                prediction = "Fire"
-            elif road_pred == 1 and road_conf > 0.5:
-                prediction = "Road Accident"
-            else:
-                prediction = "unknown"  # BFP only handles Road Accident or Fire
-            logger.debug(f"BFP image classified as: {prediction} (Fire conf: {fire_conf:.2f}, Road conf: {road_conf:.2f})")
+                prediction = "unknown"
+                conf = 0.0
+            logger.debug(f"BFP image classified as: {prediction} (Confidence: {conf:.2f})")
             return prediction
         return 'unknown'
     except Exception as e:
@@ -227,36 +184,20 @@ def classify_image_cdrrmo(base64_image):
         img = cv2.resize(img, (640, 640))
         img = img.transpose(2, 0, 1)
         img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if fire_classifier and road_classifier:
-            fire_inputs = {fire_classifier.get_inputs()[0].name: img}
-            fire_output = fire_classifier.run(None, fire_inputs)[0]
-            if fire_output.shape[1] > 0:
-                fire_conf_scores = fire_output[0, :, 4]
-                fire_class_probs = fire_output[0, :, 5:7]
-                fire_best_idx = np.argmax(fire_conf_scores)
-                fire_conf = fire_conf_scores[fire_best_idx]
-                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
-            else:
-                fire_conf = 0.0
-                fire_pred = 0
-            road_inputs = {road_classifier.get_inputs()[0].name: img}
-            road_output = road_classifier.run(None, road_inputs)[0]
-            if road_output.shape[1] > 0:
-                road_conf_scores = road_output[0, :, 4]
-                road_class_probs = road_output[0, :, 5:7]
-                road_best_idx = np.argmax(road_conf_scores)
-                road_conf = road_conf_scores[road_best_idx]
-                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
-            else:
-                road_conf = 0.0
-                road_pred = 0
-            if fire_pred == 1 and fire_conf > 0.5:
-                prediction = "Fire"
-            elif road_pred == 1 and road_conf > 0.5:
-                prediction = "Road Accident"
+        if image_classifier:
+            inputs = {image_classifier.get_inputs()[0].name: img}
+            output = image_classifier.run(None, inputs)[0]
+            if output.shape[1] > 0:
+                conf_scores = output[0, :, 4]
+                class_probs = output[0, :, 5:7]
+                best_idx = np.argmax(conf_scores)
+                conf = conf_scores[best_idx]
+                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
+                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
             else:
                 prediction = "Normal"
-            logger.debug(f"CDRRMO image classified as: {prediction} (Fire conf: {fire_conf:.2f}, Road conf: {road_conf:.2f})")
+                conf = 0.0
+            logger.debug(f"CDRRMO image classified as: {prediction} (Confidence: {conf:.2f})")
             return prediction
         return 'unknown'
     except Exception as e:
@@ -275,36 +216,20 @@ def classify_image_pnp(base64_image):
         img = cv2.resize(img, (640, 640))
         img = img.transpose(2, 0, 1)
         img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if fire_classifier and road_classifier:
-            fire_inputs = {fire_classifier.get_inputs()[0].name: img}
-            fire_output = fire_classifier.run(None, fire_inputs)[0]
-            if fire_output.shape[1] > 0:
-                fire_conf_scores = fire_output[0, :, 4]
-                fire_class_probs = fire_output[0, :, 5:7]
-                fire_best_idx = np.argmax(fire_conf_scores)
-                fire_conf = fire_conf_scores[fire_best_idx]
-                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
-            else:
-                fire_conf = 0.0
-                fire_pred = 0
-            road_inputs = {road_classifier.get_inputs()[0].name: img}
-            road_output = road_classifier.run(None, road_inputs)[0]
-            if road_output.shape[1] > 0:
-                road_conf_scores = road_output[0, :, 4]
-                road_class_probs = road_output[0, :, 5:7]
-                road_best_idx = np.argmax(road_conf_scores)
-                road_conf = road_conf_scores[road_best_idx]
-                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
-            else:
-                road_conf = 0.0
-                road_pred = 0
-            if fire_pred == 1 and fire_conf > 0.5:
-                prediction = "Fire"
-            elif road_pred == 1 and road_conf > 0.5:
-                prediction = "Road Accident"
+        if image_classifier:
+            inputs = {image_classifier.get_inputs()[0].name: img}
+            output = image_classifier.run(None, inputs)[0]
+            if output.shape[1] > 0:
+                conf_scores = output[0, :, 4]
+                class_probs = output[0, :, 5:7]
+                best_idx = np.argmax(conf_scores)
+                conf = conf_scores[best_idx]
+                pred = np.argmax(class_probs[best_idx]) if conf > 0.5 else 0
+                prediction = {0: "Normal", 1: "Road Accident", 2: "Fire"}.get(pred, "Normal") if conf > 0.5 else "Normal"
             else:
                 prediction = "Normal"
-            logger.debug(f"PNP image classified as: {prediction} (Fire conf: {fire_conf:.2f}, Road conf: {road_conf:.2f})")
+                conf = 0.0
+            logger.debug(f"PNP image classified as: {prediction} (Confidence: {conf:.2f})")
             return prediction
         return 'unknown'
     except Exception as e:
