@@ -131,15 +131,29 @@ def classify_image_barangay(base64_image):
         if fire_classifier and road_classifier:
             # Run fire classifier
             fire_inputs = {fire_classifier.get_inputs()[0].name: img}
-            fire_output = fire_classifier.run(None, fire_inputs)[0]
-            fire_conf = np.max(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
-            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            fire_output = fire_classifier.run(None, fire_inputs)[0]  # Shape: [1, num_detections, 7]
+            if fire_output.shape[1] > 0:  # Check if there are detections
+                fire_conf_scores = fire_output[0, :, 4]  # Objectness scores
+                fire_class_probs = fire_output[0, :, 5:7]  # Class probabilities [Non-Fire, Fire]
+                fire_best_idx = np.argmax(fire_conf_scores)  # Select highest objectness score
+                fire_conf = fire_conf_scores[fire_best_idx]
+                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
+            else:
+                fire_conf = 0.0
+                fire_pred = 0
             # Run road classifier
             road_inputs = {road_classifier.get_inputs()[0].name: img}
-            road_output = road_classifier.run(None, road_inputs)[0]
-            road_conf = np.max(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
-            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
-            # Determine classification with confidence threshold
+            road_output = road_classifier.run(None, road_inputs)[0]  # Shape: [1, num_detections, 7]
+            if road_output.shape[1] > 0:
+                road_conf_scores = road_output[0, :, 4]
+                road_class_probs = road_output[0, :, 5:7]  # Class probabilities [Non-Road Accident, Road Accident]
+                road_best_idx = np.argmax(road_conf_scores)
+                road_conf = road_conf_scores[road_best_idx]
+                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
+            else:
+                road_conf = 0.0
+                road_pred = 0
+            # Determine classification
             if fire_pred == 1 and fire_conf > 0.5:
                 prediction = "Fire"
             elif road_pred == 1 and road_conf > 0.5:
@@ -168,12 +182,26 @@ def classify_image_bfp(base64_image):
         if fire_classifier and road_classifier:
             fire_inputs = {fire_classifier.get_inputs()[0].name: img}
             fire_output = fire_classifier.run(None, fire_inputs)[0]
-            fire_conf = np.max(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
-            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            if fire_output.shape[1] > 0:
+                fire_conf_scores = fire_output[0, :, 4]
+                fire_class_probs = fire_output[0, :, 5:7]
+                fire_best_idx = np.argmax(fire_conf_scores)
+                fire_conf = fire_conf_scores[fire_best_idx]
+                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
+            else:
+                fire_conf = 0.0
+                fire_pred = 0
             road_inputs = {road_classifier.get_inputs()[0].name: img}
             road_output = road_classifier.run(None, road_inputs)[0]
-            road_conf = np.max(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
-            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            if road_output.shape[1] > 0:
+                road_conf_scores = road_output[0, :, 4]
+                road_class_probs = road_output[0, :, 5:7]
+                road_best_idx = np.argmax(road_conf_scores)
+                road_conf = road_conf_scores[road_best_idx]
+                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
+            else:
+                road_conf = 0.0
+                road_pred = 0
             if fire_pred == 1 and fire_conf > 0.5:
                 prediction = "Fire"
             elif road_pred == 1 and road_conf > 0.5:
@@ -202,12 +230,26 @@ def classify_image_cdrrmo(base64_image):
         if fire_classifier and road_classifier:
             fire_inputs = {fire_classifier.get_inputs()[0].name: img}
             fire_output = fire_classifier.run(None, fire_inputs)[0]
-            fire_conf = np.max(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
-            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            if fire_output.shape[1] > 0:
+                fire_conf_scores = fire_output[0, :, 4]
+                fire_class_probs = fire_output[0, :, 5:7]
+                fire_best_idx = np.argmax(fire_conf_scores)
+                fire_conf = fire_conf_scores[fire_best_idx]
+                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
+            else:
+                fire_conf = 0.0
+                fire_pred = 0
             road_inputs = {road_classifier.get_inputs()[0].name: img}
             road_output = road_classifier.run(None, road_inputs)[0]
-            road_conf = np.max(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
-            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            if road_output.shape[1] > 0:
+                road_conf_scores = road_output[0, :, 4]
+                road_class_probs = road_output[0, :, 5:7]
+                road_best_idx = np.argmax(road_conf_scores)
+                road_conf = road_conf_scores[road_best_idx]
+                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
+            else:
+                road_conf = 0.0
+                road_pred = 0
             if fire_pred == 1 and fire_conf > 0.5:
                 prediction = "Fire"
             elif road_pred == 1 and road_conf > 0.5:
@@ -236,12 +278,26 @@ def classify_image_pnp(base64_image):
         if fire_classifier and road_classifier:
             fire_inputs = {fire_classifier.get_inputs()[0].name: img}
             fire_output = fire_classifier.run(None, fire_inputs)[0]
-            fire_conf = np.max(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
-            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            if fire_output.shape[1] > 0:
+                fire_conf_scores = fire_output[0, :, 4]
+                fire_class_probs = fire_output[0, :, 5:7]
+                fire_best_idx = np.argmax(fire_conf_scores)
+                fire_conf = fire_conf_scores[fire_best_idx]
+                fire_pred = np.argmax(fire_class_probs[fire_best_idx]) if fire_conf > 0.5 else 0
+            else:
+                fire_conf = 0.0
+                fire_pred = 0
             road_inputs = {road_classifier.get_inputs()[0].name: img}
             road_output = road_classifier.run(None, road_inputs)[0]
-            road_conf = np.max(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
-            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            if road_output.shape[1] > 0:
+                road_conf_scores = road_output[0, :, 4]
+                road_class_probs = road_output[0, :, 5:7]
+                road_best_idx = np.argmax(road_conf_scores)
+                road_conf = road_conf_scores[road_best_idx]
+                road_pred = np.argmax(road_class_probs[road_best_idx]) if road_conf > 0.5 else 0
+            else:
+                road_conf = 0.0
+                road_pred = 0
             if fire_pred == 1 and fire_conf > 0.5:
                 prediction = "Fire"
             elif road_pred == 1 and road_conf > 0.5:
