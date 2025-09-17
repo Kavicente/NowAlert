@@ -114,6 +114,8 @@ def classify_image_barangay(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
+            # Convert NumPy types to native Python types
+            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
             logger.debug(f"Barangay image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -134,6 +136,8 @@ def classify_image_bfp(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
+            # Convert NumPy types to native Python types
+            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
             logger.debug(f"BFP image classified as: {prediction}")
             return 'unknown' if prediction not in ['Road Accident', 'Fire'] else prediction
         return 'unknown'
@@ -154,6 +158,8 @@ def classify_image_cdrrmo(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
+            # Convert NumPy types to native Python types
+            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
             logger.debug(f"CDRRMO image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -174,6 +180,8 @@ def classify_image_pnp(base64_image):
         features = img.flatten().reshape(1, -1)
         if image_classifier:
             prediction = image_classifier.predict(features)[0]
+            # Convert NumPy types to native Python types
+            prediction = str(prediction) if isinstance(prediction, (np.integer, np.floating)) else prediction
             logger.debug(f"PNP image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -553,11 +561,17 @@ def handle_new_alert(data):
             data['image_classification_cdrrmo'] = classify_image_cdrrmo(data['image'])
             data['image_classification_pnp'] = classify_image_pnp(data['image'])
             data['image_classification'] = data['image_classification_barangay']
+            
+            for key, value in data.items():
+                if isinstance(value, (np.integer, np.floating)):
+                    data[key] = value.item()
+                elif isinstance(value, np.ndarray):
+                    data[key] = value.tolist()
+    
     alerts.append(data)
-
-    # Emit to relevant rooms
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
     municipality = get_municipality_from_barangay(data.get('barangay'))
+    
     if municipality:
         municipality = municipality.lower()
         cdrrmo_room = f"cdrrmo_{municipality}"
