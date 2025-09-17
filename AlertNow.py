@@ -23,6 +23,7 @@ from CDRRMOAnalytics import get_cdrrmo_analytics_data, get_cdrrmo_trends, get_cd
 from PNPAnalytics import get_pnp_analytics_data, get_pnp_trends, get_pnp_distribution, get_pnp_causes
 from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
 import random
+import onnxruntime as ort
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -45,6 +46,23 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
+fire_classifier = None
+try:
+    fire_classifier = ort.InferenceSession(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'fire_classifier.onnx'))
+    logger.info("fire_classifier.onnx loaded successfully.")
+except FileNotFoundError:
+    logger.error("fire_classifier.onnx not found.")
+except Exception as e:
+    logger.error(f"Error loading fire_classifier.onnx: {e}")
+
+road_classifier = None
+try:
+    road_classifier = ort.InferenceSession(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'road_classifier.onnx'))
+    logger.info("road_classifier.onnx loaded successfully.")
+except FileNotFoundError:
+    logger.error("road_classifier.onnx not found.")
+except Exception as e:
+    logger.error(f"Error loading road_classifier.onnx: {e}")
 
 image_classifier = None
 try:
@@ -63,6 +81,8 @@ except FileNotFoundError:
     logger.error("label_encoder.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading label_encoder.pkl: {e}")
+
+
 
 road_accident_df = pd.DataFrame()
 try:
@@ -122,10 +142,23 @@ def classify_image_barangay(base64_image):
             logger.error("Failed to decode image for barangay")
             return 'unknown'
         img = cv2.resize(img, (64, 64))
-        features = img.flatten().reshape(1, -1)
-        if image_classifier and label_encoder:
-            prediction = image_classifier.predict(features)[0]
-            prediction = label_encoder.inverse_transform([prediction])[0]
+        features = img.flatten().reshape(1, -1).astype(np.float32)  # ONNX expects float32
+        if fire_classifier and road_classifier:
+            # Run fire classifier
+            fire_inputs = {fire_classifier.get_inputs()[0].name: features}
+            fire_output = fire_classifier.run(None, fire_inputs)[0]
+            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            # Run road classifier
+            road_inputs = {road_classifier.get_inputs()[0].name: features}
+            road_output = road_classifier.run(None, road_inputs)[0]
+            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            # Determine classification
+            if fire_pred == 1:
+                prediction = "Fire"
+            elif road_pred == 1:
+                prediction = "Road Accident"
+            else:
+                prediction = "Normal"
             logger.debug(f"Barangay image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -133,7 +166,6 @@ def classify_image_barangay(base64_image):
         logger.error(f"Barangay image classification failed: {e}")
         return 'unknown'
 
-# Updated classify_image_bfp function
 def classify_image_bfp(base64_image):
     try:
         import base64
@@ -144,18 +176,27 @@ def classify_image_bfp(base64_image):
             logger.error("Failed to decode image for BFP")
             return 'unknown'
         img = cv2.resize(img, (64, 64))
-        features = img.flatten().reshape(1, -1)
-        if image_classifier and label_encoder:
-            prediction = image_classifier.predict(features)[0]
-            prediction = label_encoder.inverse_transform([prediction])[0]
+        features = img.flatten().reshape(1, -1).astype(np.float32)
+        if fire_classifier and road_classifier:
+            fire_inputs = {fire_classifier.get_inputs()[0].name: features}
+            fire_output = fire_classifier.run(None, fire_inputs)[0]
+            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            road_inputs = {road_classifier.get_inputs()[0].name: features}
+            road_output = road_classifier.run(None, road_inputs)[0]
+            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            if fire_pred == 1:
+                prediction = "Fire"
+            elif road_pred == 1:
+                prediction = "Road Accident"
+            else:
+                prediction = "unknown"  # BFP only handles Road Accident or Fire
             logger.debug(f"BFP image classified as: {prediction}")
-            return 'unknown' if prediction not in ['Road Accident', 'Fire'] else prediction
+            return prediction
         return 'unknown'
     except Exception as e:
         logger.error(f"BFP image classification failed: {e}")
         return 'unknown'
 
-# Updated classify_image_cdrrmo function
 def classify_image_cdrrmo(base64_image):
     try:
         import base64
@@ -166,10 +207,20 @@ def classify_image_cdrrmo(base64_image):
             logger.error("Failed to decode image for CDRRMO")
             return 'unknown'
         img = cv2.resize(img, (64, 64))
-        features = img.flatten().reshape(1, -1)
-        if image_classifier and label_encoder:
-            prediction = image_classifier.predict(features)[0]
-            prediction = label_encoder.inverse_transform([prediction])[0]
+        features = img.flatten().reshape(1, -1).astype(np.float32)
+        if fire_classifier and road_classifier:
+            fire_inputs = {fire_classifier.get_inputs()[0].name: features}
+            fire_output = fire_classifier.run(None, fire_inputs)[0]
+            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            road_inputs = {road_classifier.get_inputs()[0].name: features}
+            road_output = road_classifier.run(None, road_inputs)[0]
+            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            if fire_pred == 1:
+                prediction = "Fire"
+            elif road_pred == 1:
+                prediction = "Road Accident"
+            else:
+                prediction = "Normal"
             logger.debug(f"CDRRMO image classified as: {prediction}")
             return prediction
         return 'unknown'
@@ -177,7 +228,6 @@ def classify_image_cdrrmo(base64_image):
         logger.error(f"CDRRMO image classification failed: {e}")
         return 'unknown'
 
-# Updated classify_image_pnp function
 def classify_image_pnp(base64_image):
     try:
         import base64
@@ -188,10 +238,20 @@ def classify_image_pnp(base64_image):
             logger.error("Failed to decode image for PNP")
             return 'unknown'
         img = cv2.resize(img, (64, 64))
-        features = img.flatten().reshape(1, -1)
-        if image_classifier and label_encoder:
-            prediction = image_classifier.predict(features)[0]
-            prediction = label_encoder.inverse_transform([prediction])[0]
+        features = img.flatten().reshape(1, -1).astype(np.float32)
+        if fire_classifier and road_classifier:
+            fire_inputs = {fire_classifier.get_inputs()[0].name: features}
+            fire_output = fire_classifier.run(None, fire_inputs)[0]
+            fire_pred = np.argmax(fire_output, axis=1)[0] if fire_output.ndim > 1 else fire_output[0]
+            road_inputs = {road_classifier.get_inputs()[0].name: features}
+            road_output = road_classifier.run(None, road_inputs)[0]
+            road_pred = np.argmax(road_output, axis=1)[0] if road_output.ndim > 1 else road_output[0]
+            if fire_pred == 1:
+                prediction = "Fire"
+            elif road_pred == 1:
+                prediction = "Road Accident"
+            else:
+                prediction = "Normal"
             logger.debug(f"PNP image classified as: {prediction}")
             return prediction
         return 'unknown'
