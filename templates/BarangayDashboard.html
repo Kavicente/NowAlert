@@ -184,9 +184,7 @@
                     const residentBarangay = data.resident_barangay || emergencyBarangay;
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        <button onclick="showResponseForm('${data.alert_id}', ${data.lat || 0}, ${data.lon || 0}, '${data.barangay || 'N/A'}', '${data.emergency_type || 'Not Specified'}')">Respond</button>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
-                        ${alert.image_classification_barangay} (${(alert.image_classification_confidence_barangay * 100).toFixed(2)}%)
                     `;
                     feed.prepend(alertDiv);
 
