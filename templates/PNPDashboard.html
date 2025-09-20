@@ -186,7 +186,6 @@
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
                         ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
-                        ${alert.image_classification_barangay} (${(alert.image_classification_confidence_barangay * 100).toFixed(2)}%)
                     `;
                     feed.prepend(alertDiv);
 
