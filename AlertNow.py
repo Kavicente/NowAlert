@@ -410,19 +410,21 @@ def handle_connect():
 @socketio.on('request_response_form')
 def handle_request_response_form(data):
     try:
-        role = data.get('role')
         alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        municipality = data.get('municipality')
+        role = data.get('role')
+        municipality = data.get('municipality').lower()
+        barangay = data.get('barangay').lower()
+        
         if role == 'cdrrmo':
-            room = f'cdrrmo_{municipality.lower()}'
+            room = f'cdrrmo_{municipality}'
+            socketio.emit('show_response_form', {'alert_id': alert_id}, room=room)
+            logger.info(f"Emitted show_response_form to CDRRMODashboard for alert_id: {alert_id}, room: {room}")
         elif role == 'pnp':
-            room = f'pnp_{municipality.lower()}'
+            room = f'pnp_{municipality}'
+            socketio.emit('show_response_form', {'alert_id': alert_id}, room=room)
+            logger.info(f"Emitted show_response_form to PNPDashboard for alert_id: {alert_id}, room: {room}")
         else:
-            logger.error(f"Invalid role for response form request: {role}")
-            return
-        emit('show_response_form', {'alert_id': alert_id, 'barangay': barangay}, room=room)
-        logger.info(f"Response form requested for {role} in {room}")
+            logger.error(f"Invalid role for response form: {role}")
     except Exception as e:
         logger.error(f"Error handling request_response_form: {e}")
 

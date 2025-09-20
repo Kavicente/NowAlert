@@ -226,6 +226,34 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
+            socket.on('show_response_form', (data) => {
+                console.log('Show response form for alert:', data);
+                const modal = document.getElementById('response-modal');
+                modal.style.display = 'flex';
+                const submitButton = document.getElementById('submit-response');
+                submitButton.onclick = () => {
+                    const responseData = {
+                        alert_id: data.alert_id,
+                        role: 'pnp',
+                        municipality: '{{ municipality }}'.toLowerCase(),
+                        barangay: data.barangay || 'Unknown',
+                        emergency_type: data.emergency_type || 'Road Accident',
+                        road_accident_cause: document.getElementById('accident-cause').value,
+                        road_accident_type: document.getElementById('road-accident-type').value,
+                        weather: document.getElementById('weather').value,
+                        road_condition: document.getElementById('road-condition').value,
+                        vehicle_type: document.getElementById('vehicle-type').value,
+                        driver_age: document.getElementById('driver-age').value,
+                        driver_gender: document.getElementById('driver-gender').value,
+                        lat: data.lat || {{ lat_coord|default(14.0549) }},
+                        lon: data.lon || {{ lon_coord|default(121.3013) }},
+                        timestamp: data.timestamp || new Date().toISOString()
+                    };
+                    socket.emit('submit_response', responseData);
+                    modal.style.display = 'none';
+                };
+            });
+
             socket.on('pnp_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
@@ -248,14 +276,6 @@
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     alertItem.appendChild(predictionDiv);
                 }
-            });
-
-            socket.on('show_response_form', (data) => {
-                console.log('Show response form for alert:', data);
-                const modal = document.getElementById('response-modal');
-                modal.dataset.alertId = data.alert_id;
-                modal.dataset.barangay = data.barangay;
-                modal.style.display = 'flex';
             });
 
             function updateUIWithAlert(data) {
