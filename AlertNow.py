@@ -440,16 +440,9 @@ def handle_new_alert(data):
     data['timestamp'] = datetime.utcnow().isoformat()
     data['resident_barangay'] = data.get('barangay', 'Unknown')
     
-    
-    
-            
-    for key, value in data.items():
-        if isinstance(value, (np.integer, np.floating)):
-            data[key] = value.item()
-        elif isinstance(value, np.ndarray):
-                data[key] = value.tolist()
-    
+   
     alerts.append(data)
+    
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
     municipality = get_municipality_from_barangay(data.get('barangay'))
     if municipality:
