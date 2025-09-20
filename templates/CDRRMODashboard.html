@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CDRRMO Dashboard</title>
+    <title>CDRMMO Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
@@ -58,13 +59,13 @@
     </div>
     <div class="dashboard">
         <header>
-            <h1>CDRRMO {{ municipality }} Dashboard</h1>
+            <h1>CDRMMO {{ municipality }} Dashboard</h1>
             <div class="filters">
             </div>
         </header>
     </div>
     <main class="main-content">
-        <h2 class="h2">CDRRMO {{ municipality }} Map</h2>
+        <h2 class="h2">CDRMMO {{ municipality }} Map</h2>
         <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div id="map"></div>
         <section class="stats">
@@ -89,7 +90,7 @@
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-            const municipalityMap = L.map('map').setView([lat, lon], 16);
+            const cdrrmoMap = L.map('map').setView([lat, lon], 16);
 
             var satellite = L.tileLayer(tileLayerUrl, {
                 attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -102,22 +103,20 @@
                 attribution: '© OpenStreetMap contributors'
             });
 
-            satellite.addTo(municipalityMap);
+            satellite.addTo(cdrrmoMap);
 
             var baseLayers = {
                 "Satellite with Labels": satellite,
                 "OpenStreetMap": osm
             };
-            L.control.layers(baseLayers).addTo(municipalityMap);
+            L.control.layers(baseLayers).addTo(cdrrmoMap);
 
             const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                const municipality = '{{ municipality }}'.toLowerCase();
-                socket.emit('register_role', { role: 'cdrrmo', municipality: municipality });
-                console.log(`Registered to room: cdrrmo_${municipality}`);
+                socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
             socket.on('connect_error', (error) => {
@@ -134,14 +133,14 @@
                 console.log('Update map received:', data);
                 const lat = data.lat || {{ lat_coord|default(14.0549) }};
                 const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                municipalityMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(municipalityMap).bindPopup(
+                cdrrmoMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
                     `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                 ).openPopup();
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
-            socket.on('pnp_response', (data) => {
+            socket.on('cdrrmo_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
@@ -200,11 +199,11 @@
                     }
 
                     if (data.lat && data.lon) {
-                        const marker = L.marker([data.lat, data.lon]).addTo(pnpMap).bindPopup(
+                        const marker = L.marker([data.lat, data.lon]).addTo(cdrrmoMap).bindPopup(
                             `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                         ).openPopup();
                         if (feed.children.length === 1) {
-                            pnpMap.setView([data.lat, data.lon], 15);
+                            cdrrmoMap.setView([data.lat, data.lon], 15);
                         }
                     }
 

@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
@@ -77,7 +78,7 @@
         </section>
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
-            <span class="close-btn">&times;</span>
+            <span class="-close-btn">&times;</span>
             <img id="modal-image" src="">
         </div>
     </main>
@@ -89,7 +90,7 @@
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-            const municipalityMap = L.map('map').setView([lat, lon], 16);
+            const pnpMap = L.map('map').setView([lat, lon], 16);
 
             var satellite = L.tileLayer(tileLayerUrl, {
                 attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -102,22 +103,20 @@
                 attribution: '© OpenStreetMap contributors'
             });
 
-            satellite.addTo(municipalityMap);
+            satellite.addTo(pnpMap);
 
             var baseLayers = {
                 "Satellite with Labels": satellite,
                 "OpenStreetMap": osm
             };
-            L.control.layers(baseLayers).addTo(municipalityMap);
+            L.control.layers(baseLayers).addTo(pnpMap);
 
             const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                const municipality = '{{ municipality }}'.toLowerCase();
-                socket.emit('register_role', { role: 'pnp', municipality: municipality });
-                console.log(`Registered to room: pnp_${municipality}`);
+                socket.emit('register_role', { role: 'pnp', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
             socket.on('connect_error', (error) => {
@@ -134,8 +133,8 @@
                 console.log('Update map received:', data);
                 const lat = data.lat || {{ lat_coord|default(14.0549) }};
                 const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                municipalityMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(municipalityMap).bindPopup(
+                pnpMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(pnpMap).bindPopup(
                     `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                 ).openPopup();
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
@@ -200,11 +199,11 @@
                     }
 
                     if (data.lat && data.lon) {
-                        const marker = L.marker([data.lat, data.lon]).addTo(barangayMap).bindPopup(
+                        const marker = L.marker([data.lat, data.lon]).addTo(pnpMap).bindPopup(
                             `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                         ).openPopup();
                         if (feed.children.length === 1) {
-                            barangayMap.setView([data.lat, data.lon], 15);
+                            pnpMap.setView([data.lat, data.lon], 15);
                         }
                     }
 
