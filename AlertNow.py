@@ -46,14 +46,7 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
-image_classifier = None
-try:
-    image_classifier = ort.InferenceSession(os.path.join(os.path.dirname(__file__), 'training', 'Image Model', 'image_classifier.onnx'))
-    logger.info("image_classifier.onnx loaded successfully.")
-except FileNotFoundError:
-    logger.error("image_classifier.onnx not found.")
-except Exception as e:
-    logger.error(f"Error loading image_classifier.onnx: {e}")
+
 
 
 
@@ -103,200 +96,6 @@ def get_municipality_from_barangay(barangay):
             return municipality
     return None
 
-
-# Updated classify_image_barangay function
-def classify_image_barangay(base64_image):
-    try:
-        import base64
-        img_data = base64.b64decode(base64_image)
-        nparr = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            logger.error("Failed to decode image for barangay")
-            return 'unknown', 0.0
-        img = cv2.resize(img, (640, 640))
-        img = img.transpose(2, 0, 1)
-        img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if image_classifier:
-            inputs = {image_classifier.get_inputs()[0].name: img}
-            output = image_classifier.run(None, inputs)[0]  # Shape: [1, num_detections, 8]
-            if output.shape[1] > 0:
-                conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:8]  # [Fire, Normal, Road Accident]
-                # Compute per-class confidence for all detections
-                fire_conf = conf_scores * class_probs[:, 0]
-                normal_conf = conf_scores * class_probs[:, 1]
-                road_conf = conf_scores * class_probs[:, 2]
-                # Find max confidence per class across all detections
-                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
-                max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
-                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                # Apply stricter threshold for Fire
-                if max_fire_conf > 0.7:
-                    prediction = "Fire"
-                    conf = max_fire_conf
-                elif max_road_conf > 0.5:
-                    prediction = "Road Accident"
-                    conf = max_road_conf
-                elif max_normal_conf > 0.5:
-                    prediction = "Normal"
-                    conf = max_normal_conf
-                else:
-                    prediction = "Normal"
-                    conf = max_normal_conf
-                pred = {"Fire": 0, "Normal": 1, "Road Accident": 2}.get(prediction, 1)
-            else:
-                prediction = "Normal"
-                conf = 0.0
-                pred = 1
-            logger.debug(f"Barangay image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction, conf
-        return 'unknown', 0.0
-    except Exception as e:
-        logger.error(f"Barangay image classification failed: {e}")
-        return 'unknown', 0.0
-
-def classify_image_bfp(base64_image):
-    try:
-        import base64
-        img_data = base64.b64decode(base64_image)
-        nparr = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            logger.error("Failed to decode image for BFP")
-            return 'unknown', 0.0
-        img = cv2.resize(img, (640, 640))
-        img = img.transpose(2, 0, 1)
-        img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if image_classifier:
-            inputs = {image_classifier.get_inputs()[0].name: img}
-            output = image_classifier.run(None, inputs)[0]
-            if output.shape[1] > 0:
-                conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:8]
-                fire_conf = conf_scores * class_probs[:, 0]
-                road_conf = conf_scores * class_probs[:, 2]
-                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
-                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                if max_fire_conf > 0.7:
-                    prediction = "Fire"
-                    conf = max_fire_conf
-                elif max_road_conf > 0.5:
-                    prediction = "Road Accident"
-                    conf = max_road_conf
-                else:
-                    prediction = "unknown"
-                    conf = 0.0
-                pred = {"Fire": 0, "Road Accident": 2}.get(prediction, 1)
-            else:
-                prediction = "unknown"
-                conf = 0.0
-                pred = 1
-            logger.debug(f"BFP image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction, conf
-        return 'unknown', 0.0
-    except Exception as e:
-        logger.error(f"BFP image classification failed: {e}")
-        return 'unknown', 0.0
-
-def classify_image_cdrrmo(base64_image):
-    try:
-        import base64
-        img_data = base64.b64decode(base64_image)
-        nparr = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            logger.error("Failed to decode image for CDRRMO")
-            return 'unknown', 0.0
-        img = cv2.resize(img, (640, 640))
-        img = img.transpose(2, 0, 1)
-        img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if image_classifier:
-            inputs = {image_classifier.get_inputs()[0].name: img}
-            output = image_classifier.run(None, inputs)[0]
-            if output.shape[1] > 0:
-                conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:8]
-                fire_conf = conf_scores * class_probs[:, 0]
-                normal_conf = conf_scores * class_probs[:, 1]
-                road_conf = conf_scores * class_probs[:, 2]
-                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
-                max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
-                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                if max_fire_conf > 0.7:
-                    prediction = "Fire"
-                    conf = max_fire_conf
-                elif max_road_conf > 0.5:
-                    prediction = "Road Accident"
-                    conf = max_road_conf
-                elif max_normal_conf > 0.5:
-                    prediction = "Normal"
-                    conf = max_normal_conf
-                else:
-                    prediction = "Normal"
-                    conf = max_normal_conf
-                pred = {"Fire": 0, "Normal": 1, "Road Accident": 2}.get(prediction, 1)
-            else:
-                prediction = "Normal"
-                conf = 0.0
-                pred = 1
-            logger.debug(f"CDRRMO image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction, conf
-        return 'unknown', 0.0
-    except Exception as e:
-        logger.error(f"CDRRMO image classification failed: {e}")
-        return 'unknown', 0.0
-
-def classify_image_pnp(base64_image):
-    try:
-        import base64
-        img_data = base64.b64decode(base64_image)
-        nparr = np.frombuffer(img_data, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            logger.error("Failed to decode image for PNP")
-            return 'unknown', 0.0
-        img = cv2.resize(img, (640, 640))
-        img = img.transpose(2, 0, 1)
-        img = img[np.newaxis, ...].astype(np.float32) / 255.0
-        if image_classifier:
-            inputs = {image_classifier.get_inputs()[0].name: img}
-            output = image_classifier.run(None, inputs)[0]
-            if output.shape[1] > 0:
-                conf_scores = output[0, :, 4]
-                class_probs = output[0, :, 5:8]
-                fire_conf = conf_scores * class_probs[:, 0]
-                normal_conf = conf_scores * class_probs[:, 1]
-                road_conf = conf_scores * class_probs[:, 2]
-                max_fire_conf = np.max(fire_conf) if fire_conf.size > 0 else 0.0
-                max_normal_conf = np.max(normal_conf) if normal_conf.size > 0 else 0.0
-                max_road_conf = np.max(road_conf) if road_conf.size > 0 else 0.0
-                if max_fire_conf > 0.7:
-                    prediction = "Fire"
-                    conf = max_fire_conf
-                elif max_road_conf > 0.5:
-                    prediction = "Road Accident"
-                    conf = max_road_conf
-                elif max_normal_conf > 0.5:
-                    prediction = "Normal"
-                    conf = max_normal_conf
-                else:
-                    prediction = "Normal"
-                    conf = max_normal_conf
-                pred = {"Fire": 0, "Normal": 1, "Road Accident": 2}.get(prediction, 1)
-            else:
-                prediction = "Normal"
-                conf = 0.0
-                pred = 1
-            logger.debug(f"PNP image classified as: {prediction} (Confidence: {conf:.2f}, Class index: {pred})")
-            return prediction, conf
-        return 'unknown', 0.0
-    except Exception as e:
-        logger.error(f"PNP image classification failed: {e}")
-        return 'unknown', 0.0
-
-def classify_image(base64_image):
-    return classify_image_barangay(base64_image)
 
 @app.route('/api/android_signup', methods=['POST'])
 def android_signup():
@@ -431,24 +230,7 @@ def admin_delete_user(contact_no):
     logger.info(f"User deleted with contact_no: {contact_no}")
     return jsonify({'message': 'User deleted successfully'})
 
-def add_response(data):
-    if isinstance(data, str):
-        try:
-            data = json.loads(data)
-        except json.JSONDecodeError:
-            logger.warning(f"Invalid JSON response: {data}")
-            return
-    # Populate road_accident_cause and road_accident_type for cdrrmo
-    if data.get('role') == 'cdrrmo' and 'image' in data:
-        try:
-            image_classification = classify_image(data['image'])
-            data['road_accident_cause'] = image_classification if image_classification != 'unknown' else data.get('road_accident_cause', 'Unknown')
-            data['road_accident_type'] = image_classification if image_classification != 'unknown' else data.get('road_accident_type', 'Unknown')
-        except Exception as e:
-            logger.error(f"Image classification failed in add_response: {e}")
-            data['road_accident_cause'] = data.get('road_accident_cause', 'Unknown')
-            data['road_accident_type'] = data.get('road_accident_type', 'Unknown')
-    today_responses.append(data)
+
 
 
 @socketio.on('submit_response')
@@ -657,22 +439,15 @@ def handle_new_alert(data):
     data['alert_id'] = alert_id
     data['timestamp'] = datetime.utcnow().isoformat()
     data['resident_barangay'] = data.get('barangay', 'Unknown')
-    data['image_classification'] = 'no_image'
     
-    # Classify image if present
-    if 'image' in data and data['image']:
-            # Classify image for each role
-            data['image_classification_barangay'] = classify_image_barangay(data['image'])
-            data['image_classification_bfp'] = classify_image_bfp(data['image'])
-            data['image_classification_cdrrmo'] = classify_image_cdrrmo(data['image'])
-            data['image_classification_pnp'] = classify_image_pnp(data['image'])
-            data['image_classification'] = data['image_classification_barangay']
+    
+    
             
-            for key, value in data.items():
-                if isinstance(value, (np.integer, np.floating)):
-                    data[key] = value.item()
-                elif isinstance(value, np.ndarray):
-                    data[key] = value.tolist()
+    for key, value in data.items():
+        if isinstance(value, (np.integer, np.floating)):
+            data[key] = value.item()
+        elif isinstance(value, np.ndarray):
+                data[key] = value.tolist()
     
     alerts.append(data)
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
@@ -1633,10 +1408,7 @@ def send_alert():
             'user_barangay': barangay
         }
         
-        if alert['image']:
-            prediction = classify_image(alert['image'])
-            if prediction not in ['road_accident', 'fire_incident']:
-                alert['image'] = None
+        
 
         alerts.append(alert)
         socketio.emit('new_alert', alert)
