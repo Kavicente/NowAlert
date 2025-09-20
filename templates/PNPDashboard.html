@@ -41,6 +41,38 @@
             font-size: 30px;
             cursor: pointer;
         }
+        .response-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .response-modal-content {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            max-width: 500px;
+            width: 90%;
+        }
+        .response-modal-content select, .response-modal-content button {
+            margin: 5px;
+            padding: 5px;
+            width: 100%;
+        }
+        .response-modal .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            font-size: 30px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -81,6 +113,60 @@
             <span class="-close-btn">&times;</span>
             <img id="modal-image" src="">
         </div>
+        <div id="response-modal" class="response-modal">
+            <span class="close-btn">&times;</span>
+            <div class="response-modal-content">
+                <h3>Respond to Alert</h3>
+                <select id="road_accident_cause">
+                    <option value="Head-on collision">Head-on collision</option>
+                    <option value="Rear-end collision">Rear-end collision</option>
+                    <option value="Side-impact collision">Side-impact collision</option>
+                    <option value="Single vehicle accident">Single vehicle accident</option>
+                    <option value="Pedestrian accident">Pedestrian accident</option>
+                </select>
+                <select id="road_accident_type">
+                    <option value="Overspeeding">Overspeeding</option>
+                    <option value="Drunk Driving">Drunk Driving</option>
+                    <option value="Reckless Driving">Reckless Driving</option>
+                    <option value="Overloading">Overloading</option>
+                    <option value="Fatigue">Fatigue</option>
+                    <option value="Distracted Driving">Distracted Driving</option>
+                    <option value="Poor Maintenance">Poor Maintenance</option>
+                    <option value="Mechanical Failure">Mechanical Failure</option>
+                    <option value="Inexperience">Inexperience</option>
+                </select>
+                <select id="weather">
+                    <option value="Sunny">Sunny</option>
+                    <option value="Rainy">Rainy</option>
+                    <option value="Foggy">Foggy</option>
+                    <option value="Cloudy">Cloudy</option>
+                </select>
+                <select id="road_condition">
+                    <option value="Dry">Dry</option>
+                    <option value="Wet">Wet</option>
+                    <option value="Icy">Icy</option>
+                    <option value="Snowy">Snowy</option>
+                </select>
+                <select id="vehicle_type">
+                    <option value="Car">Car</option>
+                    <option value="Motorcycle">Motorcycle</option>
+                    <option value="Truck">Truck</option>
+                    <option value="Bus">Bus</option>
+                </select>
+                <select id="driver_age">
+                    <option value="18-25">18-25</option>
+                    <option value="26-35">26-35</option>
+                    <option value="36-50">36-50</option>
+                    <option value="51+">51+</option>
+                </select>
+                <select id="driver_gender">
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                </select>
+                <button id="submit-response">Submit Response</button>
+            </div>
+        </div>
+
     </main>
 
     <script>
@@ -164,6 +250,14 @@
                 }
             });
 
+            socket.on('show_response_form', (data) => {
+                console.log('Show response form for alert:', data);
+                const modal = document.getElementById('response-modal');
+                modal.dataset.alertId = data.alert_id;
+                modal.dataset.barangay = data.barangay;
+                modal.style.display = 'flex';
+            });
+
             function updateUIWithAlert(data) {
                 const feed = document.getElementById('alert-container');
                 if (feed) {
@@ -227,6 +321,42 @@
                 if (e.target === modal) {
                     modal.style.display = 'none';
                 }
+            });
+
+            const responseModal = document.getElementById('response-modal');
+            const responseCloseBtn = document.querySelector('.response-modal .close-btn');
+            responseCloseBtn.addEventListener('click', () => {
+                responseModal.style.display = 'none';
+            });
+            responseModal.addEventListener('click', (e) => {
+                if (e.target === responseModal) {
+                    responseModal.style.display = 'none';
+                }
+            });
+
+            const submitButton = document.getElementById('submit-response');
+            submitButton.addEventListener('click', () => {
+                const alertId = responseModal.dataset.alertId;
+                const barangay = responseModal.dataset.barangay;
+                const responseData = {
+                    alert_id: alertId,
+                    role: 'pnp',
+                    barangay: barangay,
+                    municipality: '{{ municipality }}'.toLowerCase(),
+                    emergency_type: 'Road Accident',
+                    road_accident_cause: document.getElementById('road_accident_cause').value,
+                    road_accident_type: document.getElementById('road_accident_type').value,
+                    weather: document.getElementById('weather').value,
+                    road_condition: document.getElementById('road_condition').value,
+                    vehicle_type: document.getElementById('vehicle_type').value,
+                    driver_age: document.getElementById('driver_age').value,
+                    driver_gender: document.getElementById('driver_gender').value,
+                    lat: {{ lat_coord|default(14.0549) }},
+                    lon: {{ lon_coord|default(121.3013) }},
+                    timestamp: new Date().toISOString()
+                };
+                socket.emit('submit_response', responseData);
+                responseModal.style.display = 'none';
             });
 
             function notifyAlert(data) {
