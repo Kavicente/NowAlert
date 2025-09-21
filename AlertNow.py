@@ -250,7 +250,7 @@ def handle_submit_response(data):
         driver_gender = data.get('driver_gender', '')
         lat = data.get('lat', 0.0)
         lon = data.get('lon', 0.0)
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')  # Changed to string
         responded = True
 
         conn = get_db_connection()
@@ -278,7 +278,7 @@ def handle_submit_response(data):
         conn.commit()
         conn.close()
 
-        # Prediction logic
+        # Emit response with prediction
         response_data = {
             'alert_id': alert_id,
             'role': role,
@@ -286,7 +286,7 @@ def handle_submit_response(data):
             'municipality': municipality,
             'emergency_type': emergency_type,
             'prediction': prediction,
-            'timestamp': timestamp
+            'timestamp': timestamp  # Using the string timestamp
         }
         socketio.emit(f'{role}_response', response_data)
         logger.info(f"Response submitted for alert {alert_id} by {role}")
