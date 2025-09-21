@@ -99,7 +99,7 @@
         <section id="alerts">
             <h2 class="h2">Live Alerts</h2>
             <div id="alert-container"></div>
-            <div id="prediction"></div>
+            
         </section>
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
@@ -218,10 +218,11 @@
             socket.on('cdrrmo_response', (data) => {
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
-                    const predictionDiv = document.createElement('div');
-                    predictionDiv.className = 'prediction';
+                    const predictionElem = document.createElement('div');
+                    predictionElem.classList.add("prediction");
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
+
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
                         const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
                         if (match) {
@@ -235,10 +236,12 @@
                     } else {
                         formattedPrediction = 'Prediction unavailable';
                     }
-                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    alertItem.appendChild(predictionDiv);
+
+                    predictionElem.textContent = `Prediction: ${formattedPrediction}`;
+                    alertItem.appendChild(predictionElem);
                 }
             });
+
 
             socket.on('request_response_popup', (data) => {
                 console.log('Response popup requested:', data);
