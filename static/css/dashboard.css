@@ -188,6 +188,14 @@ canvas {
     padding: 5px;
     border-radius: 4px;
 }
+.heatmap-layer {
+    opacity: 0.7; /* Slightly transparent for visibility over map */
+    z-index: 400; /* Ensure it overlays other map elements but under markers */
+    transition: opacity 0.3s ease;
+}
+.heatmap-layer:hover {
+    opacity: 0.9; /* Slightly more opaque on hover for interactivity */
+}
 
 @media (max-width: 600px) {
     .sidebar {
