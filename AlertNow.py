@@ -233,90 +233,13 @@ def admin_delete_user(contact_no):
 
 
 
-@socketio.on('submit_response')
-def handle_submit_response(data):
-    try:
-        alert_id = data.get('alert_id', str(uuid.uuid4()))
-        role = data.get('role', '').lower()
-        barangay = data.get('barangay', '')
-        municipality = get_municipality_from_barangay(barangay) or data.get('municipality', '')
-        emergency_type = data.get('emergency_type', 'unknown')
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        lat = float(data.get('lat', 0))
-        lon = float(data.get('lon', 0))
-        responded = data.get('responded', True)
-        
-        # Road accident fields
-        road_accident_cause = data.get('road_accident_cause', 'Unknown')
-        road_accident_type = data.get('road_accident_type', 'Unknown')
-        weather = data.get('weather', 'Unknown')
-        road_condition = data.get('road_condition', 'Unknown')
-        vehicle_type = data.get('vehicle_type', 'Unknown')
-        driver_age = data.get('driver_age', 'Unknown')
-        driver_gender = data.get('driver_gender', 'Unknown')
-        
-        # Fire incident fields
-        cause = data.get('cause', 'Unknown')
-        property_type = data.get('property_type', 'Unknown')
-        
-        conn = get_db_connection()
-        table = f"{role}_response" if role in ['barangay', 'cdrrmo', 'pnp', 'bfp'] else 'barangay_response'
-        if role == 'bfp':
-            conn.execute(f'''
-                INSERT INTO {table} (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded))
-        else:
-            conn.execute(f'''
-                INSERT INTO {table} (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-        conn.commit()
-        conn.close()
-        
-        response_data = {
-            'alert_id': alert_id,
-            'emergency_type': emergency_type,
-            'timestamp': timestamp,
-            'lat': lat,
-            'lon': lon,
-            'barangay': barangay,
-            'responded': responded
-        }
-        if role == 'bfp':
-            response_data.update({
-                'cause': cause,
-                'weather': weather,
-                'property_type': property_type
-            })
-        else:
-            response_data.update({
-                'road_accident_cause': road_accident_cause,
-                'road_accident_type': road_accident_type,
-                'weather': weather,
-                'road_condition': road_condition,
-                'vehicle_type': vehicle_type,
-                'driver_age': driver_age,
-                'driver_gender': driver_gender
-            })
-        
-        global today_responses
-        today_responses.append(response_data)
-        
-        room = f"{role}_{barangay if role == 'barangay' or role == 'bfp' else municipality}"
-        socketio.emit('update_response', response_data, room=room)
-        logger.info(f"Response submitted for {role} in {barangay or municipality}")
-        emit('response_submitted', {'message': 'Response submitted successfully'})
-    except Exception as e:
-        logger.error(f"Error submitting response: {e}")
-        emit('response_error', {'error': str(e)}) 
 
-
+# Update in submit_response (around line 300)
 @app.route('/api/submit_response', methods=['POST'])
 def submit_response():
     data = request.json
     role = data.get('role')
-    alert_id = data.get('alert_id', str(uuid.uuid4()))  # Generate UUID if not provided
+    alert_id = data.get('alert_id', str(uuid.uuid4()))
     barangay = data.get('barangay')
     municipality = get_municipality_from_barangay(barangay) if barangay else data.get('municipality')
     emergency_type = data.get('emergency_type', 'unknown')
@@ -331,6 +254,27 @@ def submit_response():
     lat = data.get('lat')
     lon = data.get('lon')
     timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+
+    # Generate prediction for road accidents
+    prediction = 'N/A'
+    if emergency_type.lower() == 'road accident' and road_accident_predictor is not None:
+        try:
+            input_data = pd.DataFrame([{
+                'road_accident_cause': road_accident_cause,
+                'road_accident_type': road_accident_type,
+                'weather': weather,
+                'road_condition': road_condition,
+                'vehicle_type': vehicle_type,
+                'driver_age': driver_age,
+                'driver_gender': driver_gender
+            }])
+            input_data_encoded = pd.get_dummies(input_data)
+            input_data_encoded = input_data_encoded.reindex(columns=road_accident_df.columns, fill_value=0)
+            prediction_prob = road_accident_predictor.predict_proba(input_data_encoded)[0][1]
+            prediction = f"{prediction_prob*100:.1f}% chance in year {datetime.now().year + 1}"
+        except Exception as e:
+            logger.error(f"Prediction error: {e}")
+            prediction = 'prediction_error'
 
     try:
         conn = get_db_connection()
@@ -371,32 +315,19 @@ def submit_response():
             'vehicle_type': vehicle_type,
             'driver_age': driver_age,
             'driver_gender': driver_gender,
-            'property_type': property_type,
             'lat': lat,
             'lon': lon,
-            'timestamp': timestamp
+            'timestamp': timestamp,
+            'prediction': prediction
         }
-        responses.append(response_data)
-        today_responses.append(response_data)
-        socketio.emit('update_response', response_data, room=f"{role}_{barangay or municipality}")
-        logger.info(f"Response submitted by {role} for alert_id: {alert_id}")
-        return jsonify({'message': 'Response submitted successfully'})
+        socketio.emit(f'{role}_response', response_data, room=f"{role}_{barangay if role == 'barangay' or role == 'bfp' else municipality}")
+        return jsonify({'message': 'Response submitted successfully', 'prediction': prediction})
     except Exception as e:
         logger.error(f"Error submitting response: {e}")
         return jsonify({'error': str(e)}), 500
     
 # New function get_road_condition
-@socketio.on('update_response')
-def handle_update_response(data):
-    logger.info(f"Update response received: {data}")
-    try:
-        role = data.get('role', '').lower()
-        barangay = data.get('barangay', '').lower()
-        municipality = data.get('municipality', '').lower()
-        emit('update_response', data, broadcast=True, include_self=True)
-        logger.info(f"Broadcasted update_response for role {role}")
-    except Exception as e:
-        logger.error(f"Error broadcasting update_response: {e}")
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
