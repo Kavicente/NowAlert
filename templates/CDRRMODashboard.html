@@ -214,7 +214,7 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
-            socket.on('cdrrmo_response', (data) => {
+            socket.on('cdrrmo_response_submitted', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {

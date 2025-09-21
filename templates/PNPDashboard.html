@@ -183,7 +183,7 @@
                 "Satellite with Labels": satellite,
                 "OpenStreetMap": osm
             };
-            L.control.layers(baseLayers).addTo(pnpMap);
+            L.control.layers(baseStyles).addTo(pnpMap);
 
             const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
@@ -214,7 +214,7 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
-            socket.on('pnp_response', (data) => {
+            socket.on('pnp_response_submitted', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
