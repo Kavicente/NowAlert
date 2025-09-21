@@ -669,7 +669,7 @@ def handle_cdrrmo_response_submitted(data):
         municipality = data.get('municipality', '').lower()
         barangay = data.get('barangay', '').lower()
         response = {
-            'alert_id': str(uuid.uuid4()),
+            'alert_id': data.get('alert_id', str(uuid.uuid4())),
             'role': data.get('role', 'cdrrmo'),
             'municipality': municipality,
             'emergency_type': data.get('emergency_type', 'N/A'),
@@ -798,7 +798,7 @@ def handle_pnp_response_submitted(data):
         municipality = data.get('municipality', '').lower()
         barangay = data.get('barangay', '').lower()
         response = {
-            'alert_id': str(uuid.uuid4()),
+            'alert_id': data.get('alert_id', str(uuid.uuid4())),
             'role': data.get('role', 'pnp'),
             'municipality': municipality,
             'emergency_type': data.get('emergency_type', 'N/A'),
