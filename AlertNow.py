@@ -264,11 +264,13 @@ def handle_submit_response(data):
                 INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+            prediction = handle_cdrrmo_response_submitted(data)
         elif role == 'pnp':
             conn.execute('''
                 INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+            prediction = handle_pnp_response_submitted(data)
         elif role == 'bfp':
             # Existing BFP logic remains unchanged
             pass
@@ -277,21 +279,6 @@ def handle_submit_response(data):
         conn.close()
 
         # Prediction logic
-        prediction = 'N/A'
-        if road_accident_predictor and road_accident_cause and road_accident_type:
-            try:
-                # Prepare features for prediction (simplified example, adjust based on your model)
-                features = [road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender]
-                # Convert to numeric or categorical format as required by the model
-                # This is a placeholder; replace with actual feature engineering
-                input_data = np.array(features).reshape(1, -1)
-                prediction_proba = road_accident_predictor.predict_proba(input_data)
-                prediction = f"{prediction_proba[0][1]*100:.2f}% chance in year 1"  # Adjust based on model output
-            except Exception as e:
-                logger.error(f"Prediction error for alert {alert_id}: {e}")
-                prediction = 'prediction_error'
-
-        # Emit response with prediction
         response_data = {
             'alert_id': alert_id,
             'role': role,
