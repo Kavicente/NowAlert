@@ -231,7 +231,26 @@ def admin_delete_user(contact_no):
     return jsonify({'message': 'User deleted successfully'})
 
 
+@socketio.on('request_heatmap_data')
+def handle_heatmap_data(role):
+    try:
+        conn = get_db_connection()
+        if role == 'barangay':
+            cursor = conn.execute('SELECT lat, lon FROM barangay_response')
+        elif role == 'cdrrmo':
+            cursor = conn.execute('SELECT lat, lon FROM cdrrmo_response')
+        elif role == 'pnp':
+            cursor = conn.execute('SELECT lat, lon FROM pnp_response')
+        else:
+            conn.close()
+            return jsonify({'error': 'Invalid role'})
 
+        heatmap_data = [[row['lat'], row['lon'], 1] for row in cursor.fetchall() if row['lat'] and row['lon']]
+        conn.close()
+        emit('heatmap_data', {'role': role, 'data': heatmap_data})
+    except Exception as e:
+        logger.error(f"Error in handle_heatmap_data: {e}")
+        emit('heatmap_data', {'error': str(e)})
 
 @socketio.on('submit_response')
 def handle_submit_response(data):
@@ -1852,6 +1871,9 @@ def get_bfp_stats():
     except Exception as e:
         logger.error(f"Error in get_bfp_stats: {e}")
         return Counter()
+
+
+
 
 if __name__ == '__main__':
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')

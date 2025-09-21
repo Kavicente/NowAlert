@@ -9,6 +9,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
     <style>
         .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
@@ -252,6 +253,25 @@
                     })
                     .catch(error => console.error('Error fetching stats:', error));
             }
+
+            async function loadHeatmap() {
+                try {
+                    const response = await fetch('/get_heatmap_data?table=pnp_response&municipality={{ municipality }}');
+                    const data = await response.json();
+                    const heatData = data.map(item => [item.lat, item.lon, 1]); // Intensity set to 1 for each alert
+                    const heatmapLayer = L.heatLayer(heatData, {
+                        radius: 25,
+                        blur: 15,
+                        maxZoom: 17,
+                        gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' }
+                    }).addTo(pnpMap);
+                } catch (error) {
+                    console.error('Error loading heatmap:', error);
+                }
+            }
+            loadHeatmap();
+
+
         });
     </script>
 </body>
