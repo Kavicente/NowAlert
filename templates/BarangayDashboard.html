@@ -111,7 +111,7 @@
             };
             L.control.layers(baseLayers).addTo(barangayMap);
 
-            const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
+            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {

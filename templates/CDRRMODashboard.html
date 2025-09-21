@@ -41,7 +41,30 @@
             font-size: 30px;
             cursor: pointer;
         }
-        
+        .response-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            z-index: 1000;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        .response-popup select, .response-popup button {
+            margin: 5px;
+            padding: 5px;
+            width: 200px;
+        }
+        .response-popup .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 20px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -72,7 +95,6 @@
         <section class="stats">
             <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
             <p class="p">Critical Incidents: <span id="critical-incidents">{{ stats.critical if stats else 0 }}</span></p>
-            <p class="p">Prediction: <span id="prediction">N/A</span></p>
         </section>
         <section id="alerts">
             <h2 class="h2">Live Alerts</h2>
@@ -83,9 +105,16 @@
             <span class="close-btn">&times;</span>
             <img id="modal-image" src="">
         </div>
-        <div id="response-form" class="response-form">
-            <h3>Submit Response</h3>
-            <select id="cause">
+        <div id="response-popup" class="response-popup">
+            <span class="close-btn">&times;</span>
+            <select id="cause-select">
+                <option value="Head-on collision">Head-on collision</option>
+                <option value="Rear-end collision">Rear-end collision</option>
+                <option value="Side-impact collision">Side-impact collision</option>
+                <option value="Single vehicle accident">Single vehicle accident</option>
+                <option value="Pedestrian accident">Pedestrian accident</option>
+            </select>
+            <select id="type-select">
                 <option value="Overspeeding">Overspeeding</option>
                 <option value="Drunk Driving">Drunk Driving</option>
                 <option value="Reckless Driving">Reckless Driving</option>
@@ -96,42 +125,35 @@
                 <option value="Mechanical Failure">Mechanical Failure</option>
                 <option value="Inexperience">Inexperience</option>
             </select>
-            <select id="type">
-                <option value="Head-on collision">Head-on collision</option>
-                <option value="Rear-end collision">Rear-end collision</option>
-                <option value="Side-impact collision">Side-impact collision</option>
-                <option value="Single vehicle accident">Single vehicle accident</option>
-                <option value="Pedestrian accident">Pedestrian accident</option>
-            </select>
-            <select id="weather">
+            <select id="weather-select">
                 <option value="Sunny">Sunny</option>
                 <option value="Rainy">Rainy</option>
                 <option value="Foggy">Foggy</option>
                 <option value="Cloudy">Cloudy</option>
             </select>
-            <select id="road_condition">
+            <select id="road-condition-select">
                 <option value="Dry">Dry</option>
                 <option value="Wet">Wet</option>
                 <option value="Icy">Icy</option>
                 <option value="Snowy">Snowy</option>
             </select>
-            <select id="vehicle_type">
+            <select id="vehicle-type-select">
                 <option value="Car">Car</option>
                 <option value="Motorcycle">Motorcycle</option>
                 <option value="Truck">Truck</option>
                 <option value="Bus">Bus</option>
             </select>
-            <select id="driver_age">
+            <select id="driver-age-select">
                 <option value="18-25">18-25</option>
                 <option value="26-35">26-35</option>
                 <option value="36-50">36-50</option>
                 <option value="51+">51+</option>
             </select>
-            <select id="driver_gender">
+            <select id="driver-gender-select">
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
             </select>
-            <button onclick="submitResponse()">Submit Response</button>
+            <button id="submit-response">Submit Response</button>
         </div>
     </main>
 
@@ -163,7 +185,7 @@
             };
             L.control.layers(baseLayers).addTo(cdrrmoMap);
 
-            const socket = io('https://alert-858l.onrender.com', { transports: ['websocket'] });
+            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
@@ -192,17 +214,6 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
-            socket.on('show_response_form', (data) => {
-                console.log('Show response form:', data);
-                const form = document.getElementById('response-form');
-                form.style.display = 'block';
-                form.dataset.alertId = data.alert_id;
-                form.dataset.barangay = data.barangay;
-                form.dataset.emergencyType = data.emergency_type;
-                form.dataset.lat = data.lat;
-                form.dataset.lon = data.lon;
-            });
-
             socket.on('cdrrmo_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
@@ -225,6 +236,41 @@
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     alertItem.appendChild(predictionDiv);
                 }
+            });
+
+            socket.on('request_response_popup', (data) => {
+                console.log('Response popup requested:', data);
+                const popup = document.getElementById('response-popup');
+                const submitButton = document.getElementById('submit-response');
+                const closeBtn = popup.querySelector('.close-btn');
+                popup.dataset.alertId = data.alert_id;
+                popup.style.display = 'block';
+
+                closeBtn.addEventListener('click', () => {
+                    popup.style.display = 'none';
+                });
+
+                submitButton.onclick = () => {
+                    const responseData = {
+                        alert_id: data.alert_id,
+                        role: 'cdrrmo',
+                        barangay: data.barangay,
+                        municipality: '{{ municipality }}'.toLowerCase(),
+                        emergency_type: data.emergency_type,
+                        road_accident_cause: document.getElementById('cause-select').value,
+                        road_accident_type: document.getElementById('type-select').value,
+                        weather: document.getElementById('weather-select').value,
+                        road_condition: document.getElementById('road-condition-select').value,
+                        vehicle_type: document.getElementById('vehicle-type-select').value,
+                        driver_age: document.getElementById('driver-age-select').value,
+                        driver_gender: document.getElementById('driver-gender-select').value,
+                        lat: data.lat,
+                        lon: data.lon,
+                        timestamp: data.timestamp
+                    };
+                    socket.emit('submit_response', responseData);
+                    popup.style.display = 'none';
+                };
             });
 
             function updateUIWithAlert(data) {
@@ -282,7 +328,7 @@
             }
 
             const modal = document.getElementById('image-modal');
-            const closeBtn = document.querySelector('.image-modal .close-btn');
+            const closeBtn = document.querySelector('.close-btn');
             closeBtn.addEventListener('click', () => {
                 modal.style.display = 'none';
             });
@@ -291,30 +337,6 @@
                     modal.style.display = 'none';
                 }
             });
-
-            function submitResponse() {
-                const form = document.getElementById('response-form');
-                const responseData = {
-                    alert_id: form.dataset.alertId,
-                    role: 'cdrrmo',
-                    municipality: '{{ municipality }}'.toLowerCase(),
-                    barangay: form.dataset.barangay,
-                    emergency_type: form.dataset.emergencyType,
-                    lat: parseFloat(form.dataset.lat),
-                    lon: parseFloat(form.dataset.lon),
-                    responded: true,
-                    road_accident_cause: document.getElementById('cause').value,
-                    road_accident_type: document.getElementById('type').value,
-                    weather: document.getElementById('weather').value,
-                    road_condition: document.getElementById('road_condition').value,
-                    vehicle_type: document.getElementById('vehicle_type').value,
-                    driver_age: document.getElementById('driver_age').value,
-                    driver_gender: document.getElementById('driver_gender').value,
-                    timestamp: new Date().toISOString()
-                };
-                console.log('Submitting response:', responseData);
-                socket.emit('submit_response', responseData);
-            }
 
             function notifyAlert(data) {
                 const notification = document.getElementById('notification');
