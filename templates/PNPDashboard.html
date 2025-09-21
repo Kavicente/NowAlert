@@ -183,7 +183,7 @@
                 "Satellite with Labels": satellite,
                 "OpenStreetMap": osm
             };
-            L.control.layers(baseStyles).addTo(pnpMap);
+            L.control.layers(baseLayers).addTo(pnpMap);
 
             const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
@@ -215,7 +215,7 @@
             });
 
             socket.on('pnp_response_submitted', (data) => {
-                console.log('Response submitted:', data);
+                console.log('PNP response received:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = document.createElement('div');
@@ -225,13 +225,15 @@
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
                         const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
                         if (match) {
-                            const percentage = match[1];
+                            const percentage = parseFloat(match[1]).toFixed(1);
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
                             formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
+                    } else {
+                        formattedPrediction = 'Prediction unavailable';
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     alertItem.appendChild(predictionDiv);
@@ -248,7 +250,7 @@
 
                 closeBtn.addEventListener('click', () => {
                     popup.style.display = 'none';
-                });
+                }, { once: true });
 
                 submitButton.onclick = () => {
                     const responseData = {
