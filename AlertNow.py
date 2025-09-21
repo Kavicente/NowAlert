@@ -356,7 +356,7 @@ def submit_response():
             'property_type': property_type,
             'lat': lat,
             'lon': lon,
-            'timestamp': timestamp
+            'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S')
         }
         responses.append(response_data)
         today_responses.append(response_data)
