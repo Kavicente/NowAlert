@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BFP Charts - {{ barangay }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fcharts.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+    <header>
+        <h1>BFP {{ barangay }} Charts</h1>
+        <p id="datetime">{{ current_datetime }}</p>
+    </header>
+    <div class="sidebar" id="sidebar">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('bfp_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('bfp_charts') }}">Charts</a></li>
+            </ul>
+        </nav>
+    </div>
+    <main class="main-content" id="mainContent">
+        <div class="tabs">
+            <button class="tab active" onclick="filterData('today')">Today</button>
+            <button class="tab" onclick="filterData('daily')">Daily</button>
+            <button class="tab" onclick="filterData('weekly')">Weekly</button>
+            <button class="tab" onclick="filterData('monthly')">Monthly</button>
+            <button class="tab" onclick="filterData('yearly')">Yearly</button>
+        </div>
+        <div id="chartSection" class="section">
+            <div class="chart-container"><h2>Fire Cause Chart</h2><canvas id="causeChart"></canvas></div>
+            <div class="chart-container"><h2>Fire Type Chart</h2><canvas id="typeChart"></canvas></div>
+            <div class="chart-container"><h2>Weather Chart</h2><canvas id="weatherChart"></canvas></div>
+            <div class="chart-container"><h2>Fire Severity Chart</h2><canvas id="severityChart"></canvas></div>
+        </div>
+    </main>
+    <script>
+        const socket = io.connect('https://alertnow-t1kg.onrender.com' + document.domain + ':' + location.port);
+        let charts = {};
+        const ctxs = {
+            causeChart: document.getElementById('causeChart').getContext('2d'),
+            typeChart: document.getElementById('typeChart').getContext('2d'),
+            weatherChart: document.getElementById('weatherChart').getContext('2d'),
+            severityChart: document.getElementById('severityChart').getContext('2d')
+        };
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
+        function initCharts(data) {
+            charts.causeChart = new Chart(ctxs.causeChart, { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.typeChart = new Chart(ctxs.typeChart, { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.weatherChart = new Chart(ctxs.weatherChart, { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.severityChart = new Chart(ctxs.severityChart, { type: 'polarArea', data: data.severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+        }
+
+        function updateCharts(data) {
+            charts.causeChart.data = data.cause;
+            charts.typeChart.data = data.type;
+            charts.weatherChart.data = data.weather;
+            charts.severityChart.data = data.severity;
+            Object.values(charts).forEach(chart => chart.update());
+        }
+
+        socket.on('bfp_response_update', (data) => {
+            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today') {
+                updateCharts(data);
+            }
+        });
+
+        function filterData(timeFilter) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            const barangay = '{{ barangay }}'; // Use Jinja variable for barangay
+            fetch(`/bfp_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(barangay)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (charts.causeChart) Object.values(charts).forEach(chart => chart.destroy());
+                    initCharts(data);
+                });
+        }
+
+        window.onload = () => {
+            filterData('today');
+        };
+    </script>
+</body>
+</html>

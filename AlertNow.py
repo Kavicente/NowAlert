@@ -18,10 +18,10 @@ from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
-from BarangayAnalytics import get_barangay_analytics_data, get_barangay_trends, get_barangay_distribution, get_barangay_causes, generate_mock_data
-from CDRRMOAnalytics import get_cdrrmo_analytics_data, get_cdrrmo_trends, get_cdrrmo_distribution, get_cdrrmo_causes
-from PNPAnalytics import get_pnp_analytics_data, get_pnp_trends, get_pnp_distribution, get_pnp_causes
-from BFPAnalytics import get_bfp_trends, get_bfp_distribution, get_bfp_causes
+from BarangayCharts import  barangay_charts, barangay_charts_data
+from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data
+from PNPCharts import pnp_charts, pnp_charts_data
+from BFPCharts import bfp_charts, bfp_charts_data
 import random
 import onnxruntime as ort
 
@@ -251,6 +251,103 @@ def handle_heatmap_data(role):
     except Exception as e:
         logger.error(f"Error in handle_heatmap_data: {e}")
         emit('heatmap_data', {'error': str(e)})
+
+@socketio.on('response_update')
+def handle_response(data):
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        manila = pytz.timezone('Asia/Manila')
+        base_time = datetime.now(manila)
+        c.execute('''
+            INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('road_accident_cause'),
+            data.get('road_accident_type'),
+            data.get('weather'),
+            data.get('road_condition'),
+            data.get('vehicle_type'),
+            data.get('driver_age'),
+            data.get('driver_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        c.execute('''
+            INSERT INTO bfp_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('fire_type'),
+            data.get('fire_cause'),
+            data.get('weather'),
+            data.get('fire_severity'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        c.execute('''
+            INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('road_accident_cause'),
+            data.get('road_accident_type'),
+            data.get('weather'),
+            data.get('road_condition'),
+            data.get('vehicle_type'),
+            data.get('driver_age'),
+            data.get('driver_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        c.execute('''
+            INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('road_accident_cause'),
+            data.get('road_accident_type'),
+            data.get('weather'),
+            data.get('road_condition'),
+            data.get('vehicle_type'),
+            data.get('driver_age'),
+            data.get('driver_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        conn.commit()
+        logger.info(f"Response data inserted for alert_id: {data.get('alert_id')}")
+        # Emit updates to respective chart pages
+        from BarangayCharts import handle_barangay_response
+        from BFPCharts import handle_bfp_response
+        from CDRRMOCharts import handle_cdrrmo_response
+        from PNPCharts import handle_pnp_response
+        handle_barangay_response(data)
+        handle_bfp_response(data)
+        handle_cdrrmo_response(data)
+        handle_pnp_response(data)
+    except Exception as e:
+        logger.error(f"Error inserting response data: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 @socketio.on('submit_response')
 def handle_submit_response(data):
@@ -1012,42 +1109,7 @@ def handle_fire_response_submitted(data):
 
 
 # Added handle_fire_analytics_data
-def handle_fire_analytics_data(time_filter, municipality, barangays, role='barangay'):
-    try:
-        weather = {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0}
-        property_types = {'Residential': 0, 'Commercial': 0, 'Industrial': 0, 'Other': 0}
 
-        if time_filter == 'today':
-            today = datetime.now(pytz.timezone('Asia/Manila')).date()
-            for response in today_responses:
-                response_time = datetime.fromisoformat(response.get('timestamp', '').replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-                if (response_time.date() == today and 
-                    response.get('role', '').lower() == role.lower() and 
-                    response.get('emergency_type', '') == 'Fire' and
-                    response.get('barangay', '') in barangays and
-                    response.get('municipality', '').lower() == municipality.lower()):
-                    weather[response.get('weather', 'Unknown')] = weather.get(response.get('weather', 'Unknown'), 0) + 1
-                    property_types[response.get('property_type', 'Unknown')] = property_types.get(response.get('property_type', 'Unknown'), 0) + 1
-        else:
-            mock_data = generate_mock_data(time_filter, 'fire')
-            for record in mock_data:
-                if (record.get('role', '').lower() == role.lower() and 
-                    record.get('emergency_type', '') == 'Fire' and
-                    record.get('barangay', '') in barangays and
-                    record.get('municipality', '').lower() == municipality.lower()):
-                    weather[record.get('weather', 'Unknown')] = weather.get(record.get('weather', 'Unknown'), 0) + 1
-                    property_types[record.get('property_type', 'Unknown')] = property_types.get(record.get('property_type', 'Unknown'), 0) + 1
-
-        return {
-            'weather': weather,
-            'property_types': property_types
-        }
-    except Exception as e:
-        logger.error(f"Error in handle_fire_analytics_data: {e}")
-        return {
-            'weather': {'Sunny': 0, 'Rainy': 0, 'Foggy': 0, 'Cloudy': 0},
-            'property_types': {'Residential': 0, 'Commercial': 0, 'Industrial': 0, 'Other': 0}
-        }
 
 
 @socketio.on('submit_barangay_data')
@@ -1528,32 +1590,7 @@ def export_alerts():
         json.dump(alerts, f, indent=4)
     return jsonify({"status": "success", "file": "alerts.json"})
 
-@app.route('/api/analytics')
-def get_analytics():
-    try:
-        role = request.args.get('role', 'all')
-        if role == 'barangay':
-            trends = get_barangay_trends()
-            distribution = get_barangay_distribution()
-            causes = get_barangay_causes()
-        elif role == 'cdrrmo':
-            trends = get_cdrrmo_trends()
-            distribution = get_cdrrmo_distribution()
-            causes = get_cdrrmo_causes()
-        elif role == 'pnp':
-            trends = get_pnp_trends()
-            distribution = get_pnp_distribution()
-            causes = get_pnp_causes()
-        elif role == 'bfp':
-            trends = get_bfp_trends()
-            distribution = get_bfp_distribution()
-            causes = get_bfp_causes()
-        else:
-            return jsonify({'error': 'Invalid role'}), 400
-        return jsonify({'trends': trends, 'distribution': distribution, 'causes': causes})
-    except Exception as e:
-        logger.error(f"Error in get_analytics: {e}")
-        return jsonify({'error': 'Failed to retrieve analytics'}), 500
+
 
 
 
@@ -1724,141 +1761,6 @@ def bfp_dashboard():
 
 
 
-@app.route('/barangay/analytics')
-def barangay_analytics():
-    if 'role' not in session or session['role'] != 'barangay':
-        logger.warning("Unauthorized access to barangay_analytics")
-        return redirect(url_for('login'))
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('SELECT barangay FROM users WHERE barangay = ? AND contact_no = ?',
-                        (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    barangay = user['barangay'] if user else "Unknown"
-    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    return render_template('BarangayAnalytics.html', barangay=barangay, current_datetime=current_datetime)
-
-@app.route('/bfp/analytics')
-def bfp_analytics():
-    if 'role' not in session or session['role'] != 'bfp':
-        logger.warning("Unauthorized access to bfp_analytics")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
-                        ('bfp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    municipality = user['assigned_municipality'] if user else "Unknown"
-    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
-    return render_template('BFPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
-
-@app.route('/cdrrmo/analytics')
-def cdrrmo_analytics():
-    if 'role' not in session or session['role'] != 'cdrrmo':
-        logger.warning("Unauthorized access to cdrrmo_analytics")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
-                        ('cdrrmo', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    municipality = user['assigned_municipality'] if user else "Unknown"
-    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
-    return render_template('CDRRMOAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
-
-
-
-@app.route('/pnp/analytics')
-def pnp_analytics():
-    if 'role' not in session or session['role'] != 'pnp':
-        logger.warning("Unauthorized access to pnp_analytics")
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
-    unique_id = session.get('unique_id')
-    conn = get_db_connection()
-    user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?',
-                        ('pnp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
-    conn.close()
-    municipality = user['assigned_municipality'] if user else "Unknown"
-    current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%a/%m/%d/%y %H:%M:%S')
-    barangays = ["Barangay 1", "Barangay 2", "Barangay 3"]
-    return render_template('PNPAnalytics.html', municipality=municipality, current_datetime=current_datetime, barangays=barangays)
-
-@app.route('/api/barangay_analytics_data')
-def barangay_analytics_data():
-    from BarangayAnalytics import get_barangay_analytics_data
-    time_filter = request.args.get('time', 'today')
-    barangay = request.args.get('barangay', '')
-    date = request.args.get('date')
-    week_start = request.args.get('week_start')
-    try:
-        data = get_barangay_analytics_data(time_filter, barangay)
-        if date:
-            data = get_barangay_analytics_data('daily', barangay)
-        elif week_start:
-            data = get_barangay_analytics_data('weekly', barangay)
-        return jsonify(data)
-    except Exception as e:
-        logger.error(f"Error in barangay_analytics_data: {e}")
-        return jsonify({'error': 'Failed to fetch analytics data'}), 500
-
-@app.route('/api/cdrrmo_analytics_data')
-def cdrrmo_analytics_data():
-    from CDRRMOAnalytics import get_cdrrmo_analytics_data
-    time_filter = request.args.get('time', 'today')
-    municipality = request.args.get('municipality', '')
-    date = request.args.get('date')
-    week_start = request.args.get('week_start')
-    try:
-        data = get_cdrrmo_analytics_data(time_filter, municipality)
-        if date:
-            data = get_cdrrmo_analytics_data('daily', municipality)
-        elif week_start:
-            data = get_cdrrmo_analytics_data('weekly', municipality)
-        return jsonify(data)
-    except Exception as e:
-        logger.error(f"Error in cdrrmo_analytics_data: {e}")
-        return jsonify({'error': 'Failed to fetch analytics data'}), 500
-
-@app.route('/api/pnp_analytics_data')
-def pnp_analytics_data():
-    from PNPAnalytics import get_pnp_analytics_data
-    time_filter = request.args.get('time', 'today')
-    municipality = request.args.get('municipality', '')
-    date = request.args.get('date')
-    week_start = request.args.get('week_start')
-    try:
-        data = get_pnp_analytics_data(time_filter, municipality)
-        if date:
-            data = get_pnp_analytics_data('daily', municipality)
-        elif week_start:
-            data = get_pnp_analytics_data('weekly', municipality)
-        return jsonify(data)
-    except Exception as e:
-        logger.error(f"Error in pnp_analytics_data: {e}")
-        return jsonify({'error': 'Failed to fetch analytics data'}), 500
-
-@app.route('/api/bfp_analytics_data', methods=['GET'])
-def get_bfp_analytics_data():
-    try:
-        time_filter = request.args.get('time', 'weekly')
-        barangay = request.args.get('barangay', '')
-        trends = get_bfp_trends(time_filter, barangay)
-        distribution = get_bfp_distribution(time_filter, barangay)
-        causes = get_bfp_causes(time_filter, barangay)
-        
-        return jsonify({
-            'trends': trends,
-            'distribution': distribution,
-            'causes': causes
-        })
-    except Exception as e:
-        logger.error(f"Error in get_bfp_analytics_data: {e}")
-        return jsonify({'error': 'Failed to retrieve analytics data'}), 500
-
-
-
 
 def get_latest_alert():
     try:
@@ -1901,7 +1803,14 @@ def get_bfp_stats():
         logger.error(f"Error in get_bfp_stats: {e}")
         return Counter()
 
-
+app.route('/barangay_charts')(barangay_charts)
+app.route('/barangay_charts_data')(barangay_charts_data)
+app.route('/cdrrmo_charts')(cdrrmo_charts)
+app.route('/cdrrmo_charts_data')(cdrrmo_charts_data)
+app.route('/pnp_charts')(pnp_charts)
+app.route('/pnp_charts_data')(pnp_charts_data)
+app.route('/bfp_charts')(bfp_charts)
+app.route('/bfp_charts_data')(bfp_charts_data)
 
 
 if __name__ == '__main__':

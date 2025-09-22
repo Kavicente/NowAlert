@@ -16,7 +16,7 @@
         .response-form { margin-top: 10px; }
         .response-form select, .response-form button { margin: 5px; }
         .clickable-img { cursor: pointer; max-width: 200px; }
-        .prediction { margin-top: 10px; font-weight: bold; }
+        .prediction { margin-top: 10px; font-weight: bold; color: #ffffff;}
         .image-modal {
             display: none;
             position: fixed;
@@ -51,7 +51,7 @@
                 <li><a href="{{ url_for('pnp_dashboard') }}"><span>🏠</span> Dashboard</a></li>
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
-                <li><a href="{{ url_for('pnp_analytics') }}"><span>📊</span> Manage Reports</a></li>
+                <li><a href="{{ url_for('pnp_charts') }}"><span>📊</span> Manage Reports</a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
