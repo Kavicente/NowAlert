@@ -923,6 +923,35 @@ def handle_pnp_response_submitted(data):
         
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
+    try:
+        logger.info(f"Received BFP response: {data}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO bfp_response (alert_id, fire_type, 
+            fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('fire_type'),
+            data.get('fire_cause'),
+            data.get('weather'),
+            data.get('fire_severity'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            data.get('timestamp'),
+            data.get('responded', True)
+        ))
+        conn.commit()
+        conn.close()
+
+        # Emit response to dashboard for prediction
+        emit('bfp_response', data, room=data.get('barangay', 'default_room'))
+    except Exception as e:
+        logger.error(f"Error storing bfp response: {e}")
+    
     logger.info(f"Received fire response: {data}")
     logger.debug(f"Processing fire response for alert_id: {data.get('alert_id')}")
     default_values = {}
@@ -1891,6 +1920,22 @@ if __name__ == '__main__':
                 vehicle_type TEXT,
                 driver_age TEXT,
                 driver_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS bfp_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                fire_type TEXT,
+                fire_cause TEXT,
+                weather TEXT,
+                fire_severity TEXT,
                 lat REAL,
                 lon REAL,
                 barangay TEXT,
