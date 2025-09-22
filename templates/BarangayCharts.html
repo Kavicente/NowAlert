@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Barangay Charts - {{ barangay }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/charts.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+    <header>
+        <h1>Barangay {{ barangay }} Charts</h1>
+        <p id="datetime">{{ current_datetime }}</p>
+    </header>
+    <div class="sidebar" id="sidebar">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('barangay_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('barangay_charts') }}">Charts</a></li>
+            </ul>
+        </nav>
+    </div>
+    <main class="main-content" id="mainContent">
+        <div class="tabs">
+            <button class="tab active" onclick="filterData('today')">Today</button>
+            <button class="tab" onclick="filterData('daily')">Daily</button>
+            <button class="tab" onclick="filterData('weekly')">Weekly</button>
+            <button class="tab" onclick="filterData('monthly')">Monthly</button>
+            <button class="tab" onclick="filterData('yearly')">Yearly</button>
+        </div>
+        <div id="chartSection" class="section">
+            <div class="chart-container"><h2>Road Accident Cause Chart</h2><canvas id="causeChart"></canvas></div>
+            <div class="chart-container"><h2>Road Accident Type Chart</h2><canvas id="typeChart"></canvas></div>
+            <div class="chart-container"><h2>Driver Gender Chart</h2><canvas id="genderChart"></canvas></div>
+            <div class="chart-container"><h2>Vehicle Type Chart</h2><canvas id="vehicleChart"></canvas></div>
+            <div class="chart-container"><h2>Driver Age Chart</h2><canvas id="ageChart"></canvas></div>
+            <div class="chart-container"><h2>Road Condition Chart</h2><canvas id="conditionChart"></canvas></div>
+        </div>
+    </main>
+    <script>
+        const socket = io.connect('https://alertnow-t1kg.onrender.com' + document.domain + ':' + location.port);
+        let charts = {};
+        const ctxs = {
+            causeChart: document.getElementById('causeChart').getContext('2d'),
+            typeChart: document.getElementById('typeChart').getContext('2d'),
+            genderChart: document.getElementById('genderChart').getContext('2d'),
+            vehicleChart: document.getElementById('vehicleChart').getContext('2d'),
+            ageChart: document.getElementById('ageChart').getContext('2d'),
+            conditionChart: document.getElementById('conditionChart').getContext('2d')
+        };
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
+        function initCharts(data) {
+            charts.causeChart = new Chart(ctxs.causeChart, { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.typeChart = new Chart(ctxs.typeChart, { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.genderChart = new Chart(ctxs.genderChart, { type: 'doughnut', data: data.gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.vehicleChart = new Chart(ctxs.vehicleChart, { type: 'bar', data: data.vehicle, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.ageChart = new Chart(ctxs.ageChart, { type: 'line', data: data.age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.conditionChart = new Chart(ctxs.conditionChart, { type: 'polarArea', data: data.condition, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+        }
+
+        function updateCharts(data) {
+            charts.causeChart.data = data.cause;
+            charts.typeChart.data = data.type;
+            charts.genderChart.data = data.gender;
+            charts.vehicleChart.data = data.vehicle;
+            charts.ageChart.data = data.age;
+            charts.conditionChart.data = data.condition;
+            Object.values(charts).forEach(chart => chart.update());
+        }
+
+        socket.on('barangay_response_update', (data) => {
+            if (document.querySelector('.tab.active').textContent === 'Today') {
+                updateCharts(data);
+            }
+        });
+
+        function filterData(timeFilter) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            fetch(`/barangay_charts_data?time_filter=${timeFilter}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (charts.causeChart) Object.values(charts).forEach(chart => chart.destroy());
+                    initCharts(data);
+                });
+        }
+
+        window.onload = () => filterData('today');
+    </script>
+</body>
+</html>
