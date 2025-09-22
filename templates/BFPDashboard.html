@@ -203,8 +203,7 @@
                     alertElements.set(data.alert_id, alertDiv);
                     let displayTime;
                     try {
-                        const serverTime = new Date(data.timestamp || Date.now());
-                        displayTime = serverTime.toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
+                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });  // Updated to current time
                     } catch (e) {
                         console.error('Error parsing timestamp:', e);
                         displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });

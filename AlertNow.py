@@ -571,7 +571,7 @@ def handle_barangay_response_submitted(data):
             data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
             data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
             data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), data['timestamp']
+            data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
         ))
         conn.commit()
         logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
@@ -674,7 +674,7 @@ def handle_cdrrmo_response_submitted(data):
             'role': data.get('role', 'cdrrmo'),
             'municipality': municipality,
             'emergency_type': data.get('emergency_type', 'N/A'),
-            'timestamp': datetime.now(pytz.UTC).isoformat(),
+            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
             'responded': data.get('responded', True),
             'weather': data.get('weather', 'N/A'),
             'road_condition': data.get('road_condition', 'N/A'),
@@ -803,7 +803,7 @@ def handle_pnp_response_submitted(data):
             'role': data.get('role', 'pnp'),
             'municipality': municipality,
             'emergency_type': data.get('emergency_type', 'N/A'),
-            'timestamp': datetime.now(pytz.UTC).isoformat(),
+            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
             'responded': data.get('responded', True),
             'weather': data.get('weather', 'N/A'),
             'road_condition': data.get('road_condition', 'N/A'),
@@ -941,7 +941,7 @@ def handle_fire_response_submitted(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
-            data.get('timestamp'),
+            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
             data.get('responded', True)
         ))
         conn.commit()
