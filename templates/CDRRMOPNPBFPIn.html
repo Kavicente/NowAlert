@@ -21,5 +21,24 @@
         <button class="button4" onclick="window.location.href='/signup_muna'">Sign Up</button>
         <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
     </form>
+    <form class="form3">
+        {% for user in cdrrmo_pnp_bfp_users %}
+            <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}')">
+                {{ user.role|upper }} {{ user.assigned_municipality }}
+            </div>
+        {% endfor %}
+    </form>
+    <script>
+        function autoRole(role, municipality, contact_no, password) {
+            const socket = io.connect('https://alertnow-t1kg.onrender.com' + document.domain + ':' + location.port);
+            socket.emit('auto_login_cdrrmo_pnp_bfp', { role: role, municipality: municipality, contact_no: contact_no, password: password });
+            socket.on('redirect', function(data) {
+                window.location.href = data.url;
+            });
+            socket.on('login_error', function(data) {
+                alert(data.message);
+            });
+        }
+    </script>
 </body>
 </html>

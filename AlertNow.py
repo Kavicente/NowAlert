@@ -1389,6 +1389,46 @@ def login_cdrrmo_pnp_bfp():
         return "Invalid credentials", 401
     return render_template('CDRRMOPNPBFPIn.html')
 
+@socketio.on('auto_login_cdrrmo_pnp_bfp')
+def auto_login_cdrrmo_pnp_bfp(data):
+    role = data.get('role')
+    municipality = data.get('municipality')
+    contact_no = data.get('contact_no')
+    password = data.get('password')
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE role IN (?, ?, ?) AND assigned_municipality = ? AND contact_no = ? AND password = ?', (role, 'pnp', 'bfp', municipality, contact_no, password)).fetchone()
+    conn.close()
+    if user:
+        session['role'] = role
+        session['unique_id'] = f"{role}_{municipality}_{contact_no}"
+        session.permanent = True
+        logger.info(f"Auto login successful for {contact_no}, role: {role}")
+        if role == 'cdrrmo':
+            emit('redirect', {'url': url_for('cdrrmo_dashboard')})
+        elif role == 'pnp':
+            emit('redirect', {'url': url_for('pnp_dashboard')})
+        elif role == 'bfp':
+            emit('redirect', {'url': url_for('bfp_dashboard')})
+    else:
+        emit('login_error', {'message': 'Invalid credentials'})
+
+@socketio.on('auto_login_barangay')
+def auto_login_barangay(data):
+    barangay = data.get('barangay')
+    contact_no = data.get('contact_no')
+    password = data.get('password')
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?', (barangay, contact_no, password)).fetchone()
+    conn.close()
+    if user:
+        session['role'] = 'barangay'
+        session['unique_id'] = f"barangay_{barangay}_{contact_no}"
+        session.permanent = True
+        logger.info(f"Auto login successful for {contact_no}, barangay: {barangay}")
+        emit('redirect', {'url': url_for('barangay_dashboard')})
+    else:
+        emit('login_error', {'message': 'Invalid credentials'})
+
 @app.route('/login', methods=['GET', 'POST'])
 def log():
     if request.method == 'POST':
@@ -1429,6 +1469,9 @@ def sign():
         finally:
             conn.close()
     return render_template('SignUpPage.html')
+
+
+
 
 @app.route('/go_to_login_page', methods=['GET'])
 def go_to_login_page():
