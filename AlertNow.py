@@ -46,8 +46,24 @@ except FileNotFoundError:
 except Exception as e:
     logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
+crime_predictor = None
+try:
+    crime_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Crime Models', 'crime_predictor_lr.pkl'))
+    logger.info("crime_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("crime_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading crime_predictor_lr.pkl: {e}")
 
 
+health_predictor = None
+try:
+    health_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Health Models', 'health_predictor_lr.pkl'))
+    logger.info("health_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("health_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading health_predictor_lr.pkl: {e}")
 
 
 road_accident_df = pd.DataFrame()
@@ -210,7 +226,7 @@ def admin_create_user():
         conn.execute('INSERT INTO users (role, contact_no, password, barangay, assigned_municipality) VALUES (?, ?, ?, ?, ?)',
                     (role, contact_no, password, barangay, municipality))
         conn.commit()
-        logger.info(f"User created with contact_no: {contact_no}, role: {role}")
+        logger.info(f"User created with contact_no: {contact_no}, role: {role}, barangay: {barangay}, municipality: {municipality}")
     except sqlite3.IntegrityError:
         conn.close()
         logger.error(f"User creation failed, contact_no {contact_no} already exists")
@@ -230,6 +246,16 @@ def admin_delete_user(contact_no):
     logger.info(f"User deleted with contact_no: {contact_no}")
     return jsonify({'message': 'User deleted successfully'})
 
+@app.route('/debug/users', methods=['GET'])
+def debug_users():
+    if 'role' not in session or session['role'] != 'admin':
+        logger.warning("Unauthorized access to debug_users")
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db_connection()
+    users = conn.execute('SELECT role, barangay, contact_no, assigned_municipality, province FROM users').fetchall()
+    conn.close()
+    logger.debug(f"Debug users: {[dict(row) for row in users]}")
+    return jsonify([dict(row) for row in users])
 
 @socketio.on('request_heatmap_data')
 def handle_heatmap_data(role):
@@ -1375,7 +1401,7 @@ def login_cdrrmo_pnp_bfp():
         conn.close()
         
         if user:
-            unique_id = construct_unique_id(user['role'], assigned_municipality=assigned_municipality, contact_no=contact_no)
+            unique_id = f"{role}_{assigned_municipality}_{contact_no}"
             session['unique_id'] = unique_id
             session['role'] = user['role']
             logger.debug(f"Web login successful for user: {unique_id} ({user['role']})")
@@ -1387,70 +1413,62 @@ def login_cdrrmo_pnp_bfp():
                 return redirect(url_for('bfp_dashboard'))
         logger.warning(f"Web login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
         return "Invalid credentials", 401
-    return render_template('CDRRMOPNPBFPIn.html')
+    conn = get_db_connection()
+    cdrrmo_pnp_bfp_users = conn.execute('SELECT role, assigned_municipality, contact_no, password FROM users WHERE role IN (?, ?, ?)', ('cdrrmo', 'pnp', 'bfp')).fetchall()
+    logger.debug(f"Retrieved {len(cdrrmo_pnp_bfp_users)} CDRRMO/PNP/BFP users: {[dict(row) for row in cdrrmo_pnp_bfp_users]}")
+    conn.close()
+    return render_template('CDRRMOPNPBFPIn.html', cdrrmo_pnp_bfp_users=cdrrmo_pnp_bfp_users)
 
-@socketio.on('auto_login_cdrrmo_pnp_bfp')
-def auto_login_cdrrmo_pnp_bfp(data):
-    role = data.get('role')
+@app.route('/auto_role', methods=['POST'])
+def auto_role():
+    data = request.form
+    role = data.get('role').lower()
     municipality = data.get('municipality')
     contact_no = data.get('contact_no')
     password = data.get('password')
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE role IN (?, ?, ?) AND assigned_municipality = ? AND contact_no = ? AND password = ?', (role, 'pnp', 'bfp', municipality, contact_no, password)).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ?', (role, municipality, contact_no, password)).fetchone()
     conn.close()
     if user:
         session['role'] = role
         session['unique_id'] = f"{role}_{municipality}_{contact_no}"
         session.permanent = True
-        logger.info(f"Auto login successful for {contact_no}, role: {role}")
+        logger.info(f"Auto login successful for {role} with contact_no: {contact_no}")
         if role == 'cdrrmo':
-            emit('redirect', {'url': url_for('cdrrmo_dashboard')})
+            return redirect(url_for('cdrrmo_dashboard'))
         elif role == 'pnp':
-            emit('redirect', {'url': url_for('pnp_dashboard')})
+            return redirect(url_for('pnp_dashboard'))
         elif role == 'bfp':
-            emit('redirect', {'url': url_for('bfp_dashboard')})
-    else:
-        emit('login_error', {'message': 'Invalid credentials'})
+            return redirect(url_for('bfp_dashboard'))
+    logger.warning(f"Auto login failed for {role} with contact_no: {contact_no}")
+    return "Invalid credentials", 401
 
-@socketio.on('auto_login_barangay')
-def auto_login_barangay(data):
-    barangay = data.get('barangay')
-    contact_no = data.get('contact_no')
-    password = data.get('password')
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?', (barangay, contact_no, password)).fetchone()
-    conn.close()
-    if user:
-        session['role'] = 'barangay'
-        session['unique_id'] = f"barangay_{barangay}_{contact_no}"
-        session.permanent = True
-        logger.info(f"Auto login successful for {contact_no}, barangay: {barangay}")
-        emit('redirect', {'url': url_for('barangay_dashboard')})
-    else:
-        emit('login_error', {'message': 'Invalid credentials'})
+
+    
+    
 
 @app.route('/login', methods=['GET', 'POST'])
 def log():
     if request.method == 'POST':
-        username = request.form['username']
+        barangay = request.form['barangay']
+        contact_no = request.form['contact_no']
         password = request.form['password']
         conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
+        user = conn.execute('SELECT * FROM users WHERE barangay = ? AND contact_no = ? AND password = ?', (barangay, contact_no, password)).fetchone()
         conn.close()
         if user:
-            session['username'] = username
-            session['role'] = user['role']
-            session['barangay'] = user['barangay']
-            if user['role'] == 'official':
-                return redirect(url_for('barangay_dashboard'))
-            elif user['role'] == 'cdrrmo':
-                return redirect(url_for('cdrrmo_dashboard'))
-            elif user['role'] == 'pnp':
-                return redirect(url_for('pnp_dashboard'))
-            elif user['role'] == 'bfp':
-                return redirect(url_for('bfp_dashboard'))
+            session['role'] = 'barangay'
+            session['unique_id'] = f"barangay_{barangay}_{contact_no}"
+            session.permanent = True
+            logger.info(f"Web login successful for barangay: {barangay}")
+            return redirect(url_for('barangay_dashboard'))
+        logger.warning(f"Web login failed for barangay: {barangay}")
         return "Invalid credentials", 401
-    return render_template('LoginPage.html')
+    conn = get_db_connection()
+    barangay_users = conn.execute('SELECT barangay, contact_no, password FROM users WHERE role = ?', ('barangay',)).fetchall()
+    logger.debug(f"Retrieved {len(barangay_users)} Barangay users: {[dict(row) for row in barangay_users]}")
+    conn.close()
+    return render_template('LogInPage.html', barangay_users=barangay_users)
 
 @app.route('/signup', methods=['GET', 'POST'])
 def sign():
@@ -1461,11 +1479,16 @@ def sign():
         conn = get_db_connection()
         try:
             conn.execute('INSERT INTO users (username, barangay, role, password) VALUES (?, ?, ?, ?)',
-                         (username, barangay, 'official', password))
+                         (username, barangay, 'barangay', password))
             conn.commit()
+            logger.info(f"Signup successful for barangay: {barangay}, username: {username}")
             return redirect(url_for('login'))
         except sqlite3.IntegrityError:
+            logger.error(f"Signup failed for {barangay}: Username already exists")
             return "Username already exists", 400
+        except Exception as e:
+            logger.error(f"Signup failed for {barangay}: {e}", exc_info=True)
+            return f"Signup failed: {e}", 500
         finally:
             conn.close()
     return render_template('SignUpPage.html')
