@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>BFP Charts - {{ barangay }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/fcharts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/charts.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 </head>
@@ -54,10 +54,10 @@
         }
 
         function initCharts(data) {
-            charts.causeChart = new Chart(ctxs.causeChart, { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.typeChart = new Chart(ctxs.typeChart, { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.weatherChart = new Chart(ctxs.weatherChart, { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.severityChart = new Chart(ctxs.severityChart, { type: 'polarArea', data: data.severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.causeChart = new Chart(ctxs.causeChart, { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.typeChart = new Chart(ctxs.typeChart, { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.weatherChart = new Chart(ctxs.weatherChart, { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.severityChart = new Chart(ctxs.severityChart, { type: 'bar', data: data.severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
         function updateCharts(data) {
@@ -69,7 +69,7 @@
         }
 
         socket.on('bfp_response_update', (data) => {
-            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today') {
+            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today' && '{{ barangay }}' === data.barangay) {
                 updateCharts(data);
             }
         });
@@ -77,8 +77,7 @@
         function filterData(timeFilter) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
-            const barangay = '{{ barangay }}'; // Use Jinja variable for barangay
-            fetch(`/bfp_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(barangay)}`)
+            fetch(`/bfp_charts_data?time_filter=${timeFilter}&barangay={{ barangay }}`)
                 .then(response => response.json())
                 .then(data => {
                     if (charts.causeChart) Object.values(charts).forEach(chart => chart.destroy());

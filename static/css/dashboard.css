@@ -22,7 +22,7 @@ header {
 }
 .p {
     font-family: Arial, sans-serif;
-    color:#ffffff;
+    color:#000000;
 }
 header h1 {
     font-size: 2.5em;
@@ -30,7 +30,7 @@ header h1 {
 }
 .h2 {
     font-size: 1.5em;
-    color: #ffffff;
+    color: #000000;
 }
 h3 {
     font-size: 1.5em;
@@ -95,8 +95,8 @@ main {
     width: 87%;
     margin-top: 76px;  
     margin-left: 260px;           /* Retain original padding */
-    background: linear-gradient(135deg, #34495e, #2c3e50);
-    border: 2px solid #3498db;      /* Rounded corners */
+    background-color: #ffffff; /* Light gray background */
+          /* Rounded corners */
     box-sizing: border-box;    /* Include padding and border in size */
    transition: left 0.3s ease, width 0.3s ease;
     -ms-overflow-style: none;  /* IE and Edge */

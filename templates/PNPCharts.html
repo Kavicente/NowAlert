@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PNP Charts</title>
+    <title>PNP Charts - {{ barangay }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/charts.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
@@ -10,7 +10,7 @@
 <body>
     <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
     <header>
-        <h1>PNP Charts</h1>
+        <h1>PNP {{ barangay }} Charts</h1>
         <p id="datetime">{{ current_datetime }}</p>
     </header>
     <div class="sidebar" id="sidebar">
@@ -29,12 +29,8 @@
             <button class="tab" onclick="filterData('monthly')">Monthly</button>
             <button class="tab" onclick="filterData('yearly')">Yearly</button>
         </div>
-        <div class="tabs" style="overflow-x: auto; white-space: nowrap;">
-            {% for barangay in barangays %}
-            <button class="tab" onclick="filterBarangay('{{ barangay }}')">{{ barangay }}</button>
-            {% endfor %}
-        </div>
         <div id="chartSection" class="section">
+            <div class="chart-container"><h2>Barangay Chart</h2><canvas id="barangayChart"></canvas></div>
             <div class="chart-container"><h2>Road Accident Cause Chart</h2><canvas id="causeChart"></canvas></div>
             <div class="chart-container"><h2>Road Accident Type Chart</h2><canvas id="typeChart"></canvas></div>
             <div class="chart-container"><h2>Driver Gender Chart</h2><canvas id="genderChart"></canvas></div>
@@ -46,24 +42,15 @@
     <script>
         const socket = io.connect('https://alertnow-t1kg.onrender.com' + document.domain + ':' + location.port);
         let charts = {};
-        const ctxs = {};
-        const barangays = [
-            'I-A (Sambat)', 'I-B (City Sub Riverside)', 'I-C (Bagong Bayan)', 'II-A (Triangulo/ Guadalupe 2)', 'II-B (Guadalupe 1)',
-            'II-C (Unson)', 'II-D (Bulante)', 'II-E (San Anton)', 'II-F (Villa Rey)', 'III-A (Hermanos Belen)', 'III-B',
-            'III-C (Labak/De Roma)', 'III-D (Villongco)', 'III-E', 'III-F (Balagtas)', 'IV-A', 'IV-B', 'IV-C', 'V-A', 'V-B',
-            'V-C', 'V-D', 'VI-A (Mavenida)', 'VI-B (Sabang Mabini)', 'VI-C (Bagong Pook)', 'VI-D (Lakeside)', 'VI-E (YMCA)',
-            'VII-A (P.Alcantara)', 'VII-B', 'VII-C', 'VII-D', 'VII-E', 'Atisan', 'Bautista', 'Concepcion (Bunot)',
-            'Del Remedio (Wawa)', 'Dolores', 'San Antonio 1 (Balanga)', 'San Antonio 2 (Sapa)', 'San Bartolome (Matang-ag)',
-            'San Buenaventura (Palakpakin)', 'San Crispin (Lumbangan)', 'San Cristobal', 'San Diego (Tiim)',
-            'San Francisco (Calihan)', 'San Gabriel (Butucan)', 'San Gregorio', 'San Ignacio', 'San Isidro (Balagbag)',
-            'San Joaquin', 'San Jose (Malamig)', 'San Juan (Putol)', 'San Lorenzo (Saluyan)', 'San Lucas 1 (Malinaw)',
-            'San Lucas 2 (Malinaw)', 'San Marcos (Tikew)', 'San Mateo (Imok)', 'San Miguel (Balatuin)',
-            'San Nicolas (Mag-ampon)', 'San Pedro', 'San Rafael (Buluburan)', 'San Roque (Sambat)', 'San Vicente',
-            'Santa Ana', 'Santa Catalina (Sandig)', 'Santa Cruz (Putol)', 'Santa Elena', 'Santa Filomena (Banlagin)',
-            'Santa Isabel', 'Santa Maria', 'Santa Maria Magdalena (Boe / Kuba)', 'Santa Monica', 'Santa Veronica (Bae)',
-            'Santiago I (Bulaho)', 'Santiago II (Bulaho)', 'Santisimo Rosario (Balagbag)', 'Santo Angel (Ilog)',
-            'Santo Cristo', 'Santo Niño (Arsum)', 'Soledad (Macopa)'
-        ];
+        const ctxs = {
+            barangayChart: document.getElementById('barangayChart').getContext('2d'),
+            causeChart: document.getElementById('causeChart').getContext('2d'),
+            typeChart: document.getElementById('typeChart').getContext('2d'),
+            genderChart: document.getElementById('genderChart').getContext('2d'),
+            vehicleChart: document.getElementById('vehicleChart').getContext('2d'),
+            ageChart: document.getElementById('ageChart').getContext('2d'),
+            conditionChart: document.getElementById('conditionChart').getContext('2d')
+        };
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -73,22 +60,17 @@
         }
 
         function initCharts(data) {
-            ctxs.causeChart = document.getElementById('causeChart').getContext('2d');
-            ctxs.typeChart = document.getElementById('typeChart').getContext('2d');
-            ctxs.genderChart = document.getElementById('genderChart').getContext('2d');
-            ctxs.vehicleChart = document.getElementById('vehicleChart').getContext('2d');
-            ctxs.ageChart = document.getElementById('ageChart').getContext('2d');
-            ctxs.conditionChart = document.getElementById('conditionChart').getContext('2d');
-
-            charts.causeChart = new Chart(ctxs.causeChart, { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.typeChart = new Chart(ctxs.typeChart, { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.genderChart = new Chart(ctxs.genderChart, { type: 'doughnut', data: data.gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.vehicleChart = new Chart(ctxs.vehicleChart, { type: 'bar', data: data.vehicle, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.ageChart = new Chart(ctxs.ageChart, { type: 'line', data: data.age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
-            charts.conditionChart = new Chart(ctxs.conditionChart, { type: 'polarArea', data: data.condition, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } } } } });
+            charts.barangayChart = new Chart(ctxs.barangayChart, { type: 'bar', data: data.barangay, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.causeChart = new Chart(ctxs.causeChart, { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.typeChart = new Chart(ctxs.typeChart, { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.genderChart = new Chart(ctxs.genderChart, { type: 'doughnut', data: data.gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.vehicleChart = new Chart(ctxs.vehicleChart, { type: 'bar', data: data.vehicle, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.ageChart = new Chart(ctxs.ageChart, { type: 'doughnut', data: data.age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts.conditionChart = new Chart(ctxs.conditionChart, { type: 'polarArea', data: data.condition, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
         function updateCharts(data) {
+            charts.barangayChart.data = data.barangay;
             charts.causeChart.data = data.cause;
             charts.typeChart.data = data.type;
             charts.genderChart.data = data.gender;
@@ -99,7 +81,7 @@
         }
 
         socket.on('pnp_response_update', (data) => {
-            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today' && document.querySelector('.tabs button.active')?.textContent === data.barangay) {
+            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today' && '{{ barangay }}' === data.barangay) {
                 updateCharts(data);
             }
         });
@@ -107,20 +89,7 @@
         function filterData(timeFilter) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
-            const activeBarangay = document.querySelector('.tabs button.active')?.textContent || barangays[0];
-            fetch(`/pnp_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(activeBarangay)}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (charts.causeChart) Object.values(charts).forEach(chart => chart.destroy());
-                    initCharts(data);
-                });
-        }
-
-        function filterBarangay(barangay) {
-            document.querySelectorAll('.tabs button').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.tab[onclick="filterBarangay('${barangay}')"]`).classList.add('active');
-            const activeTimeFilter = document.querySelector('.tab.active')?.textContent.toLowerCase() || 'today';
-            fetch(`/pnp_charts_data?time_filter=${activeTimeFilter}&barangay=${encodeURIComponent(barangay)}`)
+            fetch(`/pnp_charts_data?time_filter=${timeFilter}&barangay={{ barangay }}`)
                 .then(response => response.json())
                 .then(data => {
                     if (charts.causeChart) Object.values(charts).forEach(chart => chart.destroy());
@@ -130,7 +99,6 @@
 
         window.onload = () => {
             filterData('today');
-            document.querySelector('.tabs button').classList.add('active');
         };
     </script>
 </body>
