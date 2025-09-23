@@ -100,3 +100,28 @@ body {
 .form2 button:hover {
     background-color: #66c2ff;
 }
+
+.form3 {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 300px;
+    text-align: center;
+    margin-left: 20px;
+    position: absolute;
+    top: 80px;
+    right: 10px; /* Place right side of form2 */
+}
+
+.form3 .role-item {
+    padding: 10px;
+    margin: 5px 0;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.form3 .role-item:hover {
+    background-color: #d0d0d0;
+}
