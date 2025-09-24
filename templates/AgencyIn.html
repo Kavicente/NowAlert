@@ -6,12 +6,25 @@
 </head>
 <body>
     <h1 class="h1">Log In CDRRMO or PNP or BFP</h1>
-    <form class="form2" action="/login_cdrrmo_pnp_bfp" method="post">
+    <form class="form2" action="/login_agency" method="post">
         <label>Role: 
-            <select name="role" required>
+            <select name="role" id="role" required class="select-role">
                 <option value="cdrrmo">CDRRMO</option>
                 <option value="pnp">PNP</option>
                 <option value="bfp">BFP</option>
+                <option value="city health">City Health</option>
+                <option value="hospital">Hospital</option>
+            </select>
+        </label><br>
+        <label id="hospital-label" style="display: none;">Assigned Hospital: 
+            <select name="assigned_hospital" id="assigned_hospital" class="dropdown-role">
+                <option value="SPC District Hospital">SPC District Hospital</option>
+                <option value="San Pablo Colleges Medical Center">San Pablo Colleges Medical Center</option>
+                <option value="Community General Hospital">Community General Hospital</option>
+                <option value="Immaculate Conception Hospital">Immaculate Conception Hospital</option>
+                <option value="SPC General Hospital">SPC General Hospital</option>
+                <option value="San Pablo Doctors Hospital">San Pablo Doctors Hospital</option>
+                <option value="St. Francis and Paul General Hospital">St. Francis and Paul General Hospital</option>
             </select>
         </label><br>
         <label>Assigned Municipality: <input type="text" name="municipality" required></label><br>
@@ -24,15 +37,23 @@
     <form class="form3" action="/auto_role" method="post">
         {% if cdrrmo_pnp_bfp_users %}
             {% for user in cdrrmo_pnp_bfp_users %}
-                <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}')">
-                    {{ user.role|upper }} {{ user.assigned_municipality }}
+                <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}', '{{ user.assigned_hospital|default('') }}')">
+                    {% if user.role == 'hospital' %}
+                        {{ user.assigned_hospital|upper }} {{ user.assigned_municipality }}
+                    {% else %}
+                        {{ user.role|upper }} {{ user.assigned_municipality }}
+                    {% endif %}
                 </div>
             {% endfor %}
         {% else %}
-            <div class="role-item">No CDRRMO/PNP/BFP users found.</div>
+            <div class="role-item">No CDRRMO/PNP/BFP/City Health/Hospital users found.</div>
         {% endif %}
     </form>
     <script>
+
+
+        
+
         function autoRole(role, municipality, contact_no, password) {
             const form = document.createElement('form');
             form.method = 'POST';
@@ -53,13 +74,27 @@
             passwordInput.type = 'hidden';
             passwordInput.name = 'password';
             passwordInput.value = password;
+            const hospitalInput = document.createElement('input');
+            hospitalInput.type = 'hidden';
+            hospitalInput.name = 'assigned_hospital';
+            hospitalInput.value = assigned_hospital;
             form.appendChild(roleInput);
             form.appendChild(municipalityInput);
             form.appendChild(contactInput);
             form.appendChild(passwordInput);
+            form.appendChild(hospitalInput);
             document.body.appendChild(form);
             form.submit();
         }
+
+        document.getElementById('role').addEventListener('change', function() {
+            const hospitalLabel = document.getElementById('hospital-label');
+            if (this.value === 'hospital') {
+                hospitalLabel.style.display = 'block';
+            } else {
+                hospitalLabel.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>

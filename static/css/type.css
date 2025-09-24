@@ -82,4 +82,6 @@ body {
 
 .form2 button:hover {
     background-color: #66c2ff;
+    transform: scale(1.05);
+
 }

@@ -1343,13 +1343,15 @@ def api_login():
     logger.warning(f"API login failed for unique_id: {unique_id}")
     return jsonify({'error': 'Invalid credentials'}), 401
 
-@app.route('/signup_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
-def signup_cdrrmo_pnp_bfp():
+# Update signup_agency
+@app.route('/signup_agency', methods=['GET', 'POST'])
+def signup_agency():
     if request.method == 'POST':
         role = request.form['role'].lower()
         assigned_municipality = request.form['municipality']
         contact_no = request.form['contact_no']
         password = request.form['password']
+        assigned_hospital = request.form.get('assigned_hospital', '').lower() if role == 'hospital' else None
         unique_id = construct_unique_id(role, assigned_municipality=assigned_municipality, contact_no=contact_no)
         
         conn = get_db_connection()
@@ -1357,53 +1359,57 @@ def signup_cdrrmo_pnp_bfp():
             existing_user = conn.execute('SELECT * FROM users WHERE contact_no = ?', (contact_no,)).fetchone()
             if existing_user:
                 logger.error("Signup failed: Contact number %s already exists", contact_no)
-                return "Contact number already exists", 400
+                return render_template('AgencyUp.html', error="Contact number already exists"), 400
             
             conn.execute('''
-                INSERT INTO users (role, contact_no, assigned_municipality, password)
-                VALUES (?, ?, ?, ?)
-            ''', (role, contact_no, assigned_municipality, password))
+                INSERT INTO users (role, contact_no, assigned_municipality, password, assigned_hospital)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (role, contact_no, assigned_municipality, password, assigned_hospital))
             conn.commit()
             logger.debug("User signed up successfully: %s", unique_id)
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         except sqlite3.IntegrityError as e:
             logger.error("IntegrityError during signup: %s", e)
-            return "User already exists", 400
+            return render_template('AgencyUp.html', error="User already exists"), 400
         except Exception as e:
             logger.error(f"Signup failed for {unique_id}: {e}")
-            return f"Signup failed: {e}", 500
+            return render_template('AgencyUp.html', error=f"Signup failed: {e}"), 500
         finally:
             conn.close()
-    return render_template('CDRRMOPNPBFPUp.html')
+    return render_template('AgencyUp.html')
 
-@app.route('/login_cdrrmo_pnp_bfp', methods=['GET', 'POST'])
-def login_cdrrmo_pnp_bfp():
-    logger.debug("Accessing /login_cdrrmo_pnp_bfp with method: %s", request.method)
+# Update login_agency
+@app.route('/login_agency', methods=['GET', 'POST'])
+def login_agency():
+    logger.debug("Accessing /login_agency with method: %s", request.method)
     if request.method == 'POST':
         role = request.form['role'].lower()
         if 'role' not in request.form:
             logger.error("Role field is missing in the form data")
-            return "Role is required", 400
+            return render_template('AgencyIn.html', error="Role is required", cdrrmo_pnp_bfp_users=[]), 400
         assigned_municipality = request.form['municipality']
         contact_no = request.form['contact_no']
         password = request.form['password']
+        assigned_hospital = request.form.get('assigned_hospital', '').lower() if role == 'hospital' else None
         
-        if role not in ['cdrrmo', 'pnp', 'bfp']:
+        if role not in ['cdrrmo', 'pnp', 'bfp', 'city health', 'hospital']:
             logger.error(f"Invalid role provided: {role}")
-            return "Invalid role", 400
+            return render_template('AgencyIn.html', error="Invalid role", cdrrmo_pnp_bfp_users=[]), 400
         
         logger.debug(f"Login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
         
         conn = get_db_connection()
         user = conn.execute('''
-            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
-        ''', (role, contact_no, password, assigned_municipality)).fetchone()
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ? AND (assigned_hospital = ? OR assigned_hospital IS NULL)
+        ''', (role, contact_no, password, assigned_municipality, assigned_hospital)).fetchone()
         conn.close()
         
         if user:
             unique_id = f"{role}_{assigned_municipality}_{contact_no}"
             session['unique_id'] = unique_id
             session['role'] = user['role']
+            session['municipality'] = user['assigned_municipality']
+            session['assigned_hospital'] = user['assigned_hospital'] if role == 'hospital' else None
             logger.debug(f"Web login successful for user: {unique_id} ({user['role']})")
             if user['role'] == 'cdrrmo':
                 return redirect(url_for('cdrrmo_dashboard'))
@@ -1411,27 +1417,37 @@ def login_cdrrmo_pnp_bfp():
                 return redirect(url_for('pnp_dashboard'))
             elif user['role'] == 'bfp':
                 return redirect(url_for('bfp_dashboard'))
+            elif user['role'] == 'city health':
+                return redirect(url_for('health_dashboard'))
+            elif user['role'] == 'hospital':
+                return redirect(url_for('hospital_dashboard'))
         logger.warning(f"Web login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
-        return "Invalid credentials", 401
+        return render_template('AgencyIn.html', error="Invalid credentials or hospital assignment", cdrrmo_pnp_bfp_users=[]), 401
     conn = get_db_connection()
-    cdrrmo_pnp_bfp_users = conn.execute('SELECT role, assigned_municipality, contact_no, password FROM users WHERE role IN (?, ?, ?)', ('cdrrmo', 'pnp', 'bfp')).fetchall()
-    logger.debug(f"Retrieved {len(cdrrmo_pnp_bfp_users)} CDRRMO/PNP/BFP users: {[dict(row) for row in cdrrmo_pnp_bfp_users]}")
+    cdrrmo_pnp_bfp_users = conn.execute('SELECT role, assigned_municipality, contact_no, password, assigned_hospital FROM users WHERE role IN (?, ?, ?, ?, ?)', 
+                                        ('cdrrmo', 'pnp', 'bfp', 'city health', 'hospital')).fetchall()
+    logger.debug(f"Retrieved {len(cdrrmo_pnp_bfp_users)} CDRRMO/PNP/BFP/City Health/Hospital users: {[dict(row) for row in cdrrmo_pnp_bfp_users]}")
     conn.close()
-    return render_template('CDRRMOPNPBFPIn.html', cdrrmo_pnp_bfp_users=cdrrmo_pnp_bfp_users)
+    return render_template('AgencyIn.html', cdrrmo_pnp_bfp_users=cdrrmo_pnp_bfp_users)
 
-@app.route('/auto_role', methods=['POST'])
+# Update auto_role
+@app.route('/auto_role', methods=['POST', 'GET'])
 def auto_role():
     data = request.form
     role = data.get('role').lower()
     municipality = data.get('municipality')
     contact_no = data.get('contact_no')
     password = data.get('password')
+    assigned_hospital = data.get('assigned_hospital', '').lower() if role == 'hospital' else None
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ?', (role, municipality, contact_no, password)).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ? AND (assigned_hospital = ? OR assigned_hospital IS NULL)', 
+                        (role, municipality, contact_no, password, assigned_hospital)).fetchone()
     conn.close()
     if user:
         session['role'] = role
         session['unique_id'] = f"{role}_{municipality}_{contact_no}"
+        session['municipality'] = municipality
+        session['assigned_hospital'] = user['assigned_hospital'] if role == 'hospital' else None
         session.permanent = True
         logger.info(f"Auto login successful for {role} with contact_no: {contact_no}")
         if role == 'cdrrmo':
@@ -1440,12 +1456,15 @@ def auto_role():
             return redirect(url_for('pnp_dashboard'))
         elif role == 'bfp':
             return redirect(url_for('bfp_dashboard'))
+        elif role == 'city health':
+            return redirect(url_for('health_dashboard'))
+        elif role == 'hospital':
+            return redirect(url_for('hospital_dashboard'))
     logger.warning(f"Auto login failed for {role} with contact_no: {contact_no}")
-    return "Invalid credentials", 401
-
+    return render_template('AgencyIn.html', error="Invalid credentials or hospital assignment", cdrrmo_pnp_bfp_users=[]), 401
 
     
-    
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def log():
@@ -1511,15 +1530,15 @@ def choose_login_type():
     logger.debug("Rendering LoginType.html")
     return render_template('LoginType.html')
 
-@app.route('/go_to_cdrrmopnpbfpin', methods=['GET'])
+@app.route('/login_agency', methods=['GET'])
 def go_to_cdrrmopnpbfpin():
-    logger.debug("Redirecting to /login_cdrrmo_pnp_bfp")
-    return redirect(url_for('login_cdrrmo_pnp_bfp'))
+    logger.debug("Redirecting to /login_agency")
+    return redirect(url_for('login_agency'))
 
 @app.route('/signup_muna', methods=['GET'])
 def signup_muna():
-    logger.debug("Redirecting to /signup_cdrrmo_pnp_bfp")
-    return redirect(url_for('signup_cdrrmo_pnp_bfp'))
+    logger.debug("Redirecting to /signup_agency")
+    return redirect(url_for('signup_agency'))
 
 @app.route('/signup_na', methods=['GET'])
 def signup_na():
@@ -1534,7 +1553,7 @@ def logout():
     if role == 'barangay':
         return redirect(url_for('login'))
     else:
-        return redirect(url_for('login_cdrrmo_pnp_bfp'))
+        return redirect(url_for('login_agency'))
 
 def load_coords():
     coords_path = os.path.join(app.root_path, 'assets', 'coords.txt')
@@ -1709,7 +1728,7 @@ def barangay_dashboard():
 def cdrrmo_dashboard():
     try:
         if 'role' not in session or session['role'] != 'cdrrmo':
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         stats = get_cdrrmo_stats()
         unique_id = session.get('unique_id')
         conn = get_db_connection()
@@ -1720,7 +1739,7 @@ def cdrrmo_dashboard():
         
         if not unique_id or not user or user['role'] != 'cdrrmo':
             logger.warning("Unauthorized access to cdrrmo_dashboard. Session: %s, User: %s", session, user)
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
         stats = get_cdrrmo_stats()
@@ -1749,7 +1768,7 @@ def cdrrmo_dashboard():
 def pnp_dashboard():
     try:
         if 'role' not in session or session['role'] != 'pnp':
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         stats = get_pnp_stats()
         unique_id = session.get('unique_id')
         conn = get_db_connection()
@@ -1760,7 +1779,7 @@ def pnp_dashboard():
         
         if not unique_id or not user or user['role'] != 'pnp':
             logger.warning("Unauthorized access to pnp_dashboard. Session: %s, User: %s", session, user)
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
         stats = get_pnp_stats()
@@ -1789,7 +1808,7 @@ def pnp_dashboard():
 def bfp_dashboard():
     try:
         if 'role' not in session or session['role'] != 'bfp':
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         stats = get_bfp_stats()
         unique_id = session.get('unique_id')
         conn = get_db_connection()
@@ -1800,7 +1819,7 @@ def bfp_dashboard():
         
         if not unique_id or not user or user['role'] != 'bfp':
             logger.warning("Unauthorized access to bfp_dashboard. Session: %s, User: %s", session, user)
-            return redirect(url_for('login_cdrrmo_pnp_bfp'))
+            return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
         stats = get_bfp_stats()
