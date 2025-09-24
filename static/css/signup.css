@@ -17,7 +17,19 @@ body {
     font-size: 30px;
     color: #000000;
 }
-
+.select-role {
+    width: 100%; 
+    padding: 8px; 
+    margin: 8px 0; 
+    box-sizing: border-box; 
+    background-color: #66c2ff; 
+    border: 1px solid #000000ff; 
+    border-radius: 4px; 
+    text-align: center;
+}
+.select-role:hover {
+    transform: scale(1.05);
+}
 form {
     background-color:#deeaee; 
     color: #000000;
@@ -90,9 +102,22 @@ form .button3 {
 
 form button:hover {
     background-color: #66c2ff;
+    transform: scale(1.05);
 }
 
-
+.dropdown-role {
+    width: 100%; 
+    padding: 8px; 
+    margin: 8px 0; 
+    box-sizing: border-box; 
+    background-color: #66c2ff; 
+    border: 1px solid #000000ff; 
+    border-radius: 4px; 
+    text-align: center;
+}
+.dropdown-role:hover {
+    transform: scale(1.05);
+}
 
 button {
     background-color: #66c2ff;
@@ -106,6 +131,7 @@ button {
 
 button:hover {
     background-color: #66c2ff;
+    transform: scale(1.05);
 }
 
 @media (max-width: 600px) {

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Up CDRRMO or PNP or BFP</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
+</head>
+<body>
+    <h1 class="h1">Sign Up CDRRMO or PNP or BFP</h1>
+    <form action="/signup_agency" method="post">
+        <label>Role: 
+            <select name="role" id="role" class="select-role">
+                <option value="cdrrmo">CDRRMO</option>
+                <option value="pnp">PNP</option>
+                <option value="bfp">BFP</option>
+                <option value="city health">City Health</option>
+                <option value="hospital">Hospital</option>
+            </select>
+        </label><br>
+        <label id="hospital-label" style="display: none;">Assigned Hospital: 
+            <select name="assigned_hospital" id="assigned_hospital" class="dropdown-role">
+                <option value="SPC District Hospital">SPC District Hospital</option>
+                <option value="San Pablo Colleges Medical Center">San Pablo Colleges Medical Center</option>
+                <option value="Community General Hospital">Community General Hospital</option>
+                <option value="Immaculate Conception Hospital">Immaculate Conception Hospital</option>
+                <option value="SPC General Hospital">SPC General Hospital</option>
+                <option value="San Pablo Doctors Hospital">San Pablo Doctors Hospital</option>
+                <option value="St. Francis and Paul General Hospital">St. Francis and Paul General Hospital</option>
+            </select>
+        </label><br>
+        <label>Assigned Municipality: <input type="text" name="municipality" required></label><br>
+        <label>Contact Number: <input type="tel" name="contact_no" required></label><br>
+        <label>Password: <input type="password" name="password" required></label><br>
+        <button type="submit">Sign Up</button>
+        <button class="button2" onclick="window.location.href='/login_agency'">Log In</button>
+        <button class="button3" onclick="window.location.href='/choose_login_type'">Choose Account</button>
+    </form>
+    <script>
+        document.getElementById('role').addEventListener('change', function() {
+            const hospitalLabel = document.getElementById('hospital-label');
+            if (this.value === 'hospital') {
+                hospitalLabel.style.display = 'block';
+            } else {
+                hospitalLabel.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
+

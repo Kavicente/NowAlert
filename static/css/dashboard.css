@@ -16,7 +16,7 @@ header {
     
     color: #ffffff;
     text-align: center;
-    background-color: #1F3458;
+    background: linear-gradient(135deg, #2c3e50, #3498db);
 
     margin-bottom: 20px;
 }
@@ -44,9 +44,9 @@ h3 {
 .sidebar {
     width: 260px;
     position: fixed;
-    height: 91.8%;
-    background-color: #1E2E4B;
-    
+    height: 95%;
+    background: linear-gradient(135deg, #2c3e50, #3498db);
+    color: #fff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     top: 75px;
 }
@@ -57,19 +57,28 @@ h3 {
 }
 
 .sidebar nav ul li a {
-    display: block;
-    padding: 10px 20px;
-    color: #ffffff;
+    color: #fff;
     text-decoration: none;
+    padding: 12px 20px;
+    display: block;
+    font-weight: 500;
+    text-transform: uppercase;
+    border-left: 4px solid transparent;
+    transition: border-left-color 0.3s ease, background-color 0.3s ease;
 }
 
 .sidebar nav ul li a span {
     margin-right: 10px;
 }
-
+.sidebar nav ul li:hover {
+    transform: scale(1.05);
+}
 .sidebar nav ul li a:hover {
     background: #ddd;
-    color:#000000;   
+    color:#ffffff;   
+    border-left-color: #e74c3c;
+    background-color: rgba(255, 255, 255, 0.1);
+    
 }
 
 .dashboard {
@@ -89,7 +98,7 @@ main {
     top: 0;                    /* Anchor to the top */
     left: 0%;                   /* Start from the left edge */
               /* Full width initially */
-    height: 92%;               /* Match original height */
+    height: 95%;               /* Match original height */
     overflow: auto;            /* Enable scrolling for overflow */
     padding: 20px;
     width: 87%;
