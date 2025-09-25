@@ -37,7 +37,7 @@
     <form class="form3" action="/auto_role" method="post">
         {% if cdrrmo_pnp_bfp_users %}
             {% for user in cdrrmo_pnp_bfp_users %}
-                <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}', '{{ user.assigned_hospital|default('') }}')">
+                <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}', '{{ user.assigned_hospital }}')">
                     {% if user.role == 'hospital' %}
                         {{ user.assigned_hospital|upper }} {{ user.assigned_municipality }}
                     {% else %}
