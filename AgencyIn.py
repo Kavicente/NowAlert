@@ -100,7 +100,7 @@ def auto_role():
         elif role == 'hospital':
             return redirect(url_for('hospital_dashboard'))
     logger.warning(f"Auto login failed for {role} with contact_no: {contact_no}")
-    return render_template('AgencyIn.html', error="Invalid credentials or hospital assignment", cdrrmo_pnp_bfp_users=[]), 401
+    return "Invalid credentials"
 
 def choose_login_type():
     return render_template('LoginType.html')
