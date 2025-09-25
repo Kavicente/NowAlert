@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <style>
+        .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
+        .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
+        .response-form { margin-top: 10px; }
+        .response-form select, .response-form button { margin: 5px; }
+        .clickable-img { cursor: pointer; max-width: 200px; }
+        .prediction { margin-top: 10px; font-weight: bold; }
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .image-modal img {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 5px;
+        }
+        .image-modal .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: #fff;
+            font-size: 30px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('hospital_dashboard') }}"><span>🏠</span> Dashboard</a></li>
+                <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
+                <li><a href="#map"><span>📍</span> Map</a></li>
+                <li><a href="{{ url_for('hospital_charts') }}"><span>📊</span> Manage Reports</a></li>
+                <li><a href="#notifications"><span>📣</span> Notifications</a></li>
+                <li><a href="#settings"><span>⚙️</span> Settings</a></li>
+                <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="dashboard">
+        <header>
+            <h1>Hospital {{ municipality }} Dashboard</h1>
+            <div class="filters">
+            </div>
+        </header>
+    </div>
+    <main class="main-content">
+        <h2 class="h2">Hospital {{ municipality }} Map</h2>
+        <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.5995) }}, {{ lon_coord|default(120.9842) }}</span> (Municipality: {{ municipality }})</p>
+        <div id="map"></div>
+        <section class="stats">
+            <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
+            <p class="p">Critical Incidents: <span id="critical-incidents">{{ stats.get('Heart Attack', 0) + stats.get('Stroke', 0) + stats.get('Breathing Difficulty', 0) }}</span></p>
+        </section>
+        <section id="alerts">
+            <h2 class="h2">Live Alerts</h2>
+            <div id="alert-container"></div>
+        </section>
+        <div id="notification"></div>
+        <div id="image-modal" class="image-modal">
+            <span class="close-btn">&times;</span>
+            <img id="modal-image" src="">
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const lat = {{ lat_coord|default(14.5995) }};
+            const lon = {{ lon_coord|default(120.9842) }};
+            const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
+            const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
+
+            const hospitalMap = L.map('map').setView([lat, lon], 16);
+
+            var satellite = L.tileLayer(tileLayerUrl, {
+                attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+                maxZoom: 18,
+                tileSize: 512,
+                zoomOffset: -1
+            });
+
+            var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            });
+
+            satellite.addTo(hospitalMap);
+
+            var baseLayers = {
+                "Satellite with Labels": satellite,
+                "OpenStreetMap": osm
+            };
+            L.control.layers(baseLayers).addTo(hospitalMap);
+
+            const heatmapCfg = {
+                radius: 20,
+                maxOpacity: 0.8,
+                scaleRadius: true,
+                useLocalExtrema: true,
+                latField: 'lat',
+                lngField: 'lon',
+                valueField: 'count'
+            };
+            const heatmapLayer = new HeatmapOverlay(heatmapCfg);
+            heatmapLayer.addTo(hospitalMap);
+
+            fetch('/get_heatmap_data?municipality={{ municipality }}')
+                .then(response => response.json())
+                .then(data => {
+                    const heatmapData = { max: 1, data: data.map(point => ({ lat: point.lat, lon: point.lon, count: 1 })) };
+                    heatmapLayer.setData(heatmapData);
+                })
+                .catch(error => console.error('Error fetching heatmap data:', error));
+
+            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+            const alertElements = new Map();
+
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                socket.emit('register_role', { role: 'hospital', municipality: '{{ municipality }}'.toLowerCase(), hospital: '{{ assigned_hospital|default('') }}'.toLowerCase() });
+            });
+
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+            });
+
+            socket.on('new_alert', (data) => {
+                console.log('New alert received:', data);
+                updateUIWithAlert(data);
+                notifyAlert(data);
+            });
+
+            socket.on('hospital_response', (data) => {
+                console.log('Hospital response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = document.createElement('div');
+                    predictionDiv.className = 'prediction';
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year (\d+)/);
+                        if (match) {
+                            const percentage = match[1];
+                            const year = match[2];
+                            formattedPrediction = `Predicted ${data.health_emergency_type} risk: ${percentage}% in ${year}`;
+                        }
+                    } else if (predictionText === 'prediction_error') {
+                        formattedPrediction = 'Error generating prediction';
+                    }
+                    predictionDiv.textContent = formattedPrediction;
+                    alertItem.appendChild(predictionDiv);
+                }
+            });
+
+            socket.on('birth_response', (data) => {
+                console.log('Birth response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = document.createElement('div');
+                    predictionDiv.className = 'prediction';
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year (\d+)/);
+                        if (match) {
+                            const percentage = match[1];
+                            const year = match[2];
+                            formattedPrediction = `Predicted birth complication risk: ${percentage}% in ${year}`;
+                        }
+                    } else if (predictionText === 'prediction_error') {
+                        formattedPrediction = 'Error generating prediction';
+                    }
+                    predictionDiv.textContent = formattedPrediction;
+                    alertItem.appendChild(predictionDiv);
+                }
+            });
+
+            socket.on('update_map', (data) => {
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.5995) }};
+                const lon = data.lon || {{ lon_coord|default(120.9842) }};
+                hospitalMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(hospitalMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+            });
+
+            function updateUIWithAlert(data) {
+                const alertContainer = document.getElementById('alert-container');
+                const alertItem = document.createElement('div');
+                alertItem.className = 'alert-item';
+                alertItem.id = `alert-${data.alert_id}`;
+                alertItem.innerHTML = `
+                    <p><strong>Alert ID:</strong> ${data.alert_id}</p>
+                    <p><strong>Barangay:</strong> ${data.barangay || 'Unknown'}</p>
+                    <p><strong>Type:</strong> ${data.emergency_type || 'Unknown'}</p>
+                    <p><strong>Time:</strong> ${new Date().toLocaleTimeString()}</p>
+                `;
+                if (data.image) {
+                    const img = document.createElement('img');
+                    img.src = data.image;
+                    img.className = 'clickable-img';
+                    img.onclick = () => showModal(data.image);
+                    alertItem.appendChild(img);
+                }
+                const responseForm = document.createElement('div');
+                responseForm.className = 'response-form';
+                responseForm.innerHTML = `
+                    <select id="health-emergency-type-${data.alert_id}">
+                        <option value="Heart Attack">Heart Attack</option>
+                        <option value="Stroke">Stroke</option>
+                        <option value="Fall">Fall</option>
+                        <option value="Breathing Difficulty">Breathing Difficulty</option>
+                        <option value="Giving Birth">Giving Birth</option>
+                        <option value="Seizure">Seizure</option>
+                        <option value="Burn">Burn</option>
+                        <option value="Poisoning">Poisoning</option>
+                        <option value="Allergic Reaction">Allergic Reaction</option>
+                    </select>
+                    <select id="health-cause-${data.alert_id}">
+                        <option value="Pregnant">Pregnant</option>
+                        <option value="Chronic Illness">Chronic Illness</option>
+                        <option value="Accident">Accident</option>
+                        <option value="Allergy">Allergy</option>
+                        <option value="Infection">Infection</option>
+                        <option value="Overdose">Overdose</option>
+                        <option value="Heatstroke">Heatstroke</option>
+                    </select>
+                    <select id="weather-${data.alert_id}">
+                        <option value="Sunny">Sunny</option>
+                        <option value="Rainy">Rainy</option>
+                        <option value="Stormy">Stormy</option>
+                    </select>
+                    <input type="text" id="patient-age-${data.alert_id}" placeholder="Patient Age">
+                    <select id="patient-gender-${data.alert_id}">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                    <button onclick="submitResponse('${data.alert_id}')">Submit Response</button>
+                `;
+                alertItem.appendChild(responseForm);
+                alertContainer.prepend(alertItem);
+                alertElements.set(data.alert_id, alertItem);
+                document.getElementById('total-incidents').textContent = parseInt(document.getElementById('total-incidents').textContent) + 1;
+                if (['Heart Attack', 'Stroke', 'Breathing Difficulty'].includes(data.emergency_type)) {
+                    document.getElementById('critical-incidents').textContent = parseInt(document.getElementById('critical-incidents').textContent) + 1;
+                }
+            }
+
+            function submitResponse(alertId) {
+                const response = {
+                    alert_id: alertId,
+                    health_emergency_type: document.getElementById(`health-emergency-type-${alertId}`).value,
+                    health_cause: document.getElementById(`health-cause-${alertId}`).value,
+                    weather: document.getElementById(`weather-${alertId}`).value,
+                    patient_age: document.getElementById(`patient-age-${alertId}`).value,
+                    patient_gender: document.getElementById(`patient-gender-${alertId}`).value,
+                    lat: {{ lat_coord|default(14.5995) }},
+                    lon: {{ lon_coord|default(120.9842) }},
+                    barangay: '{{ municipality }}',
+                    emergency_type: document.getElementById(`health-emergency-type-${alertId}`).value
+                };
+                socket.emit(response.health_emergency_type.toLowerCase() === 'giving birth' ? 'birth_response' : 'hospital_submit', response);
+                console.log('Response submitted:', response);
+            }
+
+            function notifyAlert(data) {
+                const notification = document.getElementById('notification');
+                notification.innerHTML = `<span style="color: red;">New ${data.emergency_type || 'Alert'} in ${data.barangay || 'Unknown'}</span>`;
+                setTimeout(() => { notification.innerHTML = ''; }, 5000);
+            }
+
+            function showModal(imageSrc) {
+                const modal = document.getElementById('image-modal');
+                const modalImg = document.getElementById('modal-image');
+                modal.style.display = 'flex';
+                modalImg.src = imageSrc;
+            }
+
+            document.querySelector('.close-btn').onclick = () => {
+                document.getElementById('image-modal').style.display = 'none';
+            };
+        });
+    </script>
+</body>
+</html>
