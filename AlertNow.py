@@ -68,7 +68,7 @@ except Exception as e:
 
 birth_predictor = None
 try:
-    birth_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Health Models', 'birth_predictor_lr.pkl'))
+    birth_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Birth Models', 'birth_predictor_lr.pkl'))
     logger.info("birth_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("birth_predictor_lr.pkl not found.")
