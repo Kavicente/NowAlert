@@ -66,6 +66,16 @@ except Exception as e:
     logger.error(f"Error loading health_predictor_lr.pkl: {e}")
 
 
+birth_predictor = None
+try:
+    birth_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Health Models', 'birth_predictor_lr.pkl'))
+    logger.info("birth_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("birth_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading birth_predictor_lr.pkl: {e}")
+    
+
 road_accident_df = pd.DataFrame()
 try:
     road_accident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'road_accident.csv'))
@@ -435,6 +445,13 @@ def handle_submit_response(data):
     except Exception as e:
         logger.error(f"Error in handle_submit_response: {e}")
 
+@socketio.on('health_submit')
+def handle_health_response(data):
+    handle_health_response_submitted(data)
+
+@socketio.on('hospital_submit')
+def handle_hospital_response(data):
+    handle_hospital_response_submitted(data)
 
 @app.route('/api/submit_response', methods=['POST'])
 def submit_response():
@@ -592,8 +609,16 @@ def handle_register_role(data):
         if municipality:
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
-
-
+    elif role == 'city health':
+            municipality = data.get('municipality').lower() if data.get('municipality') else None
+            if municipality:
+                join_room(f"city health_{municipality}")
+                logger.info(f"Client {request.sid} joined room city health_{municipality}")
+    elif role == 'hospital':
+            municipality = data.get('municipality').lower() if data.get('municipality') else None
+            if municipality:
+                join_room(f"hospital_{municipality}")
+                logger.info(f"Client {request.sid} joined room hospital_{municipality}")
 
 @socketio.on('alert')
 def handle_new_alert(data):
@@ -613,11 +638,15 @@ def handle_new_alert(data):
         cdrrmo_room = f"cdrrmo_{municipality}"
         pnp_room = f"pnp_{municipality}"
         bfp_room = f"bfp_{municipality}"
+        health_room = f"city_health__{municipality}"
+        hospital_room = f"hospital__{municipality}"
     else:
         logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
         cdrrmo_room = None
         pnp_room = None
         bfp_room = None
+        health_room = None
+        hospital_room = None
     
     emit('new_alert', data, room=barangay_room)
     logger.info(f"Alert emitted to room {barangay_room}")
@@ -630,6 +659,12 @@ def handle_new_alert(data):
     if bfp_room:
         emit('new_alert', data, room=bfp_room)
         logger.info(f"Alert emitted to room {bfp_room}")
+    if health_room:
+        emit('new_alert', data, room=health_room)
+        logger.info(f"Alert emitted to room {health_room}")
+    if hospital_room:
+        emit('new_alert', data, room=hospital_room)
+        logger.info(f"Alert emitted to room {hospital_room}")
 
     # Emit update_map to relevant rooms
     map_data = {
@@ -659,6 +694,8 @@ def handle_forward_alert(data):
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
+    city_health_room = f"city_health_room_{municipality}"
+    hospital_room = f"hospital_room_{municipality}"
     
     emit('new_alert', data, room=cdrrmo_room)
     logger.info(f"Alert forwarded to room {cdrrmo_room}")
@@ -666,6 +703,10 @@ def handle_forward_alert(data):
     logger.info(f"Alert forwarded to room {pnp_room}")
     emit('new_alert', data, room=bfp_room)
     logger.info(f"Alert forwarded to room {bfp_room}")
+    emit('new_alert', data, room=city_health_room)
+    logger.info(f"Alert forwarded to room {city_health_room}")
+    emit('new_alert', data, room=hospital_room)
+    logger.info(f"Alert forwarded to room {hospital_room}")
 
     map_data = {
         'lat': data.get('lat'),
@@ -676,6 +717,8 @@ def handle_forward_alert(data):
     emit('update_map', map_data, room=cdrrmo_room)
     emit('update_map', map_data, room=pnp_room)
     emit('update_map', map_data, room=bfp_room)
+    emit('update_map', map_data, room=city_health_room)
+    emit('update_map', map_data, room=hospital_room)
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1133,7 +1176,277 @@ def handle_fire_response_submitted(data):
     logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
     
 
+@socketio.on('health_response')
+def handle_health_response_submitted(data):
+    try:
+        logger.info(f"Health response received: {data}")
+        alert_id = data.get('alert_id')
+        response_data = {
+            'alert_id': alert_id,
+            'health_emergency_type': data.get('health_emergency_type'),
+            'health_cause': data.get('health_cause'),
+            'weather': data.get('weather'),
+            'patient_age': data.get('patient_age'),
+            'patient_gender': data.get('patient_gender'),
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type'),
+            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            'responded': True
+        }
+        conn = get_db_connection()
+        conn.execute('''
+            INSERT INTO health_response (alert_id, health_emergency_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            response_data['alert_id'],
+            response_data['health_emergency_type'],
+            response_data['health_cause'],
+            response_data['weather'],
+            response_data['patient_age'],
+            response_data['patient_gender'],
+            response_data['lat'],
+            response_data['lon'],
+            response_data['barangay'],
+            response_data['emergency_type'],
+            response_data['timestamp'],
+            response_data['responded']
+        ))
+        conn.commit()
+        conn.close()
 
+        # Prediction logic
+        prediction = "N/A"
+        if health_predictor and response_data['health_emergency_type'].lower() != "giving birth":
+            try:
+                features = [
+                    float(response_data.get('lat', 0)),
+                    float(response_data.get('lon', 0)),
+                    float(response_data.get('patient_age', 0)),
+                    1 if response_data.get('patient_gender', '').lower() == 'male' else 0,
+                    1 if response_data.get('weather', '').lower() == 'sunny' else 0,
+                    1 if response_data.get('weather', '').lower() == 'rainy' else 0,
+                    1 if response_data.get('weather', '').lower() == 'stormy' else 0
+                ]
+                prediction_result = health_predictor.predict_proba([features])[0][1]
+                prediction = f"{prediction_result * 100:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Health prediction error: {e}")
+                prediction = "prediction_error"
+        elif birth_predictor and response_data['health_emergency_type'].lower() == "giving birth":
+            try:
+                features = [
+                    float(response_data.get('lat', 0)),
+                    float(response_data.get('lon', 0)),
+                    float(response_data.get('patient_age', 0)),
+                    1 if response_data.get('patient_gender', '').lower() == 'female' else 0,
+                    1 if response_data.get('weather', '').lower() == 'sunny' else 0,
+                    1 if response_data.get('weather', '').lower() == 'rainy' else 0,
+                    1 if response_data.get('weather', '').lower() == 'stormy' else 0
+                ]
+                prediction_result = birth_predictor.predict_proba([features])[0][1]
+                prediction = f"{prediction_result * 100:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Birth prediction error: {e}")
+                prediction = "prediction_error"
+
+        response_data['prediction'] = prediction
+        responses.append(response_data)
+        socketio.emit('health_response', response_data, room=f"city_health_{response_data['barangay'].lower()}")
+        socketio.emit('update_map', {
+            'lat': response_data['lat'],
+            'lon': response_data['lon'],
+            'emergency_type': response_data['emergency_type'],
+            'barangay': response_data['barangay']
+        }, room=f"city_health_{response_data['barangay'].lower()}")
+        logger.info(f"Health response processed for alert_id: {alert_id}")
+    except Exception as e:
+        logger.error(f"Error in handle_health_response_submitted: {e}")
+
+@socketio.on('hospital_response')
+def handle_hospital_response_submitted(data):
+    try:
+        logger.info(f"Hospital response received: {data}")
+        alert_id = data.get('alert_id')
+        response_data = {
+            'alert_id': alert_id,
+            'health_emergency_type': data.get('health_emergency_type'),
+            'health_cause': data.get('health_cause'),
+            'weather': data.get('weather'),
+            'patient_age': data.get('patient_age'),
+            'patient_gender': data.get('patient_gender'),
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type'),
+            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            'responded': True
+        }
+        conn = get_db_connection()
+        conn.execute('''
+            INSERT INTO hospital_response (alert_id, health_emergency_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            response_data['alert_id'],
+            response_data['health_emergency_type'],
+            response_data['health_cause'],
+            response_data['weather'],
+            response_data['patient_age'],
+            response_data['patient_gender'],
+            response_data['lat'],
+            response_data['lon'],
+            response_data['barangay'],
+            response_data['emergency_type'],
+            response_data['timestamp'],
+            response_data['responded']
+        ))
+        conn.commit()
+        conn.close()
+
+        # Prediction logic
+        prediction = "N/A"
+        if health_predictor and response_data['health_emergency_type'].lower() != "giving birth":
+            try:
+                features = [
+                    float(response_data.get('lat', 0)),
+                    float(response_data.get('lon', 0)),
+                    float(response_data.get('patient_age', 0)),
+                    1 if response_data.get('patient_gender', '').lower() == 'male' else 0,
+                    1 if response_data.get('weather', '').lower() == 'sunny' else 0,
+                    1 if response_data.get('weather', '').lower() == 'rainy' else 0,
+                    1 if response_data.get('weather', '').lower() == 'stormy' else 0
+                ]
+                prediction_result = health_predictor.predict_proba([features])[0][1]
+                prediction = f"{prediction_result * 100:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Health prediction error: {e}")
+                prediction = "prediction_error"
+        elif birth_predictor and response_data['health_emergency_type'].lower() == "giving birth":
+            try:
+                features = [
+                    float(response_data.get('lat', 0)),
+                    float(response_data.get('lon', 0)),
+                    float(response_data.get('patient_age', 0)),
+                    1 if response_data.get('patient_gender', '').lower() == 'female' else 0,
+                    1 if response_data.get('weather', '').lower() == 'sunny' else 0,
+                    1 if response_data.get('weather', '').lower() == 'rainy' else 0,
+                    1 if response_data.get('weather', '').lower() == 'stormy' else 0
+                ]
+                prediction_result = birth_predictor.predict_proba([features])[0][1]
+                prediction = f"{prediction_result * 100:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Birth prediction error: {e}")
+                prediction = "prediction_error"
+
+        response_data['prediction'] = prediction
+        responses.append(response_data)
+        socketio.emit('hospital_response', response_data, room=f"hospital_{response_data['barangay'].lower()}")
+        socketio.emit('update_map', {
+            'lat': response_data['lat'],
+            'lon': response_data['lon'],
+            'emergency_type': response_data['emergency_type'],
+            'barangay': response_data['barangay']
+        }, room=f"hospital_{response_data['barangay'].lower()}")
+        logger.info(f"Hospital response processed for alert_id: {alert_id}")
+    except Exception as e:
+        logger.error(f"Error in handle_hospital_response_submitted: {e}")
+
+@socketio.on('birth_response')
+def handle_birth_response_submitted(data):
+    try:
+        logger.info(f"Birth response received: {data}")
+        alert_id = data.get('alert_id')
+        response_data = {
+            'alert_id': alert_id,
+            'health_emergency_type': data.get('health_emergency_type'),
+            'health_cause': data.get('health_cause'),
+            'weather': data.get('weather'),
+            'patient_age': data.get('patient_age'),
+            'patient_gender': data.get('patient_gender'),
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type'),
+            'timestamp': datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            'responded': True
+        }
+        conn = get_db_connection()
+        conn.execute('''
+            INSERT INTO health_response (alert_id, health_emergency_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            response_data['alert_id'],
+            response_data['health_emergency_type'],
+            response_data['health_cause'],
+            response_data['weather'],
+            response_data['patient_age'],
+            response_data['patient_gender'],
+            response_data['lat'],
+            response_data['lon'],
+            response_data['barangay'],
+            response_data['emergency_type'],
+            response_data['timestamp'],
+            response_data['responded']
+        ))
+        conn.execute('''
+            INSERT INTO hospital_response (alert_id, health_emergency_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            response_data['alert_id'],
+            response_data['health_emergency_type'],
+            response_data['health_cause'],
+            response_data['weather'],
+            response_data['patient_age'],
+            response_data['patient_gender'],
+            response_data['lat'],
+            response_data['lon'],
+            response_data['barangay'],
+            response_data['emergency_type'],
+            response_data['timestamp'],
+            response_data['responded']
+        ))
+        conn.commit()
+        conn.close()
+
+        # Prediction logic (birth-specific)
+        prediction = "N/A"
+        if birth_predictor and response_data['health_emergency_type'].lower() == "giving birth":
+            try:
+                features = [
+                    float(response_data.get('lat', 0)),
+                    float(response_data.get('lon', 0)),
+                    float(response_data.get('patient_age', 0)),
+                    1 if response_data.get('patient_gender', '').lower() == 'female' else 0,
+                    1 if response_data.get('weather', '').lower() == 'sunny' else 0,
+                    1 if response_data.get('weather', '').lower() == 'rainy' else 0,
+                    1 if response_data.get('weather', '').lower() == 'stormy' else 0
+                ]
+                prediction_result = birth_predictor.predict_proba([features])[0][1]
+                prediction = f"{prediction_result * 100:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Birth prediction error: {e}")
+                prediction = "prediction_error"
+
+        response_data['prediction'] = prediction
+        responses.append(response_data)
+        socketio.emit('birth_response', response_data, room=f"city_health_{response_data['barangay'].lower()}")
+        socketio.emit('birth_response', response_data, room=f"hospital_{response_data['barangay'].lower()}")
+        socketio.emit('update_map', {
+            'lat': response_data['lat'],
+            'lon': response_data['lon'],
+            'emergency_type': response_data['emergency_type'],
+            'barangay': response_data['barangay']
+        }, room=f"city_health_{response_data['barangay'].lower()}")
+        socketio.emit('update_map', {
+            'lat': response_data['lat'],
+            'lon': response_data['lon'],
+            'emergency_type': response_data['emergency_type'],
+            'barangay': response_data['barangay']
+        }, room=f"hospital_{response_data['barangay'].lower()}")
+        logger.info(f"Birth response processed for alert_id: {alert_id}")
+    except Exception as e:
+        logger.error(f"Error in handle_birth_response_submitted: {e}")
 # Added handle_fire_analytics_data
 
 
@@ -1845,7 +2158,85 @@ def bfp_dashboard():
         return "Internal Server Error", 500
 
 
+@app.route('/health_dashboard')
+def health_dashboard():
+    try:
+        if 'role' not in session or session['role'] != 'city health':
+            return redirect(url_for('login_agency'))
+        stats = get_health_stats()
+        unique_id = session.get('unique_id')
+        conn = get_db_connection()
+        user = conn.execute('''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
+        ''', ('city health', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+        conn.close()
+        
+        if not unique_id or not user or user['role'] != 'city health':
+            logger.warning("Unauthorized access to health_dashboard. Session: %s, User: %s", session, user)
+            return redirect(url_for('login_agency'))
+        
+        assigned_municipality = user['assigned_municipality'] or "San Pablo City"
+        stats = get_health_stats()
+        coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
+        
+        try:
+            lat_coord = float(coords.get('lat', 14.5995))
+            lon_coord = float(coords.get('lon', 120.9842))
+        except (ValueError, TypeError):
+            logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
+            lat_coord = 14.5995
+            lon_coord = 120.9842
 
+        logger.debug(f"Rendering HealthDashboard for {assigned_municipality}")
+        return render_template('HealthDashboard.html', 
+                               stats=stats, 
+                               municipality=assigned_municipality, 
+                               lat_coord=lat_coord,
+                               lon_coord=lon_coord,
+                               google_api_key=GOOGLE_API_KEY)
+    except Exception as e:
+        logger.error(f"Error in health_dashboard: {e}")
+        return "Internal Server Error", 500
+
+@app.route('/hospital_dashboard')
+def hospital_dashboard():
+    try:
+        if 'role' not in session or session['role'] != 'hospital':
+            return redirect(url_for('login_agency'))
+        stats = get_hospital_stats()
+        unique_id = session.get('unique_id')
+        conn = get_db_connection()
+        user = conn.execute('''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
+        ''', ('hospital', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+        conn.close()
+        
+        if not unique_id or not user or user['role'] != 'hospital':
+            logger.warning("Unauthorized access to hospital_dashboard. Session: %s, User: %s", session, user)
+            return redirect(url_for('login_agency'))
+        
+        assigned_municipality = user['assigned_municipality'] or "San Pablo City"
+        stats = get_hospital_stats()
+        coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
+        
+        try:
+            lat_coord = float(coords.get('lat', 14.5995))
+            lon_coord = float(coords.get('lon', 120.9842))
+        except (ValueError, TypeError):
+            logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
+            lat_coord = 14.5995
+            lon_coord = 120.9842
+
+        logger.debug(f"Rendering HospitalDashboard for {assigned_municipality}")
+        return render_template('HospitalDashboard.html', 
+                               stats=stats, 
+                               municipality=assigned_municipality, 
+                               lat_coord=lat_coord,
+                               lon_coord=lon_coord,
+                               google_api_key=GOOGLE_API_KEY)
+    except Exception as e:
+        logger.error(f"Error in hospital_dashboard: {e}")
+        return "Internal Server Error", 500
 
 def get_latest_alert():
     try:
@@ -1886,6 +2277,22 @@ def get_bfp_stats():
         return Counter(types)
     except Exception as e:
         logger.error(f"Error in get_bfp_stats: {e}")
+        return Counter()
+    
+def get_health_stats():
+    try:
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'city health' or a.get('assigned_municipality')]
+        return Counter(types)
+    except Exception as e:
+        logger.error(f"Error in get_health_stats: {e}")
+        return Counter()
+
+def get_hospital_stats():
+    try:
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'hospital' or a.get('assigned_hospital')]
+        return Counter(types)
+    except Exception as e:
+        logger.error(f"Error in get_hospital_stats: {e}")
         return Counter()
 
 app.route('/barangay_charts')(barangay_charts)
@@ -1968,6 +2375,40 @@ if __name__ == '__main__':
                 vehicle_type TEXT,
                 driver_age TEXT,
                 driver_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS health_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                health_emergency_type TEXT,
+                health_cause TEXT,
+                weather TEXT,
+                patient_age TEXT,
+                patient_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS hospital_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                health_emergency_type TEXT,
+                health_cause TEXT,
+                weather TEXT,
+                patient_age TEXT,
+                patient_gender TEXT,
                 lat REAL,
                 lon REAL,
                 barangay TEXT,
