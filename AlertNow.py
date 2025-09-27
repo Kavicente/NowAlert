@@ -612,6 +612,16 @@ def handle_register_role(data):
         if municipality:
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
+    elif role == 'city health':
+        municipality = data.get('municipality').lower() if data.get('municipality') else None
+        if municipality:
+            join_room(f"city health{municipality}")
+            logger.info(f"Client {request.sid} joined room city health{municipality}")
+    elif role == 'hospital':
+        municipality = data.get('municipality').lower() if data.get('municipality') else None
+        if municipality:
+            join_room(f"hospital_{municipality}")
+            logger.info(f"Client {request.sid} joined room hospital_{municipality}")
     
 
 @socketio.on('alert')
