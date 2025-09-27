@@ -447,6 +447,9 @@ def handle_submit_response(data):
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')  # Changed to string
         responded = True
 
+
+        prediction = None
+
         conn = get_db_connection()
         if role == 'barangay':
             conn.execute('''
@@ -468,18 +471,29 @@ def handle_submit_response(data):
         elif role == 'bfp':
             # Existing BFP logic remains unchanged
             pass
+        
         elif role == 'city health':
              conn.execute('''
             INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
              prediction = handle_health_response_submitted(data)
+             
+             if municipality:
+                socketio.emit('new_alert', data, room=f"city_health_{municipality.lower()}")
+                socketio.emit('update_map', data, room=f"city_health_{municipality.lower()}")
+             
         elif role == 'hospital':
             conn.execute('''
             INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
             prediction = handle_hospital_response_submitted(data)
+            
+            if municipality:
+                socketio.emit('new_alert', data, room=f"hospital_{municipality.lower()}")
+                socketio.emit('update_map', data, room=f"hospital_{municipality.lower()}")
+            
         conn.commit()
         conn.close()
 
@@ -769,7 +783,7 @@ def handle_forward_alert(data):
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
-    city_health_room = f"city_health_room_{municipality}"
+    health_room = f"city_health_room_{municipality}"
     hospital_room = f"hospital_room_{municipality}"
     
     emit('new_alert', data, room=cdrrmo_room)
@@ -778,8 +792,8 @@ def handle_forward_alert(data):
     logger.info(f"Alert forwarded to room {pnp_room}")
     emit('new_alert', data, room=bfp_room)
     logger.info(f"Alert forwarded to room {bfp_room}")
-    emit('new_alert', data, room=city_health_room)
-    logger.info(f"Alert forwarded to room {city_health_room}")
+    emit('new_alert', data, room=health_room)
+    logger.info(f"Alert forwarded to room {health_room}")
     emit('new_alert', data, room=hospital_room)
     logger.info(f"Alert forwarded to room {hospital_room}")
 
@@ -792,7 +806,7 @@ def handle_forward_alert(data):
     emit('update_map', map_data, room=cdrrmo_room)
     emit('update_map', map_data, room=pnp_room)
     emit('update_map', map_data, room=bfp_room)
-    emit('update_map', map_data, room=city_health_room)
+    emit('update_map', map_data, room=health_room)
     emit('update_map', map_data, room=hospital_room)
 
 @socketio.on('barangay_response')

@@ -132,18 +132,18 @@ body {
 .form3 {
     background-color: #deeaee; 
     margin-top: 80px;
-    display: block;
-    
+    display: grid;
+    grid-template-columns: auto auto auto;
     color: #000000;
     text-align: center;
     padding: 20px;
     border-radius: 5px;
     backdrop-filter: blur(5px);
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    max-width: 300px;
+    max-width: 540px;
     margin-left: auto;
-    margin-right: 380px;
-    margin-top: -493px; /* Adjusted to align with form2 */
+    margin-right: 180px;
+    margin-top: -570px; /* Adjusted to align with form2 */
     color: #000000;
 }
 
