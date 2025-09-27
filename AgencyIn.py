@@ -37,9 +37,14 @@ def login_agency():
         logger.debug(f"Login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
         
         conn = get_db_connection()
-        user = conn.execute('''
-            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ? AND (assigned_hospital = ? OR assigned_hospital IS NULL)
-        ''', (role, contact_no, password, assigned_municipality, assigned_hospital)).fetchone()
+        if role == 'hospital':
+            user = conn.execute('''
+                SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ? AND assigned_hospital = ?
+            ''', (role, contact_no, password, assigned_municipality, assigned_hospital)).fetchone()
+        else:
+            user = conn.execute('''
+                SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
+            ''', (role, contact_no, password, assigned_municipality)).fetchone()
         conn.close()
         
         if user:
@@ -60,7 +65,7 @@ def login_agency():
             elif user['role'] == 'hospital':
                 return redirect(url_for('hospital_dashboard'))
         logger.warning(f"Web login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
-        return render_template('AgencyIn.html', error="Invalid credentials or hospital assignment", cdrrmo_pnp_bfp_users=[])
+        return render_template('AgencyIn.html', error="Invalid credentials", cdrrmo_pnp_bfp_users=[])
     
     conn = get_db_connection()
     cdrrmo_pnp_bfp_users = conn.execute('SELECT role, assigned_municipality, contact_no, password, assigned_hospital FROM users WHERE role IN (?, ?, ?, ?, ?)', 
@@ -71,36 +76,7 @@ def login_agency():
 
 
 
-def auto_role():
-    data = request.form
-    role = data.get('role').lower()
-    municipality = data.get('municipality')
-    contact_no = data.get('contact_no')
-    password = data.get('password')
-    assigned_hospital = data.get('assigned_hospital', '').lower() if role == 'hospital' else None
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ? AND (assigned_hospital = ? OR assigned_hospital IS NULL)', 
-                        (role, municipality, contact_no, password, assigned_hospital)).fetchone()
-    conn.close()
-    if user:
-        session['role'] = role
-        session['unique_id'] = f"{role}_{municipality}_{contact_no}"
-        session['municipality'] = municipality
-        session['assigned_hospital'] = user['assigned_hospital'] if role == 'hospital' else None
-        session.permanent = True
-        logger.info(f"Auto login successful for {role} with contact_no: {contact_no}")
-        if role == 'cdrrmo':
-            return redirect(url_for('cdrrmo_dashboard'))
-        elif role == 'pnp':
-            return redirect(url_for('pnp_dashboard'))
-        elif role == 'bfp':
-            return redirect(url_for('bfp_dashboard'))
-        elif role == 'city health':
-            return redirect(url_for('health_dashboard'))
-        elif role == 'hospital':
-            return redirect(url_for('hospital_dashboard'))
-    logger.warning(f"Auto login failed for {role} with contact_no: {contact_no}")
-    return "Invalid credentials"
+
 
 def choose_login_type():
     return render_template('LoginType.html')

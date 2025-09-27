@@ -66,8 +66,8 @@
         </header>
     </div>
     <main class="main-content">
-        <h2 class="h2">Hospital {{ municipality }} Map</h2>
-        <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.5995) }}, {{ lon_coord|default(120.9842) }}</span> (Municipality: {{ municipality }})</p>
+        <h2 class="h2">Hospital  {{ municipality }} Map</h2>
+        <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(120.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div id="map"></div>
         <section class="stats">
             <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
@@ -86,8 +86,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const lat = {{ lat_coord|default(14.5995) }};
-            const lon = {{ lon_coord|default(120.9842) }};
+            const lat = {{ lat_coord|default(14.0549) }};
+            const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 

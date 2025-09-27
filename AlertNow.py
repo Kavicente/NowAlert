@@ -18,6 +18,8 @@ from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
+from HealthDashboard import get_health_stats, get_latest_alert
+from HospitalDashboard import get_hospital_stats, get_latest_alert
 from BarangayCharts import  barangay_charts, barangay_charts_data
 from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data
 from PNPCharts import pnp_charts, pnp_charts_data
@@ -1745,36 +1747,50 @@ def login_agency():
 
 # Update auto_role
 @app.route('/auto_role', methods=['POST', 'GET'])
+@app.route('/auto_role', methods=['POST'])
 def auto_role():
-    data = request.form
-    role = data.get('role').lower()
-    municipality = data.get('municipality')
-    contact_no = data.get('contact_no')
-    password = data.get('password')
-    assigned_hospital = data.get('assigned_hospital', '').lower() if role == 'hospital' else None
+    logger.debug("Accessing /auto_role with method: %s", request.method)
+    role = request.form['role'].lower()
+    assigned_municipality = request.form['municipality']
+    contact_no = request.form['contact_no']
+    password = request.form['password']
+    
+    if role not in ['cdrrmo', 'pnp', 'bfp', 'city health', 'hospital']:
+        logger.error(f"Invalid role provided: {role}")
+        return jsonify({'error': 'Invalid role'}), 400
+    
+    logger.debug(f"Auto login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
+    
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE role = ? AND assigned_municipality = ? AND contact_no = ? AND password = ? AND (assigned_hospital = ? OR assigned_hospital IS NULL)', 
-                        (role, municipality, contact_no, password, assigned_hospital)).fetchone()
+    if role == 'hospital':
+        user = conn.execute('''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
+        ''', (role, contact_no, password, assigned_municipality)).fetchone()
+    else:
+        user = conn.execute('''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ?
+        ''', (role, contact_no, password, assigned_municipality)).fetchone()
     conn.close()
+    
     if user:
-        session['role'] = role
-        session['unique_id'] = f"{role}_{municipality}_{contact_no}"
-        session['municipality'] = municipality
+        unique_id = f"{role}_{assigned_municipality}_{contact_no}"
+        session['unique_id'] = unique_id
+        session['role'] = user['role']
+        session['municipality'] = user['assigned_municipality']
         session['assigned_hospital'] = user['assigned_hospital'] if role == 'hospital' else None
-        session.permanent = True
-        logger.info(f"Auto login successful for {role} with contact_no: {contact_no}")
-        if role == 'cdrrmo':
+        logger.debug(f"Auto login successful for user: {unique_id} ({user['role']})")
+        if user['role'] == 'cdrrmo':
             return redirect(url_for('cdrrmo_dashboard'))
-        elif role == 'pnp':
+        elif user['role'] == 'pnp':
             return redirect(url_for('pnp_dashboard'))
-        elif role == 'bfp':
+        elif user['role'] == 'bfp':
             return redirect(url_for('bfp_dashboard'))
-        elif role == 'city health':
+        elif user['role'] == 'city health':
             return redirect(url_for('health_dashboard'))
-        elif role == 'hospital':
+        elif user['role'] == 'hospital':
             return redirect(url_for('hospital_dashboard'))
-    logger.warning(f"Auto login failed for {role} with contact_no: {contact_no}")
-    return "Invalid credentials", 401
+    logger.warning(f"Auto login failed for assigned_municipality: {assigned_municipality}, contact: {contact_no}, role: {role}")
+    return render_template('AgencyIn.html', error="Invalid credentials", cdrrmo_pnp_bfp_users=[])
 
     
 
