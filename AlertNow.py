@@ -370,6 +370,40 @@ def handle_response(data):
             base_time.strftime('%Y-%m-%d %H:%M:%S'),
             data.get('responded', True)
         ))
+        c.execute('''
+            INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['alert_id'],
+            data['health_type'],
+            data['health_cause'],
+            data['weather'],
+            data['patient_age'],
+            data['patient_gender'],
+            data['lat'],
+            data['lon'],
+            data['barangay'],
+            data['emergency_type'],
+            data['timestamp'],
+            data['responded']
+        ))
+        c.execute('''
+            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['alert_id'],
+            data['health_type'],
+            data['health_cause'],
+            data['weather'],
+            data['patient_age'],
+            data['patient_gender'],
+            data['lat'],
+            data['lon'],
+            data['barangay'],
+            data['emergency_type'],
+            data['timestamp'],
+            data['responded']
+        ))
         conn.commit()
         logger.info(f"Response data inserted for alert_id: {data.get('alert_id')}")
         # Emit updates to respective chart pages
@@ -381,6 +415,8 @@ def handle_response(data):
         handle_bfp_response(data)
         handle_cdrrmo_response(data)
         handle_pnp_response(data)
+        handle_health_response(data)
+        handle_hospital_response(data)
     except Exception as e:
         logger.error(f"Error inserting response data: {e}")
         conn.rollback()
@@ -402,6 +438,10 @@ def handle_submit_response(data):
         vehicle_type = data.get('vehicle_type', '')
         driver_age = data.get('driver_age', '')
         driver_gender = data.get('driver_gender', '')
+        health_cause = data.get('health_cause', '')
+        health_type = data.get('health_type', '')
+        patient_age = data.get('patient_age', '')
+        patient_gender = data.get('patient_gender', '')
         lat = data.get('lat', 0.0)
         lon = data.get('lon', 0.0)
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')  # Changed to string
@@ -428,7 +468,18 @@ def handle_submit_response(data):
         elif role == 'bfp':
             # Existing BFP logic remains unchanged
             pass
-
+        elif role == 'city health':
+             conn.execute('''
+            INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+             prediction = handle_health_response_submitted(data)
+        elif role == 'hospital':
+            conn.execute('''
+            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+            prediction = handle_hospital_response_submitted(data)
         conn.commit()
         conn.close()
 
@@ -469,6 +520,10 @@ def submit_response():
     road_condition = data.get('road_condition', 'Unknown')
     vehicle_type = data.get('vehicle_type', 'Unknown')
     driver_age = data.get('driver_age', 'Unknown')
+    health_cause = data.get('health_cause', '')
+    health_type = data.get('health_type', '')
+    patient_age = data.get('patient_age', '')
+    patient_gender = data.get('patient_gender', '')
     driver_gender = data.get('driver_gender', 'Unknown')
     property_type = data.get('property_type', 'Unknown') if role == 'bfp' else None
     lat = data.get('lat')
@@ -498,7 +553,17 @@ def submit_response():
                 INSERT INTO bfp_response (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (alert_id, road_accident_cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, True))
-        conn.commit()
+        
+        elif role == 'city health':
+             conn.execute('''
+            INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, True))
+        elif role == 'hospital':
+            conn.execute('''
+            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, True))
         conn.close()
 
         response_data = {
@@ -514,6 +579,10 @@ def submit_response():
             'vehicle_type': vehicle_type,
             'driver_age': driver_age,
             'driver_gender': driver_gender,
+            'health_cause': health_cause,
+            'health_type': health_type,
+            'patient_age': patient_age,
+            'patient_gender': patient_gender,
             'property_type': property_type,
             'lat': lat,
             'lon': lon,
@@ -640,8 +709,8 @@ def handle_new_alert(data):
         cdrrmo_room = f"cdrrmo_{municipality}"
         pnp_room = f"pnp_{municipality}"
         bfp_room = f"bfp_{municipality}"
-        health_room = f"city_health__{municipality}"
-        hospital_room = f"hospital__{municipality}"
+        health_room = f"city_health_{municipality}"
+        hospital_room = f"hospital_{municipality}"
     else:
         logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
         cdrrmo_room = None
@@ -681,7 +750,11 @@ def handle_new_alert(data):
     if pnp_room:
         emit('update_map', map_data, room=pnp_room)
     if bfp_room:
-        emit('update_map', map_data, room=bfp_room)    
+        emit('update_map', map_data, room=bfp_room)  
+    if health_room:
+        emit('update_map', map_data, room=health_room)
+    if hospital_room:
+        emit('update_map', map_data, room=hospital_room)      
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
