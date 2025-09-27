@@ -54,7 +54,7 @@
 
         
 
-        function autoRole(role, municipality, contact_no, password) {
+        function autoRole(role, municipality, contact_no, password, assigned_hospital) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/auto_role';
@@ -74,15 +74,12 @@
             passwordInput.type = 'hidden';
             passwordInput.name = 'password';
             passwordInput.value = password;
-            const hospitalInput = document.createElement('input');
-            hospitalInput.type = 'hidden';
-            hospitalInput.name = 'assigned_hospital';
-            hospitalInput.value = assigned_hospital;
+            
             form.appendChild(roleInput);
             form.appendChild(municipalityInput);
             form.appendChild(contactInput);
             form.appendChild(passwordInput);
-            form.appendChild(hospitalInput);
+            
             document.body.appendChild(form);
             form.submit();
         }
