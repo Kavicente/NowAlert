@@ -86,8 +86,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const lat = {{ lat_coord|default(14.0549) }};
-            const lon = {{ lon_coord|default(121.3013) }};
+            const lat = {{ lat_coord|default(14.5995) }};
+            const lon = {{ lon_coord|default(120.9842) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
@@ -159,11 +159,11 @@
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                        const match = predictionText.match(/(\d+\.\d+)% chance in year (\d+)/);
+                        const match = predictionText.match(/(\d+\.\d+)% chance in (\d+)/);
                         if (match) {
                             const percentage = match[1];
-                            const year = match[2];
-                            formattedPrediction = `Predicted ${data.health_emergency_type} risk: ${percentage}% in ${year}`;
+                            const period = data.health_emergency_type.toLowerCase() === 'giving birth' ? `${match[2]} months` : `year ${match[2]}`;
+                            formattedPrediction = `There will be a ${percentage}% of ${data.health_emergency_type.toLowerCase()} on this area of ${data.barangay} in next ${period}`;
                         }
                     } else if (predictionText === 'prediction_error') {
                         formattedPrediction = 'Error generating prediction';
@@ -182,11 +182,10 @@
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                        const match = predictionText.match(/(\d+\.\d+)% chance in year (\d+)/);
+                        const match = predictionText.match(/(\d+\.\d+)% chance in (\d+)/);
                         if (match) {
                             const percentage = match[1];
-                            const year = match[2];
-                            formattedPrediction = `Predicted birth complication risk: ${percentage}% in ${year}`;
+                            formattedPrediction = `A ${percentage}% of pregnancy on this barangay in next ${match[2]} months`;
                         }
                     } else if (predictionText === 'prediction_error') {
                         formattedPrediction = 'Error generating prediction';
@@ -282,7 +281,7 @@
                     barangay: '{{ municipality }}',
                     emergency_type: document.getElementById(`health-emergency-type-${alertId}`).value
                 };
-                socket.emit(response.health_emergency_type.toLowerCase() === 'giving birth' ? 'birth_response' : 'health_submit', response);
+                socket.emit(response.health_emergency_type.toLowerCase() === 'giving birth' ? 'birth_response' : 'health_response', response);
                 console.log('Response submitted:', response);
             }
 
