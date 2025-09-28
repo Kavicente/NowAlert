@@ -117,7 +117,7 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('register_role', { role: 'city health', municipality: '{{ municipality }}'.toLowerCase() });
+                socket.emit('register_role', { role: 'health', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
             socket.on('connect_error', (error) => {
