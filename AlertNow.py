@@ -398,7 +398,7 @@ def handle_response(data):
         handle_bfp_response(data)
         handle_cdrrmo_response(data)
         handle_pnp_response(data)
-        handle_health_response_submitted(data)
+        handle_health_response(data)
     except Exception as e:
         logger.error(f"Error inserting response data: {e}")
         conn.rollback()
@@ -456,7 +456,7 @@ def handle_submit_response(data):
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-            prediction = handle_health_response_submitted(data)
+            prediction = handle_health_response(data)
         conn.commit()
         conn.close()
 
@@ -479,11 +479,12 @@ def handle_submit_response(data):
 
 # After @socketio.on('response_update')
 @socketio.on('health_response')
-def handle_health_response_submitted(data):
+def handle_health_response(data):
+    conn = get_db_connection()
+    c = conn.cursor()
     try:
-        logger.info(f"Received City Health response: {data}")
-        conn = get_db_connection()
-        c = conn.cursor()
+        manila = pytz.timezone('Asia/Manila')
+        base_time = datetime.now(manila)
         c.execute('''
             INSERT INTO health_response (
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
@@ -499,79 +500,38 @@ def handle_health_response_submitted(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
             data.get('responded', True)
         ))
         conn.commit()
-        conn.close()
+        logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
 
-        # Emit response to dashboard for prediction
-        emit('health_response', data, room=data.get('barangay', 'default_room'))
-    except Exception as e:
-        logger.error(f"Error storing health response: {e}")
-    
-    logger.info(f"Received health response: {data}")
-    logger.debug(f"Processing fire response for alert_id: {data.get('alert_id')}")
-    default_values = {}
-    htype_mapping = {
-        'Heart Attack': 1,
-        'Stroke': 2,
-        'Fall': 3,
-        'Breathing Difficulty': 4,
-        'Giving Birth': 5,
-        'Seizure': 6,
-        'Burn'  : 7,
-        'Poisoning': 8,
-        'Allergic Reaction': 9,
-    }
-    hcause_mapping = {
-        'Chronic Illness': 1,
-        'Accident': 2,
-        'Allergy': 3,
-        'Infection': 4,
-        'Pregnant': 5,
-        'Overdose': 6,
-        'HeatStroke': 7,
-    }
-    cleaned_data = {
-        'alert_id': data.get('alert_id'),  # Ensure alert_id is included
-        'fire_type': htype_mapping.get(data.get('fire_type'), 0),
-        'fire_cause': hcause_mapping.get(data.get('fire_cause'), 0),
-        'weather': data.get('weather', 'Unknown'),
-        'lat': data.get('lat', 0.0),
-        'lon': data.get('lon', 0.0),
-        'barangay': data.get('barangay', 'Unknown'),
-        'emergency_type': data.get('emergency_type', 'Unknown')
-    }
-    cleaned_data.update(default_values)
-    
-    try:
+        # Generate prediction
+        prediction = "N/A"
         if health_predictor:
-            feature_names = ['Health_Type', 'Health_Cause', 'Barangay', 'Year']
-            features = pd.DataFrame([[
-                cleaned_data['fire_type'],
-                cleaned_data['fire_cause'],
-                cleaned_data['barangay'],
-                datetime.now().year
-            ]], columns=feature_names)
-            prediction = health_predictor.predict(features)[0]
-            probability = health_predictor.predict_proba(features)[0][1]
-            cleaned_data['prediction'] = f"{probability*100:.2f}% chance in year {datetime.now().year + 1}"
-        else:
-            cleaned_data['prediction'] = 'prediction_error'
+            try:
+                input_data = pd.DataFrame([{
+                    'health_type': data.get('health_type'),
+                    'health_cause': data.get('health_cause'),
+                    'weather': data.get('weather'),
+                    'patient_age': data.get('patient_age'),
+                    'patient_gender': data.get('patient_gender')
+                }])
+                prediction = health_predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Error generating health prediction: {e}")
+                prediction = "prediction_error"
+
+        data['prediction'] = prediction
+        socketio.emit('health_response', data, room=f"health_{data.get('municipality', '').lower()}")
+        from HealthDashboard import handle_health_response
+        handle_health_response(data)
     except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        cleaned_data['prediction'] = 'prediction_error'
-    
-    responses.append(cleaned_data)
-    today_responses.append(cleaned_data)
-    municipality = get_municipality_from_barangay(cleaned_data['barangay'])
-    if not municipality:
-        logger.error(f"No municipality found for barangay: {cleaned_data['barangay']}")
-        municipality = 'unknown'
-    health_room = f"health_{municipality.lower()}"
-    emit('health_response_submitted', cleaned_data, room=health_room)
-    logger.info(f"Health response broadcasted to room {health_room}: {cleaned_data}")
+        logger.error(f"Error inserting health response: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 
 
@@ -758,64 +718,63 @@ def handle_register_role(data):
 
 @socketio.on('alert')
 def handle_new_alert(data):
-    logger.info(f"New alert received: {data}")
-    alert_id = str(uuid.uuid4())
-    data['alert_id'] = alert_id
-    data['timestamp'] = datetime.utcnow().isoformat()
-    data['resident_barangay'] = data.get('barangay', 'Unknown')
-    
-   
-    alerts.append(data)
-    
-    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-    municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality:
-        municipality = municipality.lower()
-        cdrrmo_room = f"cdrrmo_{municipality}"
-        pnp_room = f"pnp_{municipality}"
-        bfp_room = f"bfp_{municipality}"
-        health_room = f"health__{municipality}"
+    try:
+        logger.info(f"New alert received: {data}")
+        alert_id = str(uuid.uuid4())
+        data['alert_id'] = alert_id
+        data['timestamp'] = datetime.utcnow().isoformat()
+        data['resident_barangay'] = data.get('barangay', 'Unknown')
         
-    else:
-        logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
-        cdrrmo_room = None
-        pnp_room = None
-        bfp_room = None
-        health_room = None
+        alerts.append(data)
         
+        barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+        municipality = get_municipality_from_barangay(data.get('barangay'))
+        if municipality:
+            municipality = municipality.lower()
+            cdrrmo_room = f"cdrrmo_{municipality}"
+            pnp_room = f"pnp_{municipality}"
+            bfp_room = f"bfp_{municipality}"
+            health_room = f"health_{municipality}"  # Fixed typo: health__ to health_
+        else:
+            logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
+            cdrrmo_room = None
+            pnp_room = None
+            bfp_room = None
+            health_room = None
+        
+        emit('new_alert', data, room=barangay_room)
+        logger.info(f"Alert emitted to room {barangay_room}")
+        if cdrrmo_room:
+            emit('new_alert', data, room=cdrrmo_room)
+            logger.info(f"Alert emitted to room {cdrrmo_room}")
+        if pnp_room:
+            emit('new_alert', data, room=pnp_room)
+            logger.info(f"Alert emitted to room {pnp_room}")
+        if bfp_room:
+            emit('new_alert', data, room=bfp_room)
+            logger.info(f"Alert emitted to room {bfp_room}")
+        if health_room:
+            emit('new_alert', data, room=health_room)
+            logger.info(f"Alert emitted to room {health_room}")
     
-    emit('new_alert', data, room=barangay_room)
-    logger.info(f"Alert emitted to room {barangay_room}")
-    if cdrrmo_room:
-        emit('new_alert', data, room=cdrrmo_room)
-        logger.info(f"Alert emitted to room {cdrrmo_room}")
-    if pnp_room:
-        emit('new_alert', data, room=pnp_room)
-        logger.info(f"Alert emitted to room {pnp_room}")
-    if bfp_room:
-        emit('new_alert', data, room=bfp_room)
-        logger.info(f"Alert emitted to room {bfp_room}")
-    if health_room:
-        emit('new_alert', data, room=health_room)
-        logger.info(f"Alert emitted to room {health_room}")
-    
-
-    # Emit update_map to relevant rooms
-    map_data = {
-        'lat': data.get('lat'),
-        'lon': data.get('lon'),
-        'barangay': data.get('barangay'),
-        'emergency_type': data.get('emergency_type')
-    }
-    emit('update_map', map_data, room=barangay_room)
-    if cdrrmo_room:
-        emit('update_map', map_data, room=cdrrmo_room)
-    if pnp_room:
-        emit('update_map', map_data, room=pnp_room)
-    if bfp_room:
-        emit('update_map', map_data, room=bfp_room)
-    if health_room:
-        emit('update_map', map_data, room=health_room)    
+        # Emit update_map to relevant rooms
+        map_data = {
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type')
+        }
+        emit('update_map', map_data, room=barangay_room)
+        if cdrrmo_room:
+            emit('update_map', map_data, room=cdrrmo_room)
+        if pnp_room:
+            emit('update_map', map_data, room=pnp_room)
+        if bfp_room:
+            emit('update_map', map_data, room=bfp_room)
+        if health_room:
+            emit('update_map', map_data, room=health_room)
+    except Exception as e:
+        logger.error(f"Error handling alert: {e}")    
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
@@ -2048,7 +2007,7 @@ def health_dashboard():
         conn.close()
         
         if not unique_id or not user or user['role'] != 'health':
-            logger.warning("Unauthorized access to bfp_dashboard. Session: %s, User: %s", session, user)
+            logger.warning("Unauthorized access to health_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
