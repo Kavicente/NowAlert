@@ -1269,7 +1269,60 @@ def handle_fire_response_submitted(data):
     emit('fire_response_submitted', cleaned_data, room=bfp_room)
     logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
     
-
+@socketio.on('health_response')
+def handle_health_response(data):
+    try:
+        logger.info(f"Handling health response for alert_id: {data.get('alert_id')}")
+        # Map incoming data to model expected columns
+        prediction_data = {
+            'Health_Type': data.get('health_type', 'Unknown'),
+            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Year': datetime.utcnow().year  # Use current year as default
+        }
+        # Convert to DataFrame for prediction
+        prediction_df = pd.DataFrame([prediction_data])
+        if health_predictor:
+            prediction = health_predictor.predict_proba(prediction_df)[:, 1][0] * 100
+            prediction_text = f"{prediction:.1f}% chance in year {datetime.utcnow().year}"
+        else:
+            prediction_text = "prediction_error"
+        # Store response in database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO health_response (alert_id, health_emergency_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('health_type'),
+            data.get('health_cause'),
+            data.get('weather'),
+            data.get('patient_age'),
+            data.get('patient_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            data.get('timestamp'),
+            True
+        ))
+        conn.commit()
+        conn.close()
+        # Emit prediction to health room
+        municipality = get_municipality_from_barangay(data.get('barangay'))
+        if municipality:
+            health_room = f"health_{municipality.lower()}"
+            emit('health_response', {
+                'alert_id': data.get('alert_id'),
+                'barangay': data.get('barangay'),
+                'prediction': prediction_text
+            }, room=health_room)
+            logger.info(f"Prediction emitted to room {health_room}: {prediction_text}")
+        else:
+            logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
+    except Exception as e:
+        logger.error(f"Error in handle_health_response: {e}")
 
 @socketio.on('submit_barangay_data')
 def submit_barangay_data(data):
