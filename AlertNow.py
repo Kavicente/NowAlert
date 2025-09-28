@@ -560,7 +560,60 @@ def handle_health_response(data):
     finally:
         conn.close()
 
+@socketio.on('hospital_response')
+def handle_hospital_response(data):
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        manila = pytz.timezone('Asia/Manila')
+        base_time = datetime.now(manila)
+        c.execute('''
+            INSERT INTO hospital_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('health_type'),
+            data.get('health_cause'),
+            data.get('weather'),
+            data.get('patient_age'),
+            data.get('patient_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        conn.commit()
+        logger.info(f"Hospital response data inserted for alert_id: {data.get('alert_id')}")
 
+        # Generate prediction
+        prediction = "N/A"
+        if health_predictor:
+            try:
+                input_data = pd.DataFrame([{
+                    'health_type': data.get('health_type'),
+                    'health_cause': data.get('health_cause'),
+                    'weather': data.get('weather'),
+                    'patient_age': data.get('patient_age'),
+                    'patient_gender': data.get('patient_gender')
+                }])
+                prediction = health_predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Error generating hospital prediction: {e}")
+                prediction = "prediction_error"
+
+        data['prediction'] = prediction
+        socketio.emit('hospital_response', data, room=f"hospital_{data.get('municipality', '').lower()}")
+        from HospitalDashboard import handle_hospital_response
+        handle_health_response(data)
+    except Exception as e:
+        logger.error(f"Error inserting health response: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
 
 @app.route('/api/submit_response', methods=['POST'])
 def submit_response():
@@ -1370,7 +1423,7 @@ def handle_health_response(data):
 @socketio.on('hospital_response')
 def handle_hospital_response(data):
     try:
-        logger.info(f"Handling health response for alert_id: {data.get('alert_id')}")
+        logger.info(f"Handling hospital response for alert_id: {data.get('alert_id')}")
         # Map incoming data to model expected columns
         prediction_data = {
             'Health_Type': data.get('health_type', 'Unknown'),
@@ -1410,8 +1463,8 @@ def handle_hospital_response(data):
         # Emit prediction to health room
         municipality = get_municipality_from_barangay(data.get('barangay'))
         if municipality:
-            hospital_room = f"health_{municipality.lower()}"
-            emit('health_response', {
+            hospital_room = f"hospital_{municipality.lower()}"
+            emit('hospital_response', {
                 'alert_id': data.get('alert_id'),
                 'barangay': data.get('barangay'),
                 'prediction': prediction_text
@@ -1420,7 +1473,7 @@ def handle_hospital_response(data):
         else:
             logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
     except Exception as e:
-        logger.error(f"Error in handle_health_response: {e}")
+        logger.error(f"Error in handle_hospital_response: {e}")
 
 @socketio.on('submit_barangay_data')
 def submit_barangay_data(data):
