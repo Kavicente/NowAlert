@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Health Charts - {{ barangay }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/charts.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+    <header>
+        <h1>Health Charts - {{ barangay }}</h1>
+        <p id="datetime">{{ current_datetime }}</p>
+    </header>
+    <div class="sidebar" id="sidebar">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('health_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('health_charts') }}">Charts</a></li>
+            </ul>
+        </nav>
+    </div>
+    <main class="main-content" id="mainContent">
+        <div class="tabs">
+            <button class="tab active" onclick="filterData('today')">Today</button>
+            <button class="tab" onclick="filterData('daily')">Daily</button>
+            <button class="tab" onclick="filterData('weekly')">Weekly</button>
+            <button class="tab" onclick="filterData('monthly')">Monthly</button>
+            <button class="tab" onclick="filterData('yearly')">Yearly</button>
+        </div>
+        <div id="chartSection" class="section">
+            <div class="chart-container"><h2>Barangay Chart</h2><canvas id="barangayChart"></canvas></div>
+            <div class="chart-container"><h2>Health Emergency Type Chart</h2><canvas id="healthTypeChart"></canvas></div>
+            <div class="chart-container"><h2>Health Emergency Cause Chart</h2><canvas id="healthCauseChart"></canvas></div>
+            <div class="chart-container"><h2>Weather Chart</h2><canvas id="weatherChart"></canvas></div>
+            <div class="chart-container"><h2>Patient Age Chart</h2><canvas id="patientAgeChart"></canvas></div>
+            <div class="chart-container"><h2>Patient Gender Chart</h2><canvas id="patientGenderChart"></canvas></div>
+        </div>
+    </main>
+    <script>
+        const socket = io.connect('https://alertnow-t1kg.onrender.com');
+        let charts = {};
+        const ctxs = {
+            barangayChart: document.getElementById('barangayChart').getContext('2d'),
+            healthTypeChart: document.getElementById('healthTypeChart').getContext('2d'),
+            healthCauseChart: document.getElementById('healthCauseChart').getContext('2d'),
+            weatherChart: document.getElementById('weatherChart').getContext('2d'),
+            patientAgeChart: document.getElementById('patientAgeChart').getContext('2d'),
+            patientGenderChart: document.getElementById('patientGenderChart').getContext('2d')
+        };
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
+        function initCharts(data) {
+            console.log('Initializing charts with data:', data);
+            charts.barangayChart = new Chart(ctxs.barangayChart, {
+                type: 'bar',
+                data: data.barangay || { labels: [], datasets: [{ label: 'Barangay Incidents', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
+            charts.healthTypeChart = new Chart(ctxs.healthTypeChart, {
+                type: 'pie',
+                data: data.health_type || { labels: [], datasets: [{ label: 'Health Emergency Type', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
+            charts.healthCauseChart = new Chart(ctxs.healthCauseChart, {
+                type: 'doughnut',
+                data: data.health_cause || { labels: [], datasets: [{ label: 'Health Emergency Cause', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
+            charts.weatherChart = new Chart(ctxs.weatherChart, {
+                type: 'bar',
+                data: data.weather || { labels: [], datasets: [{ label: 'Weather Conditions', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
+            charts.patientAgeChart = new Chart(ctxs.patientAgeChart, {
+                type: 'doughnut',
+                data: data.patient_age || { labels: [], datasets: [{ label: 'Patient Age', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
+            charts.patientGenderChart = new Chart(ctxs.patientGenderChart, {
+                type: 'pie',
+                data: data.patient_gender || { labels: [], datasets: [{ label: 'Patient Gender', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
+        }
+
+        function updateCharts(data) {
+            console.log('Updating charts with data:', data);
+            charts.barangayChart.data = data.barangay || { labels: [], datasets: [{ label: 'Barangay Incidents', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            charts.healthTypeChart.data = data.health_type || { labels: [], datasets: [{ label: 'Health Emergency Type', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            charts.healthCauseChart.data = data.health_cause || { labels: [], datasets: [{ label: 'Health Emergency Cause', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            charts.weatherChart.data = data.weather || { labels: [], datasets: [{ label: 'Weather Conditions', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            charts.patientAgeChart.data = data.patient_age || { labels: [], datasets: [{ label: 'Patient Age', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            charts.patientGenderChart.data = data.patient_gender || { labels: [], datasets: [{ label: 'Patient Gender', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            Object.values(charts).forEach(chart => chart.update());
+        }
+
+        socket.on('health_response_update', (data) => {
+            console.log('Received health_response_update:', data);
+            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today' && '{{ barangay }}' === data.barangay) {
+                updateCharts(data);
+            }
+        });
+
+        function filterData(timeFilter) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            fetch(`/health_charts_data?time=${timeFilter}&barangay={{ barangay }}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Fetched chart data:', data);
+                    if (Object.keys(charts).length === 0) {
+                        initCharts(data);
+                    } else {
+                        updateCharts(data);
+                    }
+                })
+                .catch(error => console.error('Error fetching chart data:', error));
+        }
+
+        // Initialize charts with 'today' data
+        filterData('today');
+    </script>
+</body>
+</html>
