@@ -774,7 +774,7 @@ def handle_new_alert(data):
         cdrrmo_room = f"cdrrmo_{municipality}"
         pnp_room = f"pnp_{municipality}"
         bfp_room = f"bfp_{municipality}"
-        health_room = f"city_health__{municipality}"
+        health_room = f"city health__{municipality}"
         
     else:
         logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
@@ -830,7 +830,7 @@ def handle_forward_alert(data):
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
-    health_room = f"health_room_{municipality}"
+    health_room = f"city health_{municipality}"
     
     
     emit('new_alert', data, room=cdrrmo_room)
