@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Health Office Dashboard</title>
+    <title>Health Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
         .response-form { margin-top: 10px; }
         .response-form select, .response-form button { margin: 5px; }
         .clickable-img { cursor: pointer; max-width: 200px; }
-        .prediction { margin-top: 10px; font-weight: bold; color: #030303ff;}
+        .prediction { margin-top: 10px; font-weight: bold; }
         .image-modal {
             display: none;
             position: fixed;
@@ -51,7 +51,6 @@
                 <li><a href="{{ url_for('health_dashboard') }}"><span>🏠</span> Dashboard</a></li>
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
-                <li><a><span>📊</span> Manage Reports</a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
@@ -60,13 +59,13 @@
     </div>
     <div class="dashboard">
         <header>
-            <h1>Health Office {{ municipality }} Dashboard</h1>
+            <h1>Health Dashboard - {{ municipality }}</h1>
             <div class="filters">
             </div>
         </header>
     </div>
     <main class="main-content">
-        <h2 class="h2">Health Office {{ municipality }} Map</h2>
+        <h2 class="h2">Health Map - {{ municipality }}</h2>
         <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div id="map"></div>
         <section class="stats">
@@ -130,41 +129,27 @@
                 notifyAlert(data);
             });
 
-            socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                healthMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(healthMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-            });
-
             socket.on('health_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
-                    const existingPrediction = alertItem.querySelector('.prediction');
-                    if (!existingPrediction) {  // Add prediction only if it doesn't exist
-                        const predictionDiv = document.createElement('div');
-                        predictionDiv.className = 'prediction';
-                        const predictionText = data.prediction || 'N/A';
-                        let formattedPrediction = 'N/A';
-                        if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                            if (match) {
-                                const percentage = match[1];
-                                const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
-                                const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                                formattedPrediction = `There will be a ${percentage}% chance of Health Emergency Again in next ${randomRange}`;
-                            } else {
-                                formattedPrediction = predictionText;
-                            }
+                    const predictionDiv = document.createElement('div');
+                    predictionDiv.className = 'prediction';
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Health Emergency Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
                         }
-                        predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                        alertItem.appendChild(predictionDiv);
                     }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    alertItem.appendChild(predictionDiv);
                 }
             });
 
@@ -177,7 +162,7 @@
                     alertElements.set(data.alert_id, alertDiv);
                     let displayTime;
                     try {
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });  // Updated to current time
+                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
                     } catch (e) {
                         console.error('Error parsing timestamp:', e);
                         displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
@@ -192,7 +177,7 @@
                     feed.prepend(alertDiv);
 
                     if (data.image) {
-                        const img = alertItem.querySelector('.clickable-img');
+                        const img = alertDiv.querySelector('.clickable-img');
                         img.addEventListener('click', () => {
                             const modal = document.getElementById('image-modal');
                             const modalImg = document.getElementById('modal-image');
@@ -214,11 +199,64 @@
                 }
             }
 
-            function showImageModal(base64) {
-                const modal = document.getElementById('image-modal');
-                const modalImg = document.getElementById('modal-image');
-                modalImg.src = `data:image/jpeg;base64,${base64}`;
-                modal.style.display = 'flex';
+            function showResponseForm(alertId, lat, lon, barangay, type) {
+                const form = document.createElement('div');
+                form.className = 'response-form';
+                form.innerHTML = `
+                    <select id="healthType">
+                        <option value="Heart Attack">Heart Attack</option>
+                        <option value="Stroke">Stroke</option>
+                        <option value="Injury">Injury</option>
+                        <option value="Respiratory Distress">Respiratory Distress</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <select id="healthCause">
+                        <option value="Chronic Condition">Chronic Condition</option>
+                        <option value="Accident">Accident</option>
+                        <option value="Unknown">Unknown</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <select id="weather">
+                        <option value="Sunny">Sunny</option>
+                        <option value="Rainy">Rainy</option>
+                        <option value="Foggy">Foggy</option>
+                        <option value="Cloudy">Cloudy</option>
+                    </select>
+                    <select id="patientAge">
+                        <option value="0-17">0-17</option>
+                        <option value="18-35">18-35</option>
+                        <option value="36-50">36-50</option>
+                        <option value="51+">51+</option>
+                    </select>
+                    <select id="patientGender">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                    <button onclick="submitResponse('${alertId}', ${lat}, ${lon}, '${barangay}', '${type}')">Submit Response</button>
+                `;
+                const alertItem = alertElements.get(alertId);
+                if (alertItem) {
+                    alertItem.appendChild(form);
+                }
+            }
+
+            function submitResponse(alertId, lat, lon, barangay, type) {
+                const response = {
+                    alert_id: alertId,
+                    health_type: document.getElementById('healthType').value,
+                    health_cause: document.getElementById('healthCause').value,
+                    weather: document.getElementById('weather').value,
+                    patient_age: document.getElementById('patientAge').value,
+                    patient_gender: document.getElementById('patientGender').value,
+                    lat: lat,
+                    lon: lon,
+                    barangay: barangay,
+                    emergency_type: type
+                };
+                socket.emit('health_response', response);
+                console.log('Response submitted:', response);
+                const form = document.querySelector('.response-form');
+                if (form) form.remove();
             }
 
             const modal = document.getElementById('image-modal');
@@ -253,9 +291,22 @@
                     .catch(error => console.error('Error fetching stats:', error));
             }
 
-            
-
-
+            async function loadHeatmap() {
+                try {
+                    const response = await fetch('/get_heatmap_data?table=health_response&municipality={{ municipality }}');
+                    const data = await response.json();
+                    const heatData = data.map(item => [item.lat, item.lon, 1]);
+                    const heatmapLayer = L.heatLayer(heatData, {
+                        radius: 25,
+                        blur: 15,
+                        maxZoom: 17,
+                        gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' }
+                    }).addTo(healthMap);
+                } catch (error) {
+                    console.error('Error loading heatmap:', error);
+                }
+            }
+            loadHeatmap();
         });
     </script>
 </body>
