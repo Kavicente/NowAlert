@@ -450,7 +450,7 @@ def handle_submit_response(data):
         elif role == 'bfp':
             # Existing BFP logic remains unchanged
             pass
-        elif role == 'city health':
+        elif role == 'health':
             conn.execute('''
             INSERT INTO health_response (
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
@@ -569,7 +569,7 @@ def handle_health_response_submitted(data):
     if not municipality:
         logger.error(f"No municipality found for barangay: {cleaned_data['barangay']}")
         municipality = 'unknown'
-    health_room = f"city health_{municipality.lower()}"
+    health_room = f"health_{municipality.lower()}"
     emit('health_response_submitted', cleaned_data, room=health_room)
     logger.info(f"Health response broadcasted to room {health_room}: {cleaned_data}")
 
@@ -622,7 +622,7 @@ def submit_response():
                 INSERT INTO bfp_response (alert_id, cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, responded)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (alert_id, road_accident_cause, weather, property_type, lat, lon, barangay, emergency_type, timestamp, True))
-        elif role == 'city health':
+        elif role == 'health':
             c.execute('''
             INSERT INTO health_response (
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
@@ -745,11 +745,11 @@ def handle_register_role(data):
         if municipality:
             join_room(f"bfp_{municipality}")
             logger.info(f"Client {request.sid} joined room bfp_{municipality}")
-    elif role == 'city health':
+    elif role == 'health':
             municipality = data.get('municipality').lower() if data.get('municipality') else None
             if municipality:
-                join_room(f"city health_{municipality}")
-                logger.info(f"Client {request.sid} joined room city health_{municipality}")
+                join_room(f"health_{municipality}")
+                logger.info(f"Client {request.sid} joined room health_{municipality}")
     elif role == 'hospital':
             municipality = data.get('municipality').lower() if data.get('municipality') else None
             if municipality:
@@ -774,7 +774,7 @@ def handle_new_alert(data):
         cdrrmo_room = f"cdrrmo_{municipality}"
         pnp_room = f"pnp_{municipality}"
         bfp_room = f"bfp_{municipality}"
-        health_room = f"city health__{municipality}"
+        health_room = f"health__{municipality}"
         
     else:
         logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
@@ -830,7 +830,7 @@ def handle_forward_alert(data):
     cdrrmo_room = f"cdrrmo_{municipality}"
     pnp_room = f"pnp_{municipality}"
     bfp_room = f"bfp_{municipality}"
-    health_room = f"city health_{municipality}"
+    health_room = f"health_{municipality}"
     
     
     emit('new_alert', data, room=cdrrmo_room)
@@ -1566,7 +1566,7 @@ def login_agency():
         password = request.form['password']
         assigned_hospital = request.form.get('assigned_hospital', '').lower() if role == 'hospital' else None
         
-        if role not in ['cdrrmo', 'pnp', 'bfp', 'city health', 'hospital']:
+        if role not in ['cdrrmo', 'pnp', 'bfp', 'health', 'hospital']:
             logger.error(f"Invalid role provided: {role}")
             return render_template('AgencyIn.html', error="Invalid role", cdrrmo_pnp_bfp_users=[]), 400
         
@@ -1591,7 +1591,7 @@ def login_agency():
                 return redirect(url_for('pnp_dashboard'))
             elif user['role'] == 'bfp':
                 return redirect(url_for('bfp_dashboard'))
-            elif user['role'] == 'city health':
+            elif user['role'] == 'health':
                 return redirect(url_for('health_dashboard'))
             elif user['role'] == 'hospital':
                 return redirect(url_for('hospital_dashboard'))
@@ -1599,7 +1599,7 @@ def login_agency():
         return render_template('AgencyIn.html', error="Invalid credentials or hospital assignment", cdrrmo_pnp_bfp_users=[]), 401
     conn = get_db_connection()
     cdrrmo_pnp_bfp_users = conn.execute('SELECT role, assigned_municipality, contact_no, password, assigned_hospital FROM users WHERE role IN (?, ?, ?, ?, ?)', 
-                                        ('cdrrmo', 'pnp', 'bfp', 'city health', 'hospital')).fetchall()
+                                        ('cdrrmo', 'pnp', 'bfp', 'health', 'hospital')).fetchall()
     logger.debug(f"Retrieved {len(cdrrmo_pnp_bfp_users)} CDRRMO/PNP/BFP/City Health/Hospital users: {[dict(row) for row in cdrrmo_pnp_bfp_users]}")
     conn.close()
     return render_template('AgencyIn.html', cdrrmo_pnp_bfp_users=cdrrmo_pnp_bfp_users)
@@ -1614,7 +1614,7 @@ def auto_role():
     contact_no = request.form['contact_no']
     password = request.form['password']
     
-    if role not in ['cdrrmo', 'pnp', 'bfp', 'city health', 'hospital']:
+    if role not in ['cdrrmo', 'pnp', 'bfp', 'health', 'hospital']:
         logger.error(f"Invalid role provided: {role}")
         return jsonify({'error': 'Invalid role'}), 400
     
@@ -1644,7 +1644,7 @@ def auto_role():
             return redirect(url_for('pnp_dashboard'))
         elif user['role'] == 'bfp':
             return redirect(url_for('bfp_dashboard'))
-        elif user['role'] == 'city health':
+        elif user['role'] == 'health':
             return redirect(url_for('health_dashboard'))
         elif user['role'] == 'hospital':
             return redirect(url_for('hospital_dashboard'))
@@ -1838,7 +1838,7 @@ def get_distribution():
         elif role == 'bfp':
             filtered_alerts = [a for a in alerts if a.get('role') == 'bfp' or a.get('assigned_municipality')]
         elif role == 'city_health':
-            filtered_alerts = [a for a in alerts if a.get('role') == 'city health' or a.get('assigned_municipality')]
+            filtered_alerts = [a for a in alerts if a.get('role') == 'health' or a.get('assigned_municipality')]
         else:
             filtered_alerts = alerts
         types = [a.get('emergency_type', 'unknown') for a in filtered_alerts]
@@ -2037,17 +2037,17 @@ def bfp_dashboard():
 @app.route('/health_dashboard')
 def health_dashboard():
     try:
-        if 'role' not in session or session['role'] != 'city health':
+        if 'role' not in session or session['role'] != 'health':
             return redirect(url_for('login_agency'))
         stats = get_health_stats()
         unique_id = session.get('unique_id')
         conn = get_db_connection()
         user = conn.execute('''
             SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-        ''', ('city health', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+        ''', ('health', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
         conn.close()
         
-        if not unique_id or not user or user['role'] != 'city health':
+        if not unique_id or not user or user['role'] != 'health':
             logger.warning("Unauthorized access to bfp_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
@@ -2118,7 +2118,7 @@ def get_bfp_stats():
     
 def get_health_stats():
     try:
-        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'city health' or a.get('assigned_municipality')]
+        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'health' or a.get('assigned_municipality')]
         return Counter(types)
     except Exception as e:
         logger.error(f"Error in get_health_stats: {e}")
