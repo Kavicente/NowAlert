@@ -2035,7 +2035,7 @@ def bfp_dashboard():
         return "Internal Server Error", 500
 
 @app.route('/health_dashboard')
-def barangay_dashboard():
+def health_dashboard():
     try:
         if 'role' not in session or session['role'] != 'city health':
             return redirect(url_for('login_agency'))
