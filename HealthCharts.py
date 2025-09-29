@@ -21,6 +21,19 @@ def get_default_barangay(municipality):
     from AlertNow import barangay_coords
     return next(iter(barangay_coords.get(municipality, {})), 'Unknown')
 
+
+def get_barangays():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT barangay FROM health_response WHERE barangay IS NOT NULL')
+        barangays = [row['barangay'] for row in cursor.fetchall()]
+        conn.close()
+        return sorted(barangays)
+    except Exception as e:
+        logger.error(f"Error fetching barangays: {e}")
+        return []
+
 def health_charts():
     try:
         barangay = session.get('barangay', None)
@@ -43,6 +56,7 @@ def health_charts_data():
     try:
         time_filter = request.args.get('time', 'today')
         barangay = request.args.get('barangay', 'Unknown')
+        hospital = request.args.get('hospital', '')
         municipality = get_municipality_from_barangay(barangay)
         session_municipality = session.get('municipality', 'Unknown')
         if barangay == 'Unknown' or not municipality:
@@ -81,6 +95,17 @@ def health_charts_data():
         '''
         cursor.execute(query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
         rows = cursor.fetchall()
+        hospital_query = '''
+            SELECT assigned_hospital
+            FROM hospital_response
+            WHERE timestamp BETWEEN ? AND ? AND barangay = ?
+        '''
+        if hospital:
+            hospital_query += " AND assigned_hospital = ?"
+            cursor.execute(hospital_query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay, hospital))
+        else:
+            cursor.execute(hospital_query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
+        hospital_rows = cursor.fetchall()
         conn.close()
 
         barangay_data = {}
@@ -89,6 +114,7 @@ def health_charts_data():
         weather_data = {}
         patient_age_data = {}
         patient_gender_data = {}
+        responder_data = {}
 
         for row in rows:
             barangay_val = row['barangay'] or 'Unknown'
@@ -104,8 +130,12 @@ def health_charts_data():
             weather_data[weather] = weather_data.get(weather, 0) + 1
             patient_age_data[patient_age] = patient_age_data.get(patient_age, 0) + 1
             patient_gender_data[patient_gender] = patient_gender_data.get(patient_gender, 0) + 1
+            
+        for row in hospital_rows:
+            responder = row['assigned_hospital'] or 'Unknown'
+            responder_data[responder] = responder_data.get(responder, 0) + 1
 
-        logger.info(f"Health chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}")
+        logger.info(f"Health chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}, Responder: {responder_data}")
 
         colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6', '#3498DB']
 
@@ -167,6 +197,16 @@ def health_charts_data():
                     'data': list(patient_gender_data.values()) or [0],
                     'backgroundColor': colors[:len(patient_gender_data)] or ['#999999'],
                     'borderColor': colors[:len(patient_gender_data)] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'responder': {
+                'labels': list(responder_data.keys()) or ['No Data'],
+                'datasets': [{
+                    'label': 'Health Responder',
+                    'data': list(responder_data.values()) or [0],
+                    'backgroundColor': colors[:len(responder_data)] or ['#999999'],
+                    'borderColor': colors[:len(responder_data)] or ['#999999'],
                     'borderWidth': 1
                 }]
             }

@@ -590,6 +590,12 @@ def handle_hospital_response(data):
         conn.commit()
         logger.info(f"Hospital response data inserted for alert_id: {data.get('alert_id')}")
 
+        data['assigned_hospital'] = data.get('assigned_hospital', 'Unknown')  # Add assigned_hospital to data
+        socketio.emit('hospital_response_update', data, room=f"hospital_{data.get('municipality', '').lower()}")
+        socketio.emit('health_response_update', data, room=f"health_{data.get('municipality', '').lower()}")  # Emit to health charts for synchronization
+        from HospitalCharts import handle_hospital_response
+        handle_hospital_response(data)
+
         # Generate prediction
         prediction = "N/A"
         if health_predictor:
@@ -1411,6 +1417,18 @@ def handle_health_response(data):
             True
         ))
         conn.commit()
+        
+         # Query hospital_response for responder chart data
+        c.execute('''
+            SELECT assigned_hospital
+            FROM hospital_response
+            WHERE barangay = ? AND timestamp >= ?
+        ''', (data.get('barangay'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),))
+        responder_rows = c.fetchall()
+        responder_data = {}
+        for row in responder_rows:
+            responder = row['assigned_hospital'] or 'Unknown'
+            responder_data[responder] = responder_data.get(responder, 0) + 1
         conn.close()
         # Emit prediction to health room
         municipality = get_municipality_from_barangay(data.get('barangay'))
@@ -1484,6 +1502,17 @@ def handle_health_response(data):
                         'borderWidth': 1
                     }]
                 },
+                
+            'responder': {
+                'labels': list(responder_data.keys()) or ['No Data'],
+                'datasets': [{
+                        'label': 'Hospital Responders',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                        'borderColor': ['#D4A5A5'] or ['#999999'],
+                        'borderWidth': 1
+                }]
+            },
                 'barangay': barangay
             }
             logger.info(f"Emitting health_response_update with chart_data: {chart_data}")
@@ -1514,14 +1543,15 @@ def handle_hospital_response(data):
             prediction_text = "prediction_error"
         barangay = data.get('barangay', 'Unknown')
         municipality = get_municipality_from_barangay(barangay)
+        assigned_hospital = data.get('assigned_hospital', session.get('assigned_hospital', 'Unknown Hospital'))
         if barangay == 'Unknown' or not municipality:
             barangay = next(iter(barangay_coords.get(session.get('municipality', 'Unknown'), {})), 'Unknown')
             logger.warning(f"Invalid barangay {data.get('barangay', 'Unknown')}, using default {barangay}")
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, assigned_hospital, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
             data.get('health_type'),
@@ -1534,7 +1564,8 @@ def handle_hospital_response(data):
             data.get('barangay'),
             data.get('emergency_type'),
             datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
-            True
+            True,
+            assigned_hospital
         ))
         conn.commit()
         conn.close()
@@ -1545,7 +1576,8 @@ def handle_hospital_response(data):
             emit('hospital_response', {
                 'alert_id': data.get('alert_id'),
                 'barangay': data.get('barangay'),
-                'prediction': prediction_text
+                'prediction': prediction_text,
+                'assigned_hospital': assigned_hospital
             }, room=hospital_room)
             logger.info(f"Prediction emitted to room {hospital_room}: {prediction_text}")
             chart_data = {
@@ -1609,7 +1641,18 @@ def handle_hospital_response(data):
                         'borderWidth': 1
                     }]
                 },
-                'barangay': barangay
+                'patient_gender': {
+                    'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Gender',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                        'borderColor': ['#D4A5A5'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'barangay': barangay,
+                'assigned_hospital': assigned_hospital
             }
             logger.info(f"Emitting hospital_response_update with chart_data: {chart_data}")
             emit('hospital_response_update', chart_data, room=hospital_room)
@@ -2402,6 +2445,7 @@ def hospital_dashboard():
             return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
+        assigned_hospital = session.get('assigned_hospital', 'Unknown Hospital').title()
         stats = get_hospital_stats()
         coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
         
@@ -2417,6 +2461,7 @@ def hospital_dashboard():
         return render_template('HospitalDashboard.html', 
                                stats=stats, 
                                municipality=assigned_municipality, 
+                               assigned_hospital=assigned_hospital,
                                lat_coord=lat_coord,
                                lon_coord=lon_coord,
                                google_api_key=GOOGLE_API_KEY)
@@ -2604,7 +2649,8 @@ if __name__ == '__main__':
                 barangay TEXT,
                 emergency_type TEXT,
                 timestamp TEXT,
-                responded BOOLEAN DEFAULT TRUE
+                responded BOOLEAN DEFAULT TRUE,
+                assigned_hospital TEXT
             )
         ''')
         conn.commit()
@@ -2619,7 +2665,7 @@ if __name__ == '__main__':
         c.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 barangay TEXT,
-                role TEXT NOT NULL,
+                role TEXT NOT NULL CHECK(role IN ('resident', 'barangay', 'cdrrmo', 'pnp', 'bfp', 'health', 'hospital')),
                 contact_no TEXT UNIQUE NOT NULL,
                 assigned_municipality TEXT,
                 province TEXT,

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hospital Dashboard</title>
+    <title>{{ assigned_hospital }} Dashboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -60,13 +60,13 @@
     </div>
     <div class="dashboard">
         <header>
-            <h1>Hospital Dashboard - {{ municipality }}</h1>
+            <h1>{{ assigned_hospital }} Dashboard - {{ municipality }}</h1>
             <div class="filters">
             </div>
         </header>
     </div>
     <main class="main-content">
-        <h2 class="h2">Hospital Map - {{ municipality }}</h2>
+        <h2 class="h2">{{ assigned_hospital }} Map - {{ municipality }}</h2>
         <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div id="map"></div>
         <section class="stats">
