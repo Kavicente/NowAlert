@@ -36,6 +36,7 @@
             <div class="chart-container"><h2>Weather Chart</h2><canvas id="weatherChart"></canvas></div>
             <div class="chart-container"><h2>Patient Age Chart</h2><canvas id="patientAgeChart"></canvas></div>
             <div class="chart-container"><h2>Patient Gender Chart</h2><canvas id="patientGenderChart"></canvas></div>
+            <div class="chart-container"><h2>Hospital Responder Chart</h2><canvas id="hospitalResponderChart"></canvas></div>
         </div>
     </main>
     <script>
@@ -47,7 +48,8 @@
             healthCauseChart: document.getElementById('healthCauseChart').getContext('2d'),
             weatherChart: document.getElementById('weatherChart').getContext('2d'),
             patientAgeChart: document.getElementById('patientAgeChart').getContext('2d'),
-            patientGenderChart: document.getElementById('patientGenderChart').getContext('2d')
+            patientGenderChart: document.getElementById('patientGenderChart').getContext('2d'),
+            hospitalResponderChart: document.getElementById('hospitalResponderChart').getContext('2d')
         };
 
         function toggleSidebar() {
@@ -89,6 +91,11 @@
                 data: data.patient_gender || { labels: [], datasets: [{ label: 'Patient Gender', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
                 options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
             });
+            charts.hospitalResponderChart = new Chart(ctxs.hospitalResponderChart, {
+                type: 'bar',
+                data: data.hospital_responder || { labels: [], datasets: [{ label: 'Hospital Responders', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
+                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
+            });
         }
 
         function updateCharts(data) {
@@ -99,6 +106,7 @@
             charts.weatherChart.data = data.weather || { labels: [], datasets: [{ label: 'Weather Conditions', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
             charts.patientAgeChart.data = data.patient_age || { labels: [], datasets: [{ label: 'Patient Age', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
             charts.patientGenderChart.data = data.patient_gender || { labels: [], datasets: [{ label: 'Patient Gender', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
+            charts.hospitalResponderChart.data = data.hospital_responder || { labels: [], datasets: [{ label: 'Hospital Responders', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
             Object.values(charts).forEach(chart => chart.update());
         }
 

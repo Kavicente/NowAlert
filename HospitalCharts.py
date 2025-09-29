@@ -89,6 +89,7 @@ def hospital_charts_data():
         weather_data = {}
         patient_age_data = {}
         patient_gender_data = {}
+        hospital_responder_data = {}
 
         for row in rows:
             barangay_val = row['barangay'] or 'Unknown'
@@ -97,6 +98,7 @@ def hospital_charts_data():
             weather = row['weather'] or 'Unknown'
             patient_age = row['patient_age'] or 'Unknown'
             patient_gender = row['patient_gender'] or 'Unknown'
+            hospital_responder = row['assigned_hospital'] or 'Unknown'
 
             barangay_data[barangay_val] = barangay_data.get(barangay_val, 0) + 1
             health_type_data[health_type] = health_type_data.get(health_type, 0) + 1
@@ -104,6 +106,7 @@ def hospital_charts_data():
             weather_data[weather] = weather_data.get(weather, 0) + 1
             patient_age_data[patient_age] = patient_age_data.get(patient_age, 0) + 1
             patient_gender_data[patient_gender] = patient_gender_data.get(patient_gender, 0) + 1
+            hospital_responder_data[hospital_responder] = hospital_responder_data.get(hospital_responder, 0) + 1
 
         logger.info(f"Hospital chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}")
 
