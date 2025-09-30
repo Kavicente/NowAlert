@@ -1505,6 +1505,8 @@ def handle_health_response(data):
             'barangay': barangay
         }
         logger.info(f"Emitting health_response_update with chart_data: {chart_data}")
+        from HealthCharts import health_charts_data
+        chart_data = health_charts_data()
         socketio.emit('health_response_update', chart_data, room=health_room)
         logger.info(f"Chart update emitted to room {health_room}")
 
