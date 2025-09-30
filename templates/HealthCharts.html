@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>Health Charts - {{ barangay }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/charts.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hcharts.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
 </head>
 <body>
     <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
     <header>
-        <h1>Health Charts - {{ barangay }}</h1>
+        <h1>Health Charts</h1>
         <p id="datetime">{{ current_datetime }}</p>
     </header>
     <div class="sidebar" id="sidebar">
@@ -18,82 +18,6 @@
             <ul>
                 <li><a href="{{ url_for('health_dashboard') }}">Dashboard</a></li>
                 <li><a href="{{ url_for('health_charts') }}">Charts</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Atisan')">Atisan</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Bagong Bayan')">Bagong Bayan</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Bagong Pook')">Bagong Pook</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Bautista')">Bautista</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Concepcion')">Concepcion</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Del Remedio')">Del Remedio</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Dolores')">Dolores</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Antonio 1')">San Antonio 1</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Antonio 2')">San Antonio 2</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Bartolome')">San Bartolome</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Buenaventura')">San Buenaventura</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Crispin')">San Crispin</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Cristobal')">San Cristobal</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Diego')">San Diego</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Francisco')">San Francisco</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Gabriel')">San Gabriel</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Gregorio')">San Gregorio</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Ignacio')">San Ignacio</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Isidro')">San Isidro</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Jose')">San Jose</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Juan')">San Juan</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Lorenzo')">San Lorenzo</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Lucas 1')">San Lucas 1</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Lucas 2')">San Lucas 2</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Marcos')">San Marcos</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Mateo')">San Mateo</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Miguel')">San Miguel</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Nicolas')">San Nicolas</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Pedro')">San Pedro</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Rafael')">San Rafael</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Roque')">San Roque</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('San Vicente')">San Vicente</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Ana')">Santa Ana</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Catalina')">Santa Catalina</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Cruz')">Santa Cruz</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Felomina')">Santa Felomina</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Maria')">Santa Maria</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Monica')">Santa Monica</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santa Veronica')">Santa Veronica</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santiago 1')">Santiago 1</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santiago 2')">Santiago 2</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santisima Trinidad')">Santisima Trinidad</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santo Angel')">Santo Angel</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santo Cristo')">Santo Cristo</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Santo Niño')">Santo Niño</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Soledad')">Soledad</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay I-A')">Barangay I-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay I-B')">Barangay I-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay II-A')">Barangay II-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay II-B')">Barangay II-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay II-C')">Barangay II-C</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay II-D')">Barangay II-D</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay II-E')">Barangay II-E</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay II-F')">Barangay II-F</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay III-A')">Barangay III-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay III-B')">Barangay III-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay III-C')">Barangay III-C</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay III-D')">Barangay III-D</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay III-E')">Barangay III-E</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay III-F')">Barangay III-F</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay IV-A')">Barangay IV-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay IV-B')">Barangay IV-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay IV-C')">Barangay IV-C</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay V-A')">Barangay V-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay V-B')">Barangay V-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay V-C')">Barangay V-C</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay V-D')">Barangay V-D</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VI-A')">Barangay VI-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VI-B')">Barangay VI-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VI-D')">Barangay VI-D</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VI-E')">Barangay VI-E</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VII-A')">Barangay VII-A</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VII-B')">Barangay VII-B</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VII-C')">Barangay VII-C</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VII-D')">Barangay VII-D</a></li>
-                <li><a href="#" onclick="loadBarangayCharts('Barangay VII-E')">Barangay VII-E</a></li>
             </ul>
         </nav>
     </div>
@@ -105,6 +29,7 @@
             <button class="tab" onclick="filterData('monthly')">Monthly</button>
             <button class="tab" onclick="filterData('yearly')">Yearly</button>
         </div>
+
         <div class="tabs hospital-tabs">
             <button class="tab" onclick="filterHospital('SPC District Hospital')">SPC District Hospital</button>
             <button class="tab" onclick="filterHospital('San Pablo Colleges Medical Center')">San Pablo Colleges Medical Center</button>
@@ -114,29 +39,49 @@
             <button class="tab" onclick="filterHospital('San Pablo Doctors Hospital')">San Pablo Doctors Hospital</button>
             <button class="tab" onclick="filterHospital('St. Francis and Paul General Hospital')">St. Francis and Paul General Hospital</button>
         </div>
+
+        <div class="dropdown-container">
+            <label for="barangayDropdown">Select Barangay: </label>
+            <select id="barangayDropdown" onchange="jumpToBarangay()">
+                <option value="">Select a Barangay</option>
+                {% for barangay in barangays %}
+                <option value="{{ barangay | replace(' ', '-') }}">{{ barangay }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
         <div id="chartSection" class="section">
-            <div class="chart-container"><h2>Barangay Chart</h2><canvas id="barangayChart"></canvas></div>
-            <div class="chart-container"><h2>Health Emergency Type Chart</h2><canvas id="healthTypeChart"></canvas></div>
-            <div class="chart-container"><h2>Health Emergency Cause Chart</h2><canvas id="healthCauseChart"></canvas></div>
-            <div class="chart-container"><h2>Weather Chart</h2><canvas id="weatherChart"></canvas></div>
-            <div class="chart-container"><h2>Patient Age Chart</h2><canvas id="patientAgeChart"></canvas></div>
-            <div class="chart-container"><h2>Patient Gender Chart</h2><canvas id="patientGenderChart"></canvas></div>
-            <div class="chart-container"><h2>Health Responder Chart</h2><canvas id="responderChart"></canvas></div>
+            {% for barangay in barangays %}
+            <div class="barangay-section" id="barangay-{{ barangay | replace(' ', '-') }}">
+                <h2>{{ barangay }} Emergency Health Reports</h2>
+                <div class="chart-grid">
+                    <div class="chart-container"><h2>Barangay Chart</h2><canvas id="barangayChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Health Emergency Type Chart</h2><canvas id="healthTypeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Health Emergency Cause Chart</h2><canvas id="healthCauseChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Weather Chart</h2><canvas id="weatherChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Patient Age Chart</h2><canvas id="patientAgeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Patient Gender Chart</h2><canvas id="patientGenderChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Health Responder Chart</h2><canvas id="responderChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </main>
     <script>
         const socket = io.connect('https://alertnow-t1kg.onrender.com');
         let charts = {};
-        const ctxs = {
-            barangayChart: document.getElementById('barangayChart').getContext('2d'),
-            healthTypeChart: document.getElementById('healthTypeChart').getContext('2d'),
-            healthCauseChart: document.getElementById('healthCauseChart').getContext('2d'),
-            weatherChart: document.getElementById('weatherChart').getContext('2d'),
-            patientAgeChart: document.getElementById('patientAgeChart').getContext('2d'),
-            patientGenderChart: document.getElementById('patientGenderChart').getContext('2d'),
-            responderChart: document.getElementById('responderChart').getContext('2d')
-            
-        };
+
+
+        function jumpToBarangay() {
+            const dropdown = document.getElementById('barangayDropdown');
+            const barangayId = dropdown.value;
+            if (barangayId) {
+                const section = document.getElementById(`barangay-${barangayId}`);
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -145,109 +90,73 @@
             mainContent.classList.toggle('shifted');
         }
 
-        function toggleBarangaySection() {
-                    const barangaySection = document.getElementById('barangay-section');
-                    barangaySection.classList.toggle('hidden');
-                }
-
-        function initCharts(data) {
-            console.log('Initializing charts with data:', data);
-            charts.barangayChart = new Chart(ctxs.barangayChart, {
-                type: 'bar',
-                data: data.barangay || { labels: [], datasets: [{ label: 'Barangay Incidents', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
-            charts.healthTypeChart = new Chart(ctxs.healthTypeChart, {
-                type: 'pie',
-                data: data.health_type || { labels: [], datasets: [{ label: 'Health Emergency Type', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
-            charts.healthCauseChart = new Chart(ctxs.healthCauseChart, {
-                type: 'doughnut',
-                data: data.health_cause || { labels: [], datasets: [{ label: 'Health Emergency Cause', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
-            charts.weatherChart = new Chart(ctxs.weatherChart, {
-                type: 'bar',
-                data: data.weather || { labels: [], datasets: [{ label: 'Weather Conditions', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
-            charts.patientAgeChart = new Chart(ctxs.patientAgeChart, {
-                type: 'doughnut',
-                data: data.patient_age || { labels: [], datasets: [{ label: 'Patient Age', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
-            charts.patientGenderChart = new Chart(ctxs.patientGenderChart, {
-                type: 'pie',
-                data: data.patient_gender || { labels: [], datasets: [{ label: 'Patient Gender', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
-            charts.responderChart = new Chart(ctxs.responderChart, {
-                type: 'bar',
-                data: data.responder || { labels: [], datasets: [{ label: 'Health Responder', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] },
-                options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } }
-            });
+        function initCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            charts[`${safeBarangay}-barangayChart`] = new Chart(document.getElementById(`barangayChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.barangay, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-healthTypeChart`] = new Chart(document.getElementById(`healthTypeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.health_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-healthCauseChart`] = new Chart(document.getElementById(`healthCauseChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.health_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-weatherChart`] = new Chart(document.getElementById(`weatherChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-patientAgeChart`] = new Chart(document.getElementById(`patientAgeChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.patient_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-patientGenderChart`] = new Chart(document.getElementById(`patientGenderChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.patient_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-responderChart`] = new Chart(document.getElementById(`responderChart-${safeBarangay}`).getContext('2d'), { type: 'polarArea', data: data.responder, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
-        function updateCharts(data) {
-            console.log('Updating charts with data:', data);
-            charts.barangayChart.data = data.barangay || { labels: [], datasets: [{ label: 'Barangay Incidents', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            charts.healthTypeChart.data = data.health_type || { labels: [], datasets: [{ label: 'Health Emergency Type', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            charts.healthCauseChart.data = data.health_cause || { labels: [], datasets: [{ label: 'Health Emergency Cause', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            charts.weatherChart.data = data.weather || { labels: [], datasets: [{ label: 'Weather Conditions', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            charts.patientAgeChart.data = data.patient_age || { labels: [], datasets: [{ label: 'Patient Age', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            charts.patientGenderChart.data = data.patient_gender || { labels: [], datasets: [{ label: 'Patient Gender', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            charts.responderChart.data = data.responder || { labels: [], datasets: [{ label: 'Health Responder', data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] };
-            Object.values(charts).forEach(chart => chart.update());
+        function updateCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            if (charts[`${safeBarangay}-barangayChart`]) {
+                charts[`${safeBarangay}-barangayChart`].data = data.barangay;
+                charts[`${safeBarangay}-healthTypeChart`].data = data.health_type;
+                charts[`${safeBarangay}-healthCauseChart`].data = data.health_cause;
+                charts[`${safeBarangay}-weatherChart`].data = data.weather;
+                charts[`${safeBarangay}-patientAgeChart`].data = data.patient_age;
+                charts[`${safeBarangay}-patientGenderChart`].data = data.patient_gender;
+                charts[`${safeBarangay}-responderChart`].data = data.responder;
+                Object.keys(charts).filter(key => key.startsWith(safeBarangay)).forEach(key => charts[key].update());
+            } else {
+                initCharts(barangay, data);
+            }
         }
 
         socket.on('health_response_update', (data) => {
-            console.log('Received health_response_update:', data);
-            if (document.querySelector('.tab.active').textContent.toLowerCase() === 'today' && '{{ barangay }}' === data.barangay) {
-                updateCharts(data);
+            const timeFilter = document.querySelector('.tabs:not(.hospital-tabs) .tab.active').textContent.toLowerCase();
+            if (timeFilter === 'today') {
+                const hospitalFilter = document.querySelector('.hospital-tabs .tab.active')?.textContent || '';
+                fetchCharts(timeFilter, data.barangay, hospitalFilter);
             }
         });
 
         function filterData(timeFilter) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
-            fetch(`/health_charts_data?time=${timeFilter}&barangay={{ barangay }}`)
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Fetched chart data:', data);
-                    if (Object.keys(charts).length === 0) {
-                        initCharts(data);
-                    } else {
-                        updateCharts(data);
-                    }
-                })
-                .catch(error => console.error('Error fetching chart data:', error));
+            document.querySelectorAll('.tabs:not(.hospital-tabs) .tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tabs:not(.hospital-tabs) .tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            const hospitalFilter = document.querySelector('.hospital-tabs .tab.active')?.textContent || '';
+            fetchCharts(timeFilter, null, hospitalFilter);
         }
 
         function filterHospital(hospital) {
             document.querySelectorAll('.hospital-tabs .tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.hospital-tabs .tab[onclick="filterHospital('${hospital}')"]`).classList.add('active');
             const timeFilter = document.querySelector('.tabs:not(.hospital-tabs) .tab.active').textContent.toLowerCase();
-            fetchCharts(timeFilter, '{{ barangay }}', hospital);
+            fetchCharts(timeFilter, null, hospital);
         }
 
-        function loadBarangayCharts(barangay) {
-            const timeFilter = document.querySelector('.tabs:not(.hospital-tabs) .tab.active').textContent.toLowerCase();
-            const hospitalFilter = document.querySelector('.hospital-tabs .tab.active')?.textContent || '';
-            fetchCharts(timeFilter, barangay, hospitalFilter);
-            document.querySelector('h1').textContent = `Health Charts - ${barangay}`;
+        function fetchCharts(timeFilter, barangay = null, hospital = '') {
+            const barangays = {{ barangays | tojson }};
+            barangays.forEach(b => {
+                fetch(`/health_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(b)}&hospital=${encodeURIComponent(hospital)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const safeBarangay = b.replace(/\s+/g, '-');
+                        if (charts[`${safeBarangay}-barangayChart`]) {
+                            Object.keys(charts).filter(key => key.startsWith(safeBarangay)).forEach(key => charts[key].destroy());
+                        }
+                        initCharts(b, data);
+                    });
+            });
         }
 
-        function fetchCharts(timeFilter, barangay, hospital) {
-            fetch(`/health_charts_data?time_filter=${timeFilter}&barangay=${barangay}&hospital=${hospital}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (charts.barangayChart) Object.values(charts).forEach(chart => chart.destroy());
-                    initCharts(data);
-                });
-        }
- 
-        filterData('today');
+        window.onload = () => {
+            filterData('today');
+        };
     </script>
 </body>
 </html>
