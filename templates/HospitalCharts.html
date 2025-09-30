@@ -43,7 +43,7 @@
         <div id="chartSection" class="section">
             {% for barangay in barangays %}
             <div class="barangay-section" id="barangay-{{ barangay | replace(' ', '-') }}">
-                <h2>{{ barangay }} Emergency Health Reports</h2>
+                <h2>{{ barangay }} Emergency Hospital Reports</h2>
                 <div class="chart-grid">
                     <div class="chart-container"><h2>Barangay Chart</h2><canvas id="barangayChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
                     <div class="chart-container"><h2>Health Emergency Type Chart</h2><canvas id="healthTypeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
@@ -60,6 +60,7 @@
     <script>
         const socket = io.connect('https://alertnow-t1kg.onrender.com');
         let charts = {};
+        const barangays = {{ barangays | tojson }};
 
         function jumpToBarangay() {
             const dropdown = document.getElementById('barangayDropdown');
@@ -81,57 +82,84 @@
 
         function initCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
-            charts[`${safeBarangay}-barangayChart`] = new Chart(document.getElementById(`barangayChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.barangay, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-healthTypeChart`] = new Chart(document.getElementById(`healthTypeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.health_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-healthCauseChart`] = new Chart(document.getElementById(`healthCauseChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.health_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-weatherChart`] = new Chart(document.getElementById(`weatherChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-patientAgeChart`] = new Chart(document.getElementById(`patientAgeChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.patient_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-patientGenderChart`] = new Chart(document.getElementById(`patientGenderChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.patient_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-responderChart`] = new Chart(document.getElementById(`responderChart-${safeBarangay}`).getContext('2d'), { type: 'polarArea', data: data.responder, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-barangayChart`] = new Chart(
+                document.getElementById(`barangayChart-${safeBarangay}`).getContext('2d'),
+                { type: 'bar', data: data.barangay, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
+            charts[`${safeBarangay}-healthTypeChart`] = new Chart(
+                document.getElementById(`healthTypeChart-${safeBarangay}`).getContext('2d'),
+                { type: 'pie', data: data.health_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
+            charts[`${safeBarangay}-healthCauseChart`] = new Chart(
+                document.getElementById(`healthCauseChart-${safeBarangay}`).getContext('2d'),
+                { type: 'bar', data: data.health_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
+            charts[`${safeBarangay}-weatherChart`] = new Chart(
+                document.getElementById(`weatherChart-${safeBarangay}`).getContext('2d'),
+                { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
+            charts[`${safeBarangay}-patientAgeChart`] = new Chart(
+                document.getElementById(`patientAgeChart-${safeBarangay}`).getContext('2d'),
+                { type: 'bar', data: data.patient_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
+            charts[`${safeBarangay}-patientGenderChart`] = new Chart(
+                document.getElementById(`patientGenderChart-${safeBarangay}`).getContext('2d'),
+                { type: 'doughnut', data: data.patient_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
+            charts[`${safeBarangay}-responderChart`] = new Chart(
+                document.getElementById(`responderChart-${safeBarangay}`).getContext('2d'),
+                { type: 'bar', data: data.responder, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } }
+            );
         }
 
         function updateCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
-            if (charts[`${safeBarangay}-barangayChart`]) {
-                charts[`${safeBarangay}-barangayChart`].data = data.barangay;
-                charts[`${safeBarangay}-healthTypeChart`].data = data.health_type;
-                charts[`${safeBarangay}-healthCauseChart`].data = data.health_cause;
-                charts[`${safeBarangay}-weatherChart`].data = data.weather;
-                charts[`${safeBarangay}-patientAgeChart`].data = data.patient_age;
-                charts[`${safeBarangay}-patientGenderChart`].data = data.patient_gender;
-                charts[`${safeBarangay}-responderChart`].data = data.responder;
-                Object.keys(charts).filter(key => key.startsWith(safeBarangay)).forEach(key => charts[key].update());
-            } else {
-                initCharts(barangay, data);
-            }
+            charts[`${safeBarangay}-barangayChart`].data = data.barangay;
+            charts[`${safeBarangay}-healthTypeChart`].data = data.health_type;
+            charts[`${safeBarangay}-healthCauseChart`].data = data.health_cause;
+            charts[`${safeBarangay}-weatherChart`].data = data.weather;
+            charts[`${safeBarangay}-patientAgeChart`].data = data.patient_age;
+            charts[`${safeBarangay}-patientGenderChart`].data = data.patient_gender;
+            charts[`${safeBarangay}-responderChart`].data = data.responder;
+            Object.values(charts).forEach(chart => chart.update());
         }
 
         socket.on('hospital_response_update', (data) => {
-            const timeFilter = document.querySelector('.tab.active').textContent.toLowerCase();
-            if (timeFilter === 'today') {
-                fetchCharts(timeFilter, data.barangay);
+            const currentTimeFilter = document.querySelector('.tab.active').textContent.toLowerCase();
+            const selectedBarangay = document.getElementById('barangayDropdown').value.replace(/-/g, ' ');
+            if (currentTimeFilter === 'today' && selectedBarangay === data.barangay) {
+                updateCharts(selectedBarangay, data);
             }
         });
 
         function filterData(timeFilter) {
-            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
-            fetchCharts(timeFilter);
+            document.querySelectorAll('.tabs:not(.hospital-tabs) .tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tabs:not(.hospital-tabs) .tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            const selectedBarangay = document.getElementById('barangayDropdown').value.replace(/-/g, ' ') || barangays[0] || 'Unknown';
+            fetch(`/hospital_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(selectedBarangay)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (charts[`${selectedBarangay.replace(/\s+/g, '-')}-barangayChart`]) {
+                        Object.values(charts).forEach(chart => chart.destroy());
+                        charts = {};
+                    }
+                    initCharts(selectedBarangay, data);
+                });
         }
 
-        function fetchCharts(timeFilter, barangay = null) {
-            const barangays = {{ barangays | tojson }};
-            barangays.forEach(b => {
-                fetch(`/hospital_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(b)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const safeBarangay = b.replace(/\s+/g, '-');
-                        if (charts[`${safeBarangay}-barangayChart`]) {
-                            Object.keys(charts).filter(key => key.startsWith(safeBarangay)).forEach(key => charts[key].destroy());
-                        }
-                        initCharts(b, data);
-                    });
-            });
+        function filterHospital(hospital) {
+            document.querySelectorAll('.hospital-tabs .tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.hospital-tabs .tab[onclick="filterHospital('${hospital}')"]`).classList.add('active');
+            const selectedBarangay = document.getElementById('barangayDropdown').value.replace(/-/g, ' ') || barangays[0] || 'Unknown';
+            fetch(`/hospital_charts_data?time_filter=today&barangay=${encodeURIComponent(selectedBarangay)}&hospital=${encodeURIComponent(hospital)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (charts[`${selectedBarangay.replace(/\s+/g, '-')}-barangayChart`]) {
+                        Object.values(charts).forEach(chart => chart.destroy());
+                        charts = {};
+                    }
+                    initCharts(selectedBarangay, data);
+                });
         }
 
         window.onload = () => {
