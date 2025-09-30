@@ -1458,7 +1458,7 @@ def handle_hospital_response(data):
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
         c.execute('''
-            INSERT INTO health_response (
+            INSERT INTO hospital_response (
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital, responded,
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
