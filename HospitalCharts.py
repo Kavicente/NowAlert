@@ -28,13 +28,12 @@ def load_barangays():
 
 def hospital_charts():
     try:
-        barangay = session.get('barangay', 'Unknown')
         if 'role' not in session or session['role'] != 'hospital':
-            logger.warning("Unauthorized access to hospital charts")
-            return redirect(url_for('admin_login'))
-        current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+            logger.warning("Unauthorized access to hospital_charts")
+            return redirect(url_for('login_agency'))
         barangays = load_barangays()
-        return render_template('HospitalCharts.html', barangay=barangay, current_datetime=current_datetime, barangays=barangays)
+        current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        return render_template('HospitalCharts.html', barangays=barangays, current_datetime=current_datetime)
     except Exception as e:
         logger.error(f"Error in hospital_charts: {e}")
         return "Internal Server Error", 500
@@ -43,6 +42,7 @@ def hospital_charts_data():
     try:
         time_filter = request.args.get('time_filter', 'today')
         barangay = request.args.get('barangay', 'Unknown')
+        hospital = request.args.get('hospital', '')
         municipality = get_municipality_from_barangay(barangay)
         if not municipality:
             logger.warning(f"Barangay {barangay} not found in barangay_coords, proceeding with data fetch")
@@ -72,12 +72,24 @@ def hospital_charts_data():
             end_time = now
 
         query = '''
-            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender
             FROM hospital_response
-            WHERE timestamp BETWEEN ? AND ? AND barangay = ? AND responded = 1
+            WHERE timestamp BETWEEN ? AND ? AND barangay = ?
         '''
         cursor.execute(query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
-        rows = cursor.fetchall()
+        health_rows = cursor.fetchall()
+
+        hospital_query = '''
+            SELECT assigned_hospital
+            FROM hospital_response
+            WHERE timestamp BETWEEN ? AND ? AND barangay = ?
+        '''
+        if hospital:
+            hospital_query += " AND assigned_hospital = ?"
+            cursor.execute(hospital_query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay, hospital))
+        else:
+            cursor.execute(hospital_query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
+        hospital_rows = cursor.fetchall()
         conn.close()
 
         barangay_data = {}
@@ -88,14 +100,13 @@ def hospital_charts_data():
         patient_gender_data = {}
         responder_data = {}
 
-        for row in rows:
+        for row in health_rows:
             barangay_val = row['barangay'] or 'Unknown'
             health_type = row['health_type'] or 'Unknown'
             health_cause = row['health_cause'] or 'Unknown'
             weather = row['weather'] or 'Unknown'
             patient_age = row['patient_age'] or 'Unknown'
             patient_gender = row['patient_gender'] or 'Unknown'
-            responder = row['assigned_hospital'] or 'Unknown'
 
             barangay_data[barangay_val] = barangay_data.get(barangay_val, 0) + 1
             health_type_data[health_type] = health_type_data.get(health_type, 0) + 1
@@ -103,9 +114,12 @@ def hospital_charts_data():
             weather_data[weather] = weather_data.get(weather, 0) + 1
             patient_age_data[patient_age] = patient_age_data.get(patient_age, 0) + 1
             patient_gender_data[patient_gender] = patient_gender_data.get(patient_gender, 0) + 1
+
+        for row in hospital_rows:
+            responder = row['assigned_hospital'] or 'Unknown'
             responder_data[responder] = responder_data.get(responder, 0) + 1
 
-        logger.info(f"Hospital chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}, Responder: {responder_data}")
+        logger.info(f"Health chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}, Responder: {responder_data}")
 
         colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6', '#3498DB']
 
@@ -157,6 +171,7 @@ def hospital_charts_data():
                     'data': list(patient_age_data.values()) or [0],
                     'backgroundColor': colors[:len(patient_age_data)] or ['#999999'],
                     'borderColor': colors[:len(patient_age_data)] or ['#999999'],
+                    'textColor': 'white',
                     'borderWidth': 1
                 }]
             },
@@ -183,7 +198,7 @@ def hospital_charts_data():
         }
         return jsonify(chart_data)
     except Exception as e:
-        logger.error(f"Error in hospital_charts_data: {e}")
+        logger.error(f"Error in health_charts_data: {e}")
         return jsonify({
             'barangay': {'labels': ['No Data'], 'datasets': [{'label': 'Barangay Incidents', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
             'health_type': {'labels': ['No Data'], 'datasets': [{'label': 'Health Emergency Type', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},

@@ -195,24 +195,7 @@ def android_login():
     finally:
         conn.close()
 
-@app.route('/admin/login', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        conn = get_db_connection()
-        admin = conn.execute('SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ?',
-                             ('admin', username, password)).fetchone()
-        conn.close()
-        if admin:
-            session['role'] = 'admin'
-            session['unique_id'] = f"admin_{username}"
-            session.permanent = True
-            logger.info(f"Admin login successful for {username}")
-            return redirect(url_for('admin_dashboard'))
-        logger.warning(f"Invalid admin credentials for {username}")
-        return jsonify({'error': 'Invalid credentials'}), 401
-    return render_template('admin_login.html')
+
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
@@ -482,9 +465,9 @@ def handle_submit_response(data):
         elif role == 'hospital':
             conn.execute('''
             INSERT INTO hospital_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+        ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, data.get('assigned_hospital')))
             prediction = handle_hospital_response(data)
         conn.commit()
         conn.close()
@@ -514,9 +497,10 @@ def handle_hospital_response(data):
         c = conn.cursor()
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
+        assigned_hospital = session.get('assigned_hospital', 'Unknown Hospital').title()
         c.execute('''
             INSERT INTO hospital_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital, responded,
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
@@ -530,20 +514,19 @@ def handle_hospital_response(data):
             data.get('barangay'),
             data.get('emergency_type'),
             base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.data.get('assigned_hospital'),
-            data.get('responded', True)
+            data.get('responded', True),
+            data.get('assigned_hospital')
         ))
         conn.commit()
-        logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
+        logger.info(f"Hospital response data inserted for alert_id: {data.get('alert_id')}")
 
         # Map incoming data to model expected columns
         prediction_data = {
             'Health_Type': data.get('health_type', 'Unknown'),
             'Health_Cause': data.get('health_cause', 'Unknown'),
             'Barangay': data.get('barangay', 'Unknown'),
-            'Year': datetime.now().year  # Use current year as default
+            'Year': datetime.now().year
         }
-        # Convert to DataFrame for prediction
         input_data = pd.DataFrame([prediction_data])
         prediction = "N/A"
         if health_predictor:
@@ -551,7 +534,7 @@ def handle_hospital_response(data):
                 prediction = health_predictor.predict_proba(input_data)[0][1] * 100
                 prediction = f"{prediction:.1f}% chance in year {datetime.now().year}"
             except Exception as e:
-                logger.error(f"Error generating health prediction: {e}")
+                logger.error(f"Error generating hospital prediction: {e}")
                 prediction = "prediction_error"
 
         data['prediction'] = prediction
@@ -564,7 +547,8 @@ def handle_hospital_response(data):
         socketio.emit('hospital_response', {
             'alert_id': data.get('alert_id'),
             'barangay': barangay,
-            'prediction': prediction
+            'prediction': prediction,
+            'assigned_hospital': assigned_hospital
         }, room=hospital_room)
         logger.info(f"Prediction emitted to room {hospital_room}: {prediction}")
 
@@ -636,10 +620,10 @@ def handle_hospital_response(data):
         socketio.emit('hospital_response_update', chart_data, room=hospital_room)
         logger.info(f"Chart update emitted to room {hospital_room}")
 
-        from HealthDashboard import handle_hospitalresponse
+        from HospitalDashboard import handle_hospital_response
         handle_hospital_response(data)
     except Exception as e:
-        logger.error(f"Error inserting health response: {e}")
+        logger.error(f"Error inserting hospital response: {e}")
         conn.rollback()
     finally:
         conn.close()
@@ -1535,6 +1519,8 @@ def handle_health_response(data):
 @socketio.on('hospital_response')
 def handle_hospital_response(data):
     try:
+        manila = pytz.timezone('Asia/Manila')
+        base_time = datetime.now(manila)
         logger.info(f"Handling hospital response for alert_id: {data.get('alert_id')}")
         # Map incoming data to model expected columns
         prediction_data = {
@@ -1559,8 +1545,9 @@ def handle_hospital_response(data):
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, assigned_hospital, emergency_type, timestamp, responded)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hospital_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
             data.get('health_type'),
@@ -1572,9 +1559,9 @@ def handle_hospital_response(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
-            True,
-            assigned_hospital
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True),
+            data.get('assigned_hospital')
         ))
         conn.commit()
         conn.close()
