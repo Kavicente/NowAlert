@@ -489,6 +489,11 @@ def handle_submit_response(data):
         conn.commit()
         conn.close()
 
+        from HospitalCharts import hospital_charts_data
+        data['assigned_hospital'] = data.get('assigned_hospital', 'Unknown')
+        data['responded'] = 1
+        socketio.emit('hospital_response_update', data, room=f"hospital_{data.get('municipality', '').lower()}")
+        socketio.emit('health_response_update', data, room=f"health_{data.get('municipality', '').lower()}")
         # Emit response with prediction
         response_data = {
             'alert_id': alert_id,
@@ -584,17 +589,28 @@ def handle_hospital_response(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
+            data.get('hospital_name', 'Unknown'),
             base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            1
+        ))
+        c.execute('''
+            INSERT INTO hospital_response (
+                alert_id, barangay, municipality, assigned_hospital, timestamp
+            ) VALUES (?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('barangay'),
+            data.get('municipality'),
+            data.get('assigned_hospital'),
+            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
         ))
         conn.commit()
         logger.info(f"Hospital response data inserted for alert_id: {data.get('alert_id')}")
 
+        logger.info(f"Hospital response data inserted for alert_id: {data.get('alert_id')}")
         data['assigned_hospital'] = data.get('assigned_hospital', 'Unknown')  # Add assigned_hospital to data
         socketio.emit('hospital_response_update', data, room=f"hospital_{data.get('municipality', '').lower()}")
-        socketio.emit('health_response_update', data, room=f"health_{data.get('municipality', '').lower()}")  # Emit to health charts for synchronization
-        from HospitalCharts import handle_hospital_response
-        handle_hospital_response(data)
+        socketio.emit('health_response_update', data, room=f"health_{data.get('municipality', '').lower()}") 
 
         # Generate prediction
         prediction = "N/A"

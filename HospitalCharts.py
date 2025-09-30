@@ -17,40 +17,37 @@ def get_municipality_from_barangay(barangay):
     from AlertNow import get_municipality_from_barangay
     return get_municipality_from_barangay(barangay)
 
-def get_default_barangay(municipality):
-    from AlertNow import barangay_coords
-    return next(iter(barangay_coords.get(municipality, {})), 'Unknown')
+def load_barangays():
+    try:
+        with open(os.path.join(os.path.dirname(__file__), 'assets', 'barangay.txt'), 'r') as f:
+            barangays = [line.strip() for line in f if line.strip()]
+        return barangays
+    except Exception as e:
+        logger.error(f"Error loading barangays: {e}")
+        return []
 
 def hospital_charts():
     try:
-        barangay = session.get('barangay', None)
-        municipality = session.get('municipality', 'Unknown')
-        if not barangay or barangay == 'Unknown':
-            barangay = get_default_barangay(municipality)
-            session['barangay'] = barangay
-            logger.info(f"Set default barangay to {barangay} for municipality {municipality}")
+        barangay = session.get('barangay', 'Unknown')
         if 'role' not in session or session['role'] != 'hospital':
             logger.warning("Unauthorized access to hospital charts")
             return redirect(url_for('admin_login'))
         current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        logger.info(f"Rendering hospital charts for barangay: {barangay}")
-        return render_template('HospitalCharts.html', barangay=barangay, current_datetime=current_datetime)
+        barangays = load_barangays()
+        return render_template('HospitalCharts.html', barangay=barangay, current_datetime=current_datetime, barangays=barangays)
     except Exception as e:
         logger.error(f"Error in hospital_charts: {e}")
         return "Internal Server Error", 500
 
 def hospital_charts_data():
     try:
-        time_filter = request.args.get('time', 'today')
+        time_filter = request.args.get('time_filter', 'today')
         barangay = request.args.get('barangay', 'Unknown')
         municipality = get_municipality_from_barangay(barangay)
-        session_municipality = session.get('municipality', 'Unknown')
-        if barangay == 'Unknown' or not municipality:
-            barangay = get_default_barangay(session_municipality)
-            logger.warning(f"Invalid barangay {request.args.get('barangay', 'Unknown')}, using default {barangay} for municipality {session_municipality}")
-        if municipality != session_municipality:
-            logger.warning(f"Barangay {barangay} does not belong to municipality {session_municipality}")
-            return jsonify({}), 400
+        if not municipality:
+            logger.warning(f"Barangay {barangay} not found in barangay_coords, proceeding with data fetch")
+        if municipality and municipality != session.get('municipality', 'Unknown'):
+            logger.warning(f"Barangay {barangay} does not match session municipality {session.get('municipality')}")
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -75,9 +72,9 @@ def hospital_charts_data():
             end_time = now
 
         query = '''
-            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital
             FROM hospital_response
-            WHERE timestamp BETWEEN ? AND ? AND barangay = ?
+            WHERE timestamp BETWEEN ? AND ? AND barangay = ? AND responded = 1
         '''
         cursor.execute(query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
         rows = cursor.fetchall()
@@ -89,7 +86,7 @@ def hospital_charts_data():
         weather_data = {}
         patient_age_data = {}
         patient_gender_data = {}
-        hospital_responder_data = {}
+        responder_data = {}
 
         for row in rows:
             barangay_val = row['barangay'] or 'Unknown'
@@ -98,7 +95,7 @@ def hospital_charts_data():
             weather = row['weather'] or 'Unknown'
             patient_age = row['patient_age'] or 'Unknown'
             patient_gender = row['patient_gender'] or 'Unknown'
-            hospital_responder = row['assigned_hospital'] or 'Unknown'
+            responder = row['assigned_hospital'] or 'Unknown'
 
             barangay_data[barangay_val] = barangay_data.get(barangay_val, 0) + 1
             health_type_data[health_type] = health_type_data.get(health_type, 0) + 1
@@ -106,9 +103,9 @@ def hospital_charts_data():
             weather_data[weather] = weather_data.get(weather, 0) + 1
             patient_age_data[patient_age] = patient_age_data.get(patient_age, 0) + 1
             patient_gender_data[patient_gender] = patient_gender_data.get(patient_gender, 0) + 1
-            hospital_responder_data[hospital_responder] = hospital_responder_data.get(hospital_responder, 0) + 1
+            responder_data[responder] = responder_data.get(responder, 0) + 1
 
-        logger.info(f"Hospital chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}")
+        logger.info(f"Hospital chart data - Barangay: {barangay_data}, Health Type: {health_type_data}, Health Cause: {health_cause_data}, Weather: {weather_data}, Patient Age: {patient_age_data}, Patient Gender: {patient_gender_data}, Responder: {responder_data}")
 
         colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD', '#D4A5A5', '#9B59B6', '#3498DB']
 
@@ -172,9 +169,27 @@ def hospital_charts_data():
                     'borderColor': colors[:len(patient_gender_data)] or ['#999999'],
                     'borderWidth': 1
                 }]
+            },
+            'responder': {
+                'labels': list(responder_data.keys()) or ['No Data'],
+                'datasets': [{
+                    'label': 'Health Responder',
+                    'data': list(responder_data.values()) or [0],
+                    'backgroundColor': colors[:len(responder_data)] or ['#999999'],
+                    'borderColor': colors[:len(responder_data)] or ['#999999'],
+                    'borderWidth': 1
+                }]
             }
         }
         return jsonify(chart_data)
     except Exception as e:
         logger.error(f"Error in hospital_charts_data: {e}")
-        return jsonify({}), 500
+        return jsonify({
+            'barangay': {'labels': ['No Data'], 'datasets': [{'label': 'Barangay Incidents', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
+            'health_type': {'labels': ['No Data'], 'datasets': [{'label': 'Health Emergency Type', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
+            'health_cause': {'labels': ['No Data'], 'datasets': [{'label': 'Health Emergency Cause', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
+            'weather': {'labels': ['No Data'], 'datasets': [{'label': 'Weather Conditions', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
+            'patient_age': {'labels': ['No Data'], 'datasets': [{'label': 'Patient Age', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
+            'patient_gender': {'labels': ['No Data'], 'datasets': [{'label': 'Patient Gender', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]},
+            'responder': {'labels': ['No Data'], 'datasets': [{'label': 'Health Responder', 'data': [0], 'backgroundColor': ['#999999'], 'borderColor': ['#999999'], 'borderWidth': 1}]}
+        }), 500
