@@ -172,6 +172,7 @@ def health_charts_data():
                     'data': list(patient_age_data.values()) or [0],
                     'backgroundColor': colors[:len(patient_age_data)] or ['#999999'],
                     'borderColor': colors[:len(patient_age_data)] or ['#999999'],
+                    'textColor': 'white',
                     'borderWidth': 1
                 }]
             },
