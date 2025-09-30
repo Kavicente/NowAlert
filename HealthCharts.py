@@ -1,4 +1,5 @@
 from flask import render_template, request, jsonify, session, redirect, url_for
+from flask_socketio import socketio, emit, join_room
 import sqlite3
 import os
 from datetime import datetime, timedelta
@@ -18,31 +19,31 @@ def get_municipality_from_barangay(barangay):
     return get_municipality_from_barangay(barangay)
 
 def load_barangays():
+    barangays_path = os.path.join(os.path.dirname(__file__), 'assets', 'barangay.txt')
+    barangays = []
     try:
-        with open(os.path.join(os.path.dirname(__file__), 'assets', 'barangay.txt'), 'r') as f:
-            barangays = [line.strip() for line in f if line.strip()]
-        return barangays
+        with open(barangays_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    barangays.append(line.strip())
+        logger.info(f"Loaded {len(barangays)} barangays from {barangays_path}")
+    except FileNotFoundError:
+        logger.error(f"Barangay file not found at {barangays_path}")
     except Exception as e:
         logger.error(f"Error loading barangays: {e}")
-        return []
+    return barangays
 
 def health_charts():
-    try:
-        barangay = session.get('barangay', 'Unknown')
-        if 'role' not in session or session['role'] != 'health':
-            logger.warning("Unauthorized access to health charts")
-            return redirect(url_for('admin_login'))
-        current_datetime = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        barangays = load_barangays()
-        return render_template('HealthCharts.html', barangay=barangay, current_datetime=current_datetime, barangays=barangays)
-    except Exception as e:
-        logger.error(f"Error in health_charts: {e}")
-        return "Internal Server Error", 500
+    if 'role' not in session or session['role'] not in ['health', 'hospital']:
+        logger.warning("Unauthorized access to health_charts")
+        return redirect(url_for('login_agency'))
+    barangays = load_barangays()
+    return render_template('HealthCharts.html', barangays=barangays, current_datetime=datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
 
 def health_charts_data():
     try:
         time_filter = request.args.get('time_filter', 'today')
-        barangay = request.args.get('barangay', 'Unknown')
+        barangay = request.args.get('barangay', '')
         hospital = request.args.get('hospital', '')
         municipality = get_municipality_from_barangay(barangay)
         if not municipality:
@@ -73,11 +74,19 @@ def health_charts_data():
             end_time = now
 
         query = '''
-            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender
-            FROM health_response
-            WHERE timestamp BETWEEN ? AND ? AND barangay = ?
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital
+            FROM (
+                SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital
+                FROM hospital_response
+                WHERE timestamp BETWEEN ? AND ? AND barangay = ?
+                UNION ALL
+                SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, NULL as assigned_hospital
+                FROM health_response
+                WHERE timestamp BETWEEN ? AND ? AND barangay = ?
+            )
         '''
-        cursor.execute(query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
+        cursor.execute(query, (start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay,
+                               start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), barangay))
         health_rows = cursor.fetchall()
 
         hospital_query = '''
@@ -172,7 +181,6 @@ def health_charts_data():
                     'data': list(patient_age_data.values()) or [0],
                     'backgroundColor': colors[:len(patient_age_data)] or ['#999999'],
                     'borderColor': colors[:len(patient_age_data)] or ['#999999'],
-                    'textColor': 'white',
                     'borderWidth': 1
                 }]
             },
