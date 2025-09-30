@@ -507,17 +507,17 @@ def handle_submit_response(data):
 
 
 # After @socketio.on('response_update')
-@socketio.on('health_response')
-def handle_health_response(data):
+@socketio.on('hospital_response')
+def handle_hospital_response(data):
     try:
         conn = get_db_connection()  # Create new connection
         c = conn.cursor()
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
         c.execute('''
-            INSERT INTO health_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hospital_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital, responded,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
             data.get('health_type'),
@@ -530,32 +530,114 @@ def handle_health_response(data):
             data.get('barangay'),
             data.get('emergency_type'),
             base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.data.get('assigned_hospital'),
             data.get('responded', True)
         ))
         conn.commit()
         logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
 
-        # Generate prediction
+        # Map incoming data to model expected columns
+        prediction_data = {
+            'Health_Type': data.get('health_type', 'Unknown'),
+            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Year': datetime.now().year  # Use current year as default
+        }
+        # Convert to DataFrame for prediction
+        input_data = pd.DataFrame([prediction_data])
         prediction = "N/A"
         if health_predictor:
             try:
-                input_data = pd.DataFrame([{
-                    'health_type': data.get('health_type'),
-                    'health_cause': data.get('health_cause'),
-                    'weather': data.get('weather'),
-                    'patient_age': data.get('patient_age'),
-                    'patient_gender': data.get('patient_gender')
-                }])
                 prediction = health_predictor.predict_proba(input_data)[0][1] * 100
-                prediction = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
+                prediction = f"{prediction:.1f}% chance in year {datetime.now().year}"
             except Exception as e:
                 logger.error(f"Error generating health prediction: {e}")
                 prediction = "prediction_error"
 
         data['prediction'] = prediction
-        socketio.emit('health_response', data, room=f"health_{data.get('municipality', '').lower()}")
-        from HealthDashboard import handle_health_response
-        handle_health_response(data)
+        barangay = data.get('barangay', 'Unknown')
+        municipality = get_municipality_from_barangay(barangay)
+        if barangay == 'Unknown' or not municipality:
+            barangay = next(iter(barangay_coords.get(session.get('municipality', 'Unknown'), {})), 'Unknown')
+            logger.warning(f"Invalid barangay {data.get('barangay', 'Unknown')}, using default {barangay}")
+        hospital_room = f"hospital_{municipality.lower()}" if municipality else "hospital_unknown"
+        socketio.emit('hospital_response', {
+            'alert_id': data.get('alert_id'),
+            'barangay': barangay,
+            'prediction': prediction
+        }, room=hospital_room)
+        logger.info(f"Prediction emitted to room {hospital_room}: {prediction}")
+
+        # Emit chart data for dashboard
+        chart_data = {
+            'barangay': {
+                'labels': [barangay] or ['No Data'],
+                'datasets': [{
+                    'label': 'Barangay Incidents',
+                    'data': [1] or [0],
+                    'backgroundColor': ['#FF6B6B'] or ['#999999'],
+                    'borderColor': ['#FF6B6B'] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'health_type': {
+                'labels': [data.get('health_type', 'Unknown')] or ['No Data'],
+                'datasets': [{
+                    'label': 'Health Emergency Type',
+                    'data': [1] or [0],
+                    'backgroundColor': ['#4ECDC4'] or ['#999999'],
+                    'borderColor': ['#4ECDC4'] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'health_cause': {
+                'labels': [data.get('health_cause', 'Unknown')] or ['No Data'],
+                'datasets': [{
+                    'label': 'Health Emergency Cause',
+                    'data': [1] or [0],
+                    'backgroundColor': ['#45B7D1'] or ['#999999'],
+                    'borderColor': ['#45B7D1'] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'weather': {
+                'labels': [data.get('weather', 'Unknown')] or ['No Data'],
+                'datasets': [{
+                    'label': 'Weather Conditions',
+                    'data': [1] or [0],
+                    'backgroundColor': ['#96CEB4'] or ['#999999'],
+                    'borderColor': ['#96CEB4'] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'patient_age': {
+                'labels': [data.get('patient_age', 'Unknown')] or ['No Data'],
+                'datasets': [{
+                    'label': 'Patient Age',
+                    'data': [1] or [0],
+                    'backgroundColor': ['#FFEEAD'] or ['#999999'],
+                    'borderColor': ['#FFEEAD'] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'patient_gender': {
+                'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
+                'datasets': [{
+                    'label': 'Patient Gender',
+                    'data': [1] or [0],
+                    'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                    'borderColor': ['#D4A5A5'] or ['#999999'],
+                    'borderWidth': 1
+                }]
+            },
+            'barangay': barangay
+        }
+        logger.info(f"Emitting hospital_response_update with chart_data: {chart_data}")
+        socketio.emit('hospital_response_update', chart_data, room=hospital_room)
+        logger.info(f"Chart update emitted to room {hospital_room}")
+
+        from HealthDashboard import handle_hospitalresponse
+        handle_hospital_response(data)
     except Exception as e:
         logger.error(f"Error inserting health response: {e}")
         conn.rollback()
@@ -1453,14 +1535,32 @@ def handle_health_response(data):
 @socketio.on('hospital_response')
 def handle_hospital_response(data):
     try:
-        conn = get_db_connection()  # Create new connection
-        c = conn.cursor()
-        manila = pytz.timezone('Asia/Manila')
-        base_time = datetime.now(manila)
-        c.execute('''
-            INSERT INTO hospital_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital, responded,
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        logger.info(f"Handling hospital response for alert_id: {data.get('alert_id')}")
+        # Map incoming data to model expected columns
+        prediction_data = {
+            'Health_Type': data.get('health_type', 'Unknown'),
+            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Year': datetime.now().year  # Use current year as default
+        }
+        # Convert to DataFrame for prediction
+        prediction_df = pd.DataFrame([prediction_data])
+        if health_predictor:
+            prediction = health_predictor.predict_proba(prediction_df)[:, 1][0] * 100
+            prediction_text = f"{prediction:.1f}% chance in year {datetime.now().year}"
+        else:
+            prediction_text = "prediction_error"
+        barangay = data.get('barangay', 'Unknown')
+        municipality = get_municipality_from_barangay(barangay)
+        assigned_hospital = data.get('assigned_hospital', session.get('assigned_hospital', 'Unknown Hospital'))
+        if barangay == 'Unknown' or not municipality:
+            barangay = next(iter(barangay_coords.get(session.get('municipality', 'Unknown'), {})), 'Unknown')
+            logger.warning(f"Invalid barangay {data.get('barangay', 'Unknown')}, using default {barangay}")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, assigned_hospital, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
             data.get('health_type'),
@@ -1472,120 +1572,104 @@ def handle_hospital_response(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.data.get('assigned_hospital'),
-            data.get('responded', True)
+            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            True,
+            assigned_hospital
         ))
         conn.commit()
-        logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
-
-        # Map incoming data to model expected columns
-        prediction_data = {
-            'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Year': datetime.now().year  # Use current year as default
-        }
-        # Convert to DataFrame for prediction
-        input_data = pd.DataFrame([prediction_data])
-        prediction = "N/A"
-        if health_predictor:
-            try:
-                prediction = health_predictor.predict_proba(input_data)[0][1] * 100
-                prediction = f"{prediction:.1f}% chance in year {datetime.now().year}"
-            except Exception as e:
-                logger.error(f"Error generating health prediction: {e}")
-                prediction = "prediction_error"
-
-        data['prediction'] = prediction
-        barangay = data.get('barangay', 'Unknown')
-        municipality = get_municipality_from_barangay(barangay)
-        if barangay == 'Unknown' or not municipality:
-            barangay = next(iter(barangay_coords.get(session.get('municipality', 'Unknown'), {})), 'Unknown')
-            logger.warning(f"Invalid barangay {data.get('barangay', 'Unknown')}, using default {barangay}")
-        hospital_room = f"hospital_{municipality.lower()}" if municipality else "hospital_unknown"
-        socketio.emit('hospital_response', {
-            'alert_id': data.get('alert_id'),
-            'barangay': barangay,
-            'prediction': prediction
-        }, room=hospital_room)
-        logger.info(f"Prediction emitted to room {hospital_room}: {prediction}")
-
-        # Emit chart data for dashboard
-        chart_data = {
-            'barangay': {
-                'labels': [barangay] or ['No Data'],
-                'datasets': [{
-                    'label': 'Barangay Incidents',
-                    'data': [1] or [0],
-                    'backgroundColor': ['#FF6B6B'] or ['#999999'],
-                    'borderColor': ['#FF6B6B'] or ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'health_type': {
-                'labels': [data.get('health_type', 'Unknown')] or ['No Data'],
-                'datasets': [{
-                    'label': 'Health Emergency Type',
-                    'data': [1] or [0],
-                    'backgroundColor': ['#4ECDC4'] or ['#999999'],
-                    'borderColor': ['#4ECDC4'] or ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'health_cause': {
-                'labels': [data.get('health_cause', 'Unknown')] or ['No Data'],
-                'datasets': [{
-                    'label': 'Health Emergency Cause',
-                    'data': [1] or [0],
-                    'backgroundColor': ['#45B7D1'] or ['#999999'],
-                    'borderColor': ['#45B7D1'] or ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'weather': {
-                'labels': [data.get('weather', 'Unknown')] or ['No Data'],
-                'datasets': [{
-                    'label': 'Weather Conditions',
-                    'data': [1] or [0],
-                    'backgroundColor': ['#96CEB4'] or ['#999999'],
-                    'borderColor': ['#96CEB4'] or ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'patient_age': {
-                'labels': [data.get('patient_age', 'Unknown')] or ['No Data'],
-                'datasets': [{
-                    'label': 'Patient Age',
-                    'data': [1] or [0],
-                    'backgroundColor': ['#FFEEAD'] or ['#999999'],
-                    'borderColor': ['#FFEEAD'] or ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'patient_gender': {
-                'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
-                'datasets': [{
-                    'label': 'Patient Gender',
-                    'data': [1] or [0],
-                    'backgroundColor': ['#D4A5A5'] or ['#999999'],
-                    'borderColor': ['#D4A5A5'] or ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'barangay': barangay
-        }
-        logger.info(f"Emitting hospital_response_update with chart_data: {chart_data}")
-        socketio.emit('hospital_response_update', chart_data, room=hospital_room)
-        logger.info(f"Chart update emitted to room {hospital_room}")
-
-        from HealthDashboard import handle_hospitalresponse
-        handle_hospital_response(data)
-    except Exception as e:
-        logger.error(f"Error inserting health response: {e}")
-        conn.rollback()
-    finally:
         conn.close()
+        # Emit prediction to health room
+        municipality = get_municipality_from_barangay(data.get('barangay'))
+        if municipality:
+            hospital_room = f"hospital_{municipality.lower()}"
+            emit('hospital_response', {
+                'alert_id': data.get('alert_id'),
+                'barangay': data.get('barangay'),
+                'prediction': prediction_text,
+                'assigned_hospital': assigned_hospital
+            }, room=hospital_room)
+            logger.info(f"Prediction emitted to room {hospital_room}: {prediction_text}")
+            chart_data = {
+                'barangay': {
+                    'labels': [barangay] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Barangay Incidents',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#FF6B6B'] or ['#999999'],
+                        'borderColor': ['#FF6B6B'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'health_type': {
+                    'labels': [data.get('health_type', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Health Emergency Type',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#4ECDC4'] or ['#999999'],
+                        'borderColor': ['#4ECDC4'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'health_cause': {
+                    'labels': [data.get('health_cause', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Health Emergency Cause',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#45B7D1'] or ['#999999'],
+                        'borderColor': ['#45B7D1'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'weather': {
+                    'labels': [data.get('weather', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Weather Conditions',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#96CEB4'] or ['#999999'],
+                        'borderColor': ['#96CEB4'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'patient_age': {
+                    'labels': [data.get('patient_age', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Age',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#FFEEAD'] or ['#999999'],
+                        'borderColor': ['#FFEEAD'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'patient_gender': {
+                    'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Gender',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                        'borderColor': ['#D4A5A5'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'patient_gender': {
+                    'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Gender',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                        'borderColor': ['#D4A5A5'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'barangay': barangay,
+                'assigned_hospital': assigned_hospital
+            }
+            logger.info(f"Emitting hospital_response_update with chart_data: {chart_data}")
+            emit('hospital_response_update', chart_data, room=hospital_room)
+            logger.info(f"Chart update emitted to room {hospital_room}")
+        else:
+            logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
+    except Exception as e:
+        logger.error(f"Error in handle_hospital_response: {e}")
 
 @socketio.on('submit_barangay_data')
 def submit_barangay_data(data):
