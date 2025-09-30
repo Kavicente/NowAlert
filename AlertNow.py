@@ -510,7 +510,7 @@ def handle_submit_response(data):
 @socketio.on('health_response')
 def handle_health_response(data):
     try:
-        conn = get_db_connection()  # Create new connection
+        conn = sqlite3.connect(get_db_connection(), check_same_thread=False)  # Create new connection
         c = conn.cursor()
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
