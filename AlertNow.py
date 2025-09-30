@@ -446,7 +446,6 @@ def handle_submit_response(data):
         health_cause = data.get('health_cause', '')
         patient_age = data.get('patient_age', '')
         patient_gender = data.get('patient_gender', '')
-        assigned_hospital = data.get('assigned_hospital', '')
         lat = data.get('lat', 0.0)
         lon = data.get('lon', 0.0)
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')  # Changed to string
@@ -483,19 +482,13 @@ def handle_submit_response(data):
         elif role == 'hospital':
             conn.execute('''
             INSERT INTO hospital_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital, responded))
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
             prediction = handle_hospital_response(data)
-            from HospitalCharts import hospital_charts_data
-            data['assigned_hospital'] = data.get('assigned_hospital', 'Unknown')
-            data['responded'] = 1
-            socketio.emit('hospital_response_update', data, room=f"hospital_{data.get('municipality', '').lower()}")
-            socketio.emit('health_response_update', data, room=f"health_{data.get('municipality', '').lower()}")
         conn.commit()
         conn.close()
 
-        
         # Emit response with prediction
         response_data = {
             'alert_id': alert_id,
@@ -516,14 +509,12 @@ def handle_submit_response(data):
 # After @socketio.on('response_update')
 @socketio.on('health_response')
 def handle_health_response(data):
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_db_connection()
+    c = conn.cursor()
     try:
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
-        cursor.execute('''
+        c.execute('''
             INSERT INTO health_response (
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
