@@ -514,10 +514,11 @@ def handle_health_response(data):
         c = conn.cursor()
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
-        c.execute('''
-            INSERT INTO health_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
             data.get('health_type'),
@@ -529,9 +530,23 @@ def handle_health_response(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            True
         ))
+        
+        
+         # Query hospital_response for responder chart data
+        c.execute('''
+            SELECT assigned_hospital
+            FROM hospital_response
+            WHERE barangay = ? AND timestamp >= ?
+        ''', (data.get('barangay'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),))
+        responder_rows = c.fetchall()
+        responder_data = {}
+        for row in responder_rows:
+            responder = row['assigned_hospital'] or 'Unknown'
+            responder_data[responder] = responder_data.get(responder, 0) + 1
+        
         conn.commit()
         logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
 
