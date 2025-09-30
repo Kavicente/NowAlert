@@ -510,15 +510,14 @@ def handle_submit_response(data):
 @socketio.on('health_response')
 def handle_health_response(data):
     try:
-        conn = sqlite3.connect(get_db_connection(), check_same_thread=False)  # Create new connection
+        conn = get_db_connection()  # Create new connection
         c = conn.cursor()
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        c.execute('''
+            INSERT INTO health_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'),
             data.get('health_type'),
@@ -530,23 +529,9 @@ def handle_health_response(data):
             data.get('lon'),
             data.get('barangay'),
             data.get('emergency_type'),
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
-            True
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
         ))
-        
-        
-         # Query hospital_response for responder chart data
-        c.execute('''
-            SELECT assigned_hospital
-            FROM hospital_response
-            WHERE barangay = ? AND timestamp >= ?
-        ''', (data.get('barangay'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),))
-        responder_rows = c.fetchall()
-        responder_data = {}
-        for row in responder_rows:
-            responder = row['assigned_hospital'] or 'Unknown'
-            responder_data[responder] = responder_data.get(responder, 0) + 1
-        
         conn.commit()
         logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
 
@@ -1468,7 +1453,60 @@ def handle_fire_response_submitted(data):
     emit('fire_response_submitted', cleaned_data, room=bfp_room)
     logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
     
+@socketio.on('health_response')
+def handle_health_response(data):
+    try:
+        conn = get_db_connection()  # Create new connection
+        c = conn.cursor()
+        manila = pytz.timezone('Asia/Manila')
+        base_time = datetime.now(manila)
+        c.execute('''
+            INSERT INTO health_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('health_type'),
+            data.get('health_cause'),
+            data.get('weather'),
+            data.get('patient_age'),
+            data.get('patient_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        conn.commit()
+        logger.info(f"Health response data inserted for alert_id: {data.get('alert_id')}")
 
+        # Generate prediction
+        prediction = "N/A"
+        if health_predictor:
+            try:
+                input_data = pd.DataFrame([{
+                    'health_type': data.get('health_type'),
+                    'health_cause': data.get('health_cause'),
+                    'weather': data.get('weather'),
+                    'patient_age': data.get('patient_age'),
+                    'patient_gender': data.get('patient_gender')
+                }])
+                prediction = health_predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{prediction:.1f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Error generating health prediction: {e}")
+                prediction = "prediction_error"
+
+        data['prediction'] = prediction
+        socketio.emit('health_response', data, room=f"health_{data.get('municipality', '').lower()}")
+        from HealthDashboard import handle_health_response
+        handle_health_response(data)
+    except Exception as e:
+        logger.error(f"Error inserting health response: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
         
 @socketio.on('hospital_response')
 def handle_hospital_response(data):
