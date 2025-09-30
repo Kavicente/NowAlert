@@ -1503,8 +1503,8 @@ def handle_hospital_response(data):
         if barangay == 'Unknown' or not municipality:
             barangay = next(iter(barangay_coords.get(session.get('municipality', 'Unknown'), {})), 'Unknown')
             logger.warning(f"Invalid barangay {data.get('barangay', 'Unknown')}, using default {barangay}")
-        hospital_room = f"health_{municipality.lower()}" if municipality else "health_unknown"
-        socketio.emit('health_response', {
+        hospital_room = f"hospital_{municipality.lower()}" if municipality else "hospital_unknown"
+        socketio.emit('hospital_response', {
             'alert_id': data.get('alert_id'),
             'barangay': barangay,
             'prediction': prediction
