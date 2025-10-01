@@ -20,9 +20,9 @@ from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
 from HealthDashboard import get_health_stats, get_latest_alert
 from HospitalDashboard import get_hospital_stats, get_latest_alert
-from BarangayCharts import  barangay_charts, barangay_charts_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_fire_chart_data, get_barangay_health_chart_data
-from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data
-from PNPCharts import pnp_charts, pnp_charts_data
+from BarangayCharts import  barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_fire_chart_data, get_barangay_health_chart_data
+from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data, get_cdrrmo_chart_data
+from PNPCharts import pnp_charts, pnp_charts_data, get_pnp_chart_data
 from BFPCharts import bfp_charts, bfp_charts_data
 from HealthCharts import health_charts, health_charts_data
 from HospitalCharts import hospital_charts, hospital_charts_data
@@ -2215,6 +2215,26 @@ def export_alerts():
     with open('alerts.json', 'w') as f:
         json.dump(alerts, f, indent=4)
     return jsonify({"status": "success", "file": "alerts.json"})
+
+
+@socketio.on('barangay_charts_response')
+def handle_barangay_charts_response(data):
+    chart_data = get_barangay_chart_data('today', data.get('barangay'))
+    socketio.emit('barangay_charts_response_update', chart_data, broadcast=True)
+    chart_data_cdrrmo = get_cdrrmo_chart_data('today', data.get('barangay'))
+    socketio.emit('cdrrmo_charts_response_update', chart_data_cdrrmo, broadcast=True)
+    chart_data_pnp = get_pnp_chart_data('today', data.get('barangay'))
+    socketio.emit('pnp_charts_response_update', chart_data_pnp, broadcast=True)
+
+@socketio.on('cdrrmo_charts_response')
+def handle_cdrrmo_charts_response(data):
+    chart_data = get_cdrrmo_chart_data('today', data.get('barangay'))
+    socketio.emit('cdrrmo_charts_response_update', chart_data, broadcast=True)
+
+@socketio.on('pnp_charts_response')
+def handle_pnp_charts_response(data):
+    chart_data = get_pnp_chart_data('today', data.get('barangay'))
+    socketio.emit('pnp_charts_response_update', chart_data, broadcast=True)
 
 @socketio.on('bfp_response')
 def handle_bfp_response(data):
