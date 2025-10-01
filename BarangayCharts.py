@@ -1,15 +1,35 @@
-from flask import request, jsonify, render_template
+from flask import request, jsonify, render_template, Flask, redirect, url_for, flash, session
+from flask_socketio import socketio, emit, join_room
 import sqlite3
 import pytz
-from datetime import datetime
-import os 
+from datetime import datetime, timedelta
+import logging
+import os
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def load_barangays():
+    barangays_path = os.path.join(os.path.dirname(__file__), 'assets', 'barangay.txt')
+    barangays = []
+    try:
+        with open(barangays_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    barangays.append(line.strip())
+        logger.info(f"Loaded {len(barangays)} barangays from {barangays_path}")
+    except FileNotFoundError:
+        logger.error(f"Barangay file not found at {barangays_path}")
+    except Exception as e:
+        logger.error(f"Error loading barangays: {e}")
+    return barangays
 
 def get_barangay_chart_data(time_filter):
     from AlertNow import app  # Moved inside function
@@ -54,10 +74,119 @@ def get_barangay_chart_data(time_filter):
         'condition': {'labels': list(conditions.keys()), 'datasets': [{'label': 'Count', 'data': list(conditions.values()), 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]}
     }
 
-def barangay_charts():
-    from AlertNow import app  # Moved inside function
-    return render_template('BarangayCharts.html', barangay='SampleBarangay', current_datetime=datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
 
+def get_barangay_fire_chart_data(time_filter, barangay=None):
+    conn = get_db_connection()
+    c = conn.cursor()
+    manila = pytz.timezone('Asia/Manila')
+    now = datetime.now(manila)
+    base_time = now.strftime('%Y-%m-%d')
+    query = '''
+        SELECT fire_cause, fire_type, weather, fire_severity, barangay
+        FROM bfp_response
+        WHERE barangay = ?
+    '''
+    params = [barangay]
+    if time_filter == 'today':
+        query += " AND date(timestamp) = date(?)"
+        params.append(base_time)
+    elif time_filter == 'daily':
+        query += " AND date(timestamp) = date(?)"
+        params.append(base_time)
+    elif time_filter == 'weekly':
+        query += " AND strftime('%Y-%W', timestamp) = strftime('%Y-%W', ?)"
+        params.append(base_time)
+    elif time_filter == 'monthly':
+        query += " AND strftime('%Y-%m', timestamp) = strftime('%Y-%m', ?)"
+        params.append(base_time)
+    elif time_filter == 'yearly':
+        query += " AND strftime('%Y', timestamp) = strftime('%Y', ?)"
+        params.append(base_time)
+    
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+
+    causes = {}; types = {}; weathers = {}; severities = {}; barangays = {}
+    for row in rows:
+        causes[row[0]] = causes.get(row[0], 0) + 1
+        types[row[1]] = types.get(row[1], 0) + 1
+        weathers[row[2]] = weathers.get(row[2], 0) + 1
+        severities[row[3]] = severities.get(row[3], 0) + 1
+        barangays[row[4]] = barangays.get(row[4], 0) + 1
+
+    return {
+        'cause': {'labels': list(causes.keys()) if causes else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(causes.values()) if causes else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']}]},
+        'type': {'labels': list(types.keys()) if types else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(types.values()) if types else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        'weather': {'labels': list(weathers.keys()) if weathers else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(weathers.values()) if weathers else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
+        'severity': {'labels': list(severities.keys()) if severities else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(severities.values()) if severities else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]},
+        'barangay': {'labels': list(barangays.keys()) if barangays else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(barangays.values()) if barangays else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]}
+    }
+
+def get_barangay_health_chart_data(time_filter, barangay=None):
+    conn = get_db_connection()
+    c = conn.cursor()
+    manila = pytz.timezone('Asia/Manila')
+    now = datetime.now(manila)
+    base_time = now.strftime('%Y-%m-%d')
+    query = '''
+        SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital
+        FROM (
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, NULL as assigned_hospital, timestamp
+            FROM health_response
+            WHERE barangay = ?
+            UNION ALL
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital, timestamp
+            FROM hospital_response
+            WHERE barangay = ?
+        )
+    '''
+    params = [barangay, barangay]
+    if time_filter == 'today':
+        query += " WHERE date(timestamp) = date(?)"
+        params.append(base_time)
+    elif time_filter == 'daily':
+        query += " WHERE date(timestamp) = date(?)"
+        params.append(base_time)
+    elif time_filter == 'weekly':
+        query += " WHERE strftime('%Y-%W', timestamp) = strftime('%Y-%W', ?)"
+        params.append(base_time)
+    elif time_filter == 'monthly':
+        query += " WHERE strftime('%Y-%m', timestamp) = strftime('%Y-%m', ?)"
+        params.append(base_time)
+    elif time_filter == 'yearly':
+        query += " WHERE strftime('%Y', timestamp) = strftime('%Y', ?)"
+        params.append(base_time)
+    
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+
+    barangays = {}; health_types = {}; health_causes = {}; weathers = {}; ages = {}; genders = {}; responders = {}
+    for row in rows:
+        barangays[row[0]] = barangays.get(row[0], 0) + 1
+        health_types[row[1]] = health_types.get(row[1], 0) + 1
+        health_causes[row[2]] = health_causes.get(row[2], 0) + 1
+        weathers[row[3]] = weathers.get(row[3], 0) + 1
+        ages[row[4]] = ages.get(row[4], 0) + 1
+        genders[row[5]] = genders.get(row[5], 0) + 1
+        responders[row[6] or 'Unknown'] = responders.get(row[6] or 'Unknown', 0) + 1
+
+    return {
+        'barangay': {'labels': list(barangays.keys()) if barangays else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(barangays.values()) if barangays else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        'health_type': {'labels': list(health_types.keys()) if health_types else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(health_types.values()) if health_types else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        'health_cause': {'labels': list(health_causes.keys()) if health_causes else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(health_causes.values()) if health_causes else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']}]},
+        'weather': {'labels': list(weathers.keys()) if weathers else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(weathers.values()) if weathers else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
+        'patient_age': {'labels': list(ages.keys()) if ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(ages.values()) if ages else [0], 'backgroundColor': ['#36A2EB', '#FF6384', '#FFCE56', '#4BC0C0', '#9966FF'], 'borderColor': '#FF6384', 'fill': False}]},
+        'patient_gender': {'labels': list(genders.keys()) if genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(genders.values()) if genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
+        'responder': {'labels': list(responders.keys()) if responders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(responders.values()) if responders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]}
+    }
+def barangay_charts():
+    if 'role' not in session or session['role'] != 'barangay':
+        logger.warning("Unauthorized access to barangay_charts")
+        return redirect(url_for('login'))
+    barangays = load_barangays()
+    return render_template('BarangayCharts.html', barangays=barangays, current_datetime=datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
 def barangay_charts_data():
     from AlertNow import app  # Moved inside function
     time_filter = request.args.get('time_filter', 'today')
@@ -68,4 +197,20 @@ def handle_barangay_response(data):
     from AlertNow import socketio, app  # Moved inside function
     # Simulate database update and emit update
     chart_data = get_barangay_chart_data('today')
+    socketio.emit('barangay_response_update', chart_data, broadcast=True)
+    
+def barangay_fire_charts_data():
+    time_filter = request.args.get('time_filter', 'today')
+    barangay = request.args.get('barangay')
+    data = get_barangay_fire_chart_data(time_filter, barangay)
+    return jsonify(data)
+
+def barangay_health_charts_data():
+    time_filter = request.args.get('time_filter', 'today')
+    barangay = request.args.get('barangay')
+    data = get_barangay_health_chart_data(time_filter, barangay)
+    return jsonify(data)
+
+def handle_barangay_response(data):
+    chart_data = get_barangay_chart_data('today', data.get('barangay'))
     socketio.emit('barangay_response_update', chart_data, broadcast=True)
