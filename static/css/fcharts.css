@@ -1,6 +1,5 @@
 body {
-    margin: 0;
-    font-family: 'Roboto', sans-serif;
+    font-family: 'Arial', sans-serif;
     background-color: #1a2a44;
     color: #ffffff;
 }
@@ -59,9 +58,7 @@ body {
     left: 0;
     width: 98%;
     height: 88%;
-    overflow: auto;
     padding: 25px;
-    width: 97%;
     margin-top: 90px;
     margin-left: 20px;
     background: linear-gradient(135deg, #34495e, #2c3e50);
@@ -77,10 +74,8 @@ body {
     display: none;             /* Chrome, Safari, and Opera */
 }
 
-/* Optional vertical "FIRE" labels */
 .main-content::before,
 .main-content::after {
-   
     position: fixed;
     right: 50px;
     writing-mode: vertical-rl;
@@ -89,7 +84,6 @@ body {
     font-weight: bold;
 }
 .main-content::before {
-    
     margin-left: 5px;
     top: 50px;
 }
@@ -99,8 +93,8 @@ body {
 }
 
 .main-content.shifted {
-    left: 280px;               /* Shift right when sidebar is open */
-    width: calc(97% - 280px); /* Adjust width to fit beside sidebar */
+    left: 280px;
+    width: calc(97% - 280px);
 }
 
 .toggle-btn {
@@ -140,7 +134,9 @@ header p {
 .tabs {
     display: flex;
     justify-content: center;
-    margin-bottom: 25px;
+    margin-bottom: 15px;
+    position: relative;
+    z-index: 10;
 }
 
 .tab {
@@ -160,7 +156,64 @@ header p {
     border-color: #c0392b;
 }
 
+.dropdown-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+    position: relative;
+    z-index: 10;
+}
+
+.dropdown-container label {
+    color: #fff;
+    font-weight: 500;
+    margin-right: 10px;
+    align-self: center;
+}
+
+.dropdown-container select {
+    padding: 10px;
+    font-size: 16px;
+    border: 2px solid #3498db;
+    border-radius: 8px;
+    background-color: #34495e;
+    color: #fff;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.dropdown-container select:focus {
+    outline: none;
+    border-color: #e74c3c;
+}
+
 .section {
+    overflow-y: auto;
+    max-height: calc(88% - 180px); /* Adjust for header, tabs, and dropdown */
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 25px;
+    padding-bottom: 20px;
+     -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;
+}
+
+.barangay-section {
+    margin-bottom: 20px;
+}
+
+.barangay-section h2 {
+    font-size: 24px;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.barangay-section::-webkit-scrollbar {
+    display: none;             /* Chrome, Safari, and Opera */
+}
+
+.chart-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 25px;
