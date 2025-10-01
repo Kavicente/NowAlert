@@ -20,7 +20,7 @@ from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
 from HealthDashboard import get_health_stats, get_latest_alert
 from HospitalDashboard import get_hospital_stats, get_latest_alert
-from BarangayCharts import  barangay_charts, barangay_charts_data
+from BarangayCharts import  barangay_charts, barangay_charts_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_fire_chart_data, get_barangay_health_chart_data
 from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data
 from PNPCharts import pnp_charts, pnp_charts_data
 from BFPCharts import bfp_charts, bfp_charts_data
@@ -2216,7 +2216,20 @@ def export_alerts():
         json.dump(alerts, f, indent=4)
     return jsonify({"status": "success", "file": "alerts.json"})
 
+@socketio.on('bfp_response')
+def handle_bfp_response(data):
+    chart_data = get_barangay_fire_chart_data('today', data.get('barangay'))
+    socketio.emit('bfp_response_update', chart_data, broadcast=True)
 
+@socketio.on('barangay_health_response')
+def handle_barangay_health_response(data):
+    chart_data = get_barangay_health_chart_data('today', data.get('barangay'))
+    socketio.emit('barangay_health_response_update', chart_data, broadcast=True)
+
+@socketio.on('barangay_hospital_response')
+def handle_barangay_hospital_response(data):
+    chart_data = get_barangay_health_chart_data('today', data.get('barangay'))
+    socketio.emit('barangay_hospital_response_update', chart_data, broadcast=True)
 
 
 
@@ -2526,6 +2539,8 @@ def get_hospital_stats():
 
 app.route('/barangay_charts')(barangay_charts)
 app.route('/barangay_charts_data')(barangay_charts_data)
+app.route('/barangay_fire_charts_data')(barangay_fire_charts_data)
+app.route('/barangay_health_charts_data')(barangay_health_charts_data)
 app.route('/cdrrmo_charts')(cdrrmo_charts)
 app.route('/cdrrmo_charts_data')(cdrrmo_charts_data)
 app.route('/pnp_charts')(pnp_charts)
