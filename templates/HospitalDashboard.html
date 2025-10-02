@@ -308,6 +308,26 @@
                 }
             }
             loadHeatmap();
+
+            socket.on('role_accepted', (data) => {
+                if (data.role === 'hospital') {
+                    socket.on('forward_alert', (data) => {
+                        if (accepted_roles.hospital) {
+                            console.log('Forwarded alert received:', data.alert);
+                            const alertsDiv = document.getElementById('alerts');
+                            const alertDiv = document.createElement('div');
+                            alertDiv.className = 'alert';
+                            alertDiv.innerHTML = `Forwarded Emergency at ${data.alert.hospital}: ${data.alert.emergency_type} - Time: ${new Date().toLocaleTimeString()}`;
+                            alertsDiv.appendChild(alertDiv);
+                        }
+                    });
+                }
+            });
+            socket.on('role_declined', (data) => {
+                if (data.role === 'hospital') {
+                    socket.off('forward_alert');
+                }
+            });
         });
     </script>
 </body>

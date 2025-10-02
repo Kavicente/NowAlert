@@ -1,5 +1,6 @@
 from alert_data import alerts
 from collections import Counter
+from flask_socketio import sio
 import logging
 import sqlite3
 import os
@@ -37,3 +38,15 @@ def handle_health_response(data):
         # This function can be extended to process health-specific response data if needed
     except Exception as e:
         logger.error(f"Error in handle_health_response: {e}")
+
+@sio.event
+def role_accepted(data):
+    logger.info(f"Role {data['role']} accepted")
+    if data['role'] == 'health':
+        sio.on('forward_alert', lambda data: logger.info(f"Forwarded alert received: {data}") if data.get('emergency_type') == 'Health Emergency' else None)
+
+@sio.event
+def role_declined(data):
+    logger.info(f"Role {data['role']} declined")
+    if data['role'] == 'health':
+        sio.off('forward_alert')

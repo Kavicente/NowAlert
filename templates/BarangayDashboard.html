@@ -348,8 +348,15 @@
             }
             loadHeatmap();
 
+            socket.on('role_accepted', (data) => {
+                console.log(`Role ${data.role} accepted`);
+            });
+            socket.on('role_declined', (data) => {
+                console.log(`Role ${data.role} declined`);
+            });
 
-
+            
+                
         });
     </script>
 </body>
