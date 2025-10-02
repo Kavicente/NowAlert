@@ -920,16 +920,13 @@ def handle_forward_alert(data):
 
 @socketio.on('decline_alert')
 def handle_decline_alert(data):
-    logger.info(f"Received decline_alert: {data}")
-    try:
-        alert_id = data.get('alert_id')
-        if alert_id in pending_alerts:
-            del pending_alerts[alert_id]
-            logger.info(f"Alert {alert_id} declined by barangay and removed from pending")
-        else:
-            logger.warning(f"Alert {alert_id} not found in pending alerts")
-    except Exception as e:
-        logger.error(f"Error processing decline_alert: {e}")
+    alert_id = data.get('alert_id')
+    for alert in alerts:
+        if alert.get('alert_id') == alert_id:
+            alert['status'] = 'declined'
+            logger.info(f"Alert {alert_id} declined")
+            emit('alert_status', {'alert_id': alert_id, 'status': 'declined'}, broadcast=True)
+            break
 
 
 @socketio.on('forward_alert')
