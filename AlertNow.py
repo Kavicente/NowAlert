@@ -929,44 +929,7 @@ def handle_decline_alert(data):
             break
 
 
-@socketio.on('forward_alert')
-def handle_forward_alert(data):
-    logger.info(f"Forward alert received: {data}")
-    municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality:
-        municipality = municipality.lower()
-    else:
-        logger.warning(f"Municipality not found for barangay in forward: {data.get('barangay')}")
-        return  # Skip if no municipality
-    
-    cdrrmo_room = f"cdrrmo_{municipality}"
-    pnp_room = f"pnp_{municipality}"
-    bfp_room = f"bfp_{municipality}"
-    health_room = f"health_{municipality}"
-    hospital_room = f"hospital_{municipality}"
-    
-    emit('new_alert', data, room=cdrrmo_room)
-    logger.info(f"Alert forwarded to room {cdrrmo_room}")
-    emit('new_alert', data, room=pnp_room)
-    logger.info(f"Alert forwarded to room {pnp_room}")
-    emit('new_alert', data, room=bfp_room)
-    logger.info(f"Alert forwarded to room {bfp_room}")
-    emit('new_alert', data, room=health_room)
-    logger.info(f"Alert forwarded to room {health_room}")
-    emit('new_alert', data, room=hospital_room)
-    logger.info(f"Alert forwarded to room {hospital_room}")
 
-    map_data = {
-        'lat': data.get('lat'),
-        'lon': data.get('lon'),
-        'barangay': data.get('barangay'),
-        'emergency_type': data.get('emergency_type')
-    }
-    emit('update_map', map_data, room=cdrrmo_room)
-    emit('update_map', map_data, room=pnp_room)
-    emit('update_map', map_data, room=bfp_room)
-    emit('update_map', map_data, room=health_room)
-    emit('update_map', map_data, room=hospital_room)
     
 
 # /For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
