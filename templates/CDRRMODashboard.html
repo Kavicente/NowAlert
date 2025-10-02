@@ -126,8 +126,10 @@
 
             socket.on('new_alert', (data) => {
                 console.log('New alert received:', data);
-                updateUIWithAlert(data);
-                notifyAlert(data);
+                if (data.emergency_type.toLowerCase() === 'road accident') {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
+                }
             });
 
             socket.on('update_map', (data) => {

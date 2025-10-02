@@ -126,12 +126,10 @@
 
             socket.on('new_alert', (data) => {
                 console.log('New alert received:', data);
-                if (!data.alert_id) {
-                    console.error('No alert_id in new_alert data:', data);
-                    return;
+                if (data.emergency_type.toLowerCase() === 'fire incident') {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
                 }
-                updateUIWithAlert(data);
-                notifyAlert(data);
             });
 
             socket.on('update_map', (data) => {
