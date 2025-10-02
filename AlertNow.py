@@ -2114,7 +2114,7 @@ def load_coords():
     return alerts_data
 
 @app.route('/api/send_alert', methods=['POST'])
-def send_alert():
+def send_new_alert():
     data = request.json
     alert_id = str(uuid.uuid4())
     data['alert_id'] = alert_id
