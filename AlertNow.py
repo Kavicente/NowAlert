@@ -900,7 +900,6 @@ def handle_forward_alert(data):
     health_room = f"health_{municipality}"
     hospital_room = f"hospital_{municipality}"
     
-    
     emit('new_alert', data, room=cdrrmo_room)
     logger.info(f"Alert forwarded to room {cdrrmo_room}")
     emit('new_alert', data, room=pnp_room)
@@ -2113,6 +2112,17 @@ def load_coords():
     except Exception as e:
         logger.error(f"Error loading coords.txt: {e}")
     return alerts_data
+
+@app.route('/api/send_alert', methods=['POST'])
+def send_alert():
+    data = request.json
+    alert_id = str(uuid.uuid4())
+    data['alert_id'] = alert_id
+    alerts.append(data)
+    logger.info(f"New alert received: {data}")
+    if not data.get('image'):
+        socketio.emit('new_alert', data, room='barangay_' + data.get('barangay', '').lower())
+    return jsonify({'message': 'Alert sent', 'alert_id': alert_id})
 
 @app.route('/send_alert', methods=['POST'])
 def send_alert():
