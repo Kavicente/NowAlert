@@ -1,5 +1,6 @@
 from alert_data import alerts
 from collections import Counter
+from flask_socketio import sio
 import logging
 import sqlite3
 import os
@@ -26,3 +27,15 @@ def get_heatmap_data(municipality):
     data = cursor.fetchall()
     conn.close()
     return [{'lat': row[0], 'lon': row[1]} for row in data]
+
+@sio.event
+def role_accepted(data):
+    logger.info(f"Role {data['role']} accepted")
+    if data['role'] == 'cdrrmo':
+        sio.on('forward_alert', lambda data: logger.info(f"Forwarded alert received: {data}"))
+
+@sio.event
+def role_declined(data):
+    logger.info(f"Role {data['role']} declined")
+    if data['role'] == 'cdrrmo':
+        sio.off('forward_alert')

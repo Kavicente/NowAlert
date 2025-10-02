@@ -817,6 +817,50 @@ def handle_register_role(data):
                 join_room(f"hospital_{municipality}")
                 logger.info(f"Client {request.sid} joined room hospital_{municipality}")
 
+accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': False, 'pnp': False}
+
+# Update the socketio.on('new_alert') handler
+@socketio.on('newest_alert')
+def handle_newest_alert(data):
+    global alerts
+    logger.info(f"New alert received: {data}")
+    alert_id = str(uuid.uuid4())
+    data['alert_id'] = alert_id
+    alerts.append(data)
+    emit('new_alert', data, broadcast=True)
+    municipality = get_municipality_from_barangay(data.get('barangay', ''))
+    if municipality:
+        data['municipality'] = municipality
+    # Conditionally forward based on accepted roles
+    if accepted_roles.get('bfp', False) and data.get('emergency_type') in ['Fire Incident']:
+        emit('forward_alert', {'alert': data}, room='bfp')
+    if accepted_roles.get('cdrrmo', False):
+        emit('forward_alert', {'alert': data}, room='cdrrmo')
+    if accepted_roles.get('health', False) and data.get('emergency_type') in ['Health Emergency']:
+        emit('forward_alert', {'alert': data}, room='health')
+    if accepted_roles.get('hospital', False) and data.get('emergency_type') in ['Health Emergency']:
+        emit('forward_alert', {'alert': data}, room='hospital')
+    if accepted_roles.get('pnp', False) and data.get('emergency_type') in ['Crime Incident']:
+        emit('forward_alert', {'alert': data}, room='pnp')
+
+# Add a new socketio event to handle role acceptance from BarangayPage
+@socketio.on('accept_role')
+def handle_accept_role(data):
+    role = data.get('role')
+    if role in accepted_roles:
+        accepted_roles[role] = True
+        logger.info(f"Role {role} accepted")
+        emit('role_accepted', {'role': role}, broadcast=True)
+
+# Add a new socketio event to handle role decline from BarangayPage
+@socketio.on('decline_role')
+def handle_decline_role(data):
+    role = data.get('role')
+    if role in accepted_roles:
+        accepted_roles[role] = False
+        logger.info(f"Role {role} declined")
+        emit('role_declined', {'role': role}, broadcast=True)
+
 @socketio.on('alert')
 def handle_new_alert(data):
     try:
