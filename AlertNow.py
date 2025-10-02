@@ -819,6 +819,9 @@ def handle_register_role(data):
 
 accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': False, 'pnp': False}
 
+
+# For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
+
 # Update the socketio.on('new_alert') handler
 @socketio.on('newest_alert')
 def handle_newest_alert(data):
@@ -967,6 +970,10 @@ def handle_forward_alert(data):
     emit('update_map', map_data, room=health_room)
     emit('update_map', map_data, room=hospital_room)
     
+
+# /For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
+
+# Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1702,6 +1709,8 @@ def handle_hospital_response(data):
             logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
     except Exception as e:
         logger.error(f"Error in handle_hospital_response: {e}")
+
+# /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
 @socketio.on('submit_barangay_data')
 def submit_barangay_data(data):
