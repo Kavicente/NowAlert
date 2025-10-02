@@ -282,6 +282,7 @@ def handle_response(data):
     try:
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
+        destinations = data.get('destinations', []) 
         c.execute('''
             INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -393,6 +394,31 @@ def handle_response(data):
         ))
         conn.commit()
         logger.info(f"Response data inserted for alert_id: {data.get('alert_id')}")
+        
+        for role in destinations:
+            if role == 'barangay':
+                from BarangayCharts import handle_barangay_response
+                handle_barangay_response(data)
+            elif role == 'bfp':
+                from BFPCharts import handle_bfp_response
+                handle_bfp_response(data)
+            elif role == 'cdrrmo':
+                from CDRRMOCharts import handle_cdrrmo_response
+                handle_cdrrmo_response(data)
+            elif role == 'pnp':
+                from PNPCharts import handle_pnp_response
+                handle_pnp_response(data)
+            elif role == 'health':
+                from HealthCharts import handle_health_response
+                handle_health_response(data)
+            elif role == 'hospital':
+                from HospitalCharts import handle_hospital_response
+                handle_hospital_response(data)
+
+        # Emit the alert to the specified destinations
+        for role in destinations:
+            socketio.emit('new_alert', data, room=role)
+            
         # Emit updates to respective chart pages
         from BarangayCharts import handle_barangay_response
         from BFPCharts import handle_bfp_response
@@ -822,47 +848,8 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 # For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 
-# Update the socketio.on('new_alert') handler
-@socketio.on('newest_alert')
-def handle_newest_alert(data):
-    global alerts
-    logger.info(f"New alert received: {data}")
-    alert_id = str(uuid.uuid4())
-    data['alert_id'] = alert_id
-    alerts.append(data)
-    emit('new_alert', data, broadcast=True)
-    municipality = get_municipality_from_barangay(data.get('barangay', ''))
-    if municipality:
-        data['municipality'] = municipality
-    # Conditionally forward based on accepted roles
-    if accepted_roles.get('bfp', False) and data.get('emergency_type') in ['Fire Incident']:
-        emit('forward_alert', {'alert': data}, room='bfp')
-    if accepted_roles.get('cdrrmo', False):
-        emit('forward_alert', {'alert': data}, room='cdrrmo')
-    if accepted_roles.get('health', False) and data.get('emergency_type') in ['Health Emergency']:
-        emit('forward_alert', {'alert': data}, room='health')
-    if accepted_roles.get('hospital', False) and data.get('emergency_type') in ['Health Emergency']:
-        emit('forward_alert', {'alert': data}, room='hospital')
-    if accepted_roles.get('pnp', False) and data.get('emergency_type') in ['Crime Incident']:
-        emit('forward_alert', {'alert': data}, room='pnp')
 
-# Add a new socketio event to handle role acceptance from BarangayPage
-@socketio.on('accept_role')
-def handle_accept_role(data):
-    role = data.get('role')
-    if role in accepted_roles:
-        accepted_roles[role] = True
-        logger.info(f"Role {role} accepted")
-        emit('role_accepted', {'role': role}, broadcast=True)
 
-# Add a new socketio event to handle role decline from BarangayPage
-@socketio.on('decline_role')
-def handle_decline_role(data):
-    role = data.get('role')
-    if role in accepted_roles:
-        accepted_roles[role] = False
-        logger.info(f"Role {role} declined")
-        emit('role_declined', {'role': role}, broadcast=True)
 
 @socketio.on('alert')
 def handle_new_alert(data):
@@ -2824,3 +2811,4 @@ if __name__ == '__main__':
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
+    
