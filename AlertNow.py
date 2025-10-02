@@ -455,6 +455,10 @@ def handle_submit_response(data):
         health_cause = data.get('health_cause', '')
         patient_age = data.get('patient_age', '')
         patient_gender = data.get('patient_gender', '')
+        fire_type = data.get('fire_type', '')
+        fire_cause = data.get('fire_cause', '')
+        fire_severity = data.get('fire_severity', '')
+        assigned_hospital = data.get('assigned_hospital', '')
         lat = data.get('lat', 0.0)
         lon = data.get('lon', 0.0)
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')  # Changed to string
@@ -495,6 +499,20 @@ def handle_submit_response(data):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, data.get('assigned_hospital')))
             prediction = handle_hospital_response(data)
+        elif role == 'barangay':
+            c.execute('''
+            INSERT INTO barangay_fire_response (alert_id, fire_type, 
+            fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', ( alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded))
+            prediction = handle_barangay_fire_submitted(data)
+        elif role ==  'barangay':
+            c.execute('''
+                      INSERT INTO barangay_health_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', ( alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital))
+            prediction = handle_barangay_health_response(data)
         conn.commit()
         conn.close()
 
@@ -848,75 +866,57 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 # For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 
-@socketio.on('new_alert')
-def handle_new_alert(data):
-    logger.info(f"Received new_alert: {data}")
-    try:
-        alert_id = data.get('alert_id')
-        if not alert_id:  # Ensure alert_id is generated if not provided
-            alert_id = str(uuid.uuid4())
-            data['alert_id'] = alert_id
-        barangay = data.get('barangay', '').lower()
-        pending_alerts[alert_id] = data  # Store alert temporarily
-        emit('new_alert', data, room=f"barangay_{barangay}")
-        
-        map_data = {
-            'lat': data.get('lat'),
-            'lon': data.get('lon'),
-            'barangay': data.get('barangay'),
-            'emergency_type': data.get('emergency_type')
-        }
-        emit('update_map', map_data, room=f"barangay_{barangay}")  # Fixed: use f"barangay_{barangay}"
-        
-        logger.info(f"Alert {alert_id} sent to barangay {barangay} for acceptance")
-    except Exception as e:
-        logger.error(f"Error processing new_alert: {e}")
+@socketio.on('alert')
+def handle_alert(data):
+    alert_id = str(uuid.uuid4())
+    data['alert_id'] = alert_id
+    data['status'] = 'pending'
+    alerts.append(data)
+    logger.info(f"New alert received: {data}")
+    barangay = data.get('barangay', '').lower()
+    emit('new_alert', data, room=f'barangay_{barangay}')
+    emit('update_map', data, room=f'barangay_{barangay}')
 
 @socketio.on('accept_alert')
 def handle_accept_alert(data):
-    logger.info(f"Received accept_alert: {data}")
-    try:
-        alert_id = data.get('alert_id')
-        if alert_id in pending_alerts:
-            alert_data = pending_alerts[alert_id]
-            alerts.append(alert_data)  # Optional: keep if needed for storage
-            emergency_type = alert_data.get('emergency_type', '').lower()
-            barangay = alert_data.get('barangay', '').lower()
-            municipality = get_municipality_from_barangay(barangay)
-            map_data = {
-                'lat': alert_data.get('lat'),
-                'lon': alert_data.get('lon'),
-                'barangay': alert_data.get('barangay'),
-                'emergency_type': alert_data.get('emergency_type')
-            }
-            if municipality:
-                roles_to_notify = []
-                if emergency_type == 'road accident':
-                    roles_to_notify = ['cdrrmo', 'pnp']
-                elif emergency_type == 'fire incident':
-                    roles_to_notify = ['bfp', 'pnp']
-                elif emergency_type == 'crime incident':
-                    roles_to_notify = ['pnp']
-                elif emergency_type == 'health emergency':
-                    roles_to_notify = ['health', 'hospital']
-                for role in roles_to_notify:
-                    emit('new_alert', alert_data, room=f"{role}_{municipality}")
-                    emit('update_map', map_data, room=f"{role}_{municipality}")  # Added
-                    logger.info(f"Forwarded alert {alert_id} to {role} in {municipality}")
-                if emergency_type == 'health emergency':
-                    assigned_hospital = alert_data.get('assigned_hospital', '').lower()
-                    if assigned_hospital:
-                        emit('new_alert', alert_data, room=f"hospital_{assigned_hospital}")
-                        emit('update_map', map_data, room=f"hospital_{assigned_hospital}")  # Added
-                        logger.info(f"Forwarded alert {alert_id} to hospital {assigned_hospital}")
-            else:
-                logger.warning(f"Municipality not found for barangay: {barangay}")
-            del pending_alerts[alert_id]
-            logger.info(f"Alert {alert_id} forwarded after barangay acceptance")
-        else:
-            logger.warning(f"Alert {alert_id} not found in pending alerts")
-    except Exception as e:
-        logger.error(f"Error processing accept_alert: {e}")
+    alert_id = data.get('alert_id')
+    for alert in alerts:
+        if alert.get('alert_id') == alert_id:
+            alert['status'] = 'accepted'
+            logger.info(f"Alert {alert_id} accepted")
+            emit('alert_status', {'alert_id': alert_id, 'status': 'accepted'}, broadcast=True)
+            break
+
+@socketio.on('forward_alert')
+def handle_forward_alert(data):
+    alert_id = data.get('alert_id')
+    destinations = data.get('destinations', [])
+    hospital = data.get('hospital')
+    for alert in alerts:
+        if alert.get('alert_id') == alert_id:
+            if hospital:
+                alert['assigned_hospital'] = hospital
+            for dest in destinations:
+                if dest.startswith('bfp_'):
+                    emit('new_alert', alert, room=dest)
+                    emit('update_map', alert, room=dest)
+                    logger.info(f"Alert {alert_id} forwarded to {dest}")
+                elif dest.startswith('cdrrmo_'):
+                    emit('new_alert', alert, room=dest)
+                    emit('update_map', alert, room=dest)
+                    logger.info(f"Alert {alert_id} forwarded to {dest}")
+                elif dest.startswith('health_'):
+                    emit('new_alert', alert, room=dest)
+                    emit('update_map', alert, room=dest)
+                    logger.info(f"Alert {alert_id} forwarded to {dest}")
+                elif dest.startswith('hospital_'):
+                    emit('new_alert', alert, room=dest)
+                    emit('update_map', alert, room=dest)
+                    logger.info(f"Alert {alert_id} forwarded to {dest}")
+                elif dest.startswith('pnp_'):
+                    emit('new_alert', alert, room=dest)
+                    emit('update_map', alert, room=dest)
+                    logger.info(f"Alert {alert_id} forwarded to {dest}")
 
 @socketio.on('decline_alert')
 def handle_decline_alert(data):
@@ -1599,6 +1599,238 @@ def handle_hospital_response(data):
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO hospital_response (
+                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('health_type'),
+            data.get('health_cause'),
+            data.get('weather'),
+            data.get('patient_age'),
+            data.get('patient_gender'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            base_time.strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True),
+            data.get('assigned_hospital')
+        ))
+        conn.commit()
+        conn.close()
+        # Emit prediction to health room
+        municipality = get_municipality_from_barangay(data.get('barangay'))
+        if municipality:
+            hospital_room = f"hospital_{municipality.lower()}"
+            emit('hospital_response', {
+                'alert_id': data.get('alert_id'),
+                'barangay': data.get('barangay'),
+                'prediction': prediction_text,
+                'assigned_hospital': assigned_hospital
+            }, room=hospital_room)
+            logger.info(f"Prediction emitted to room {hospital_room}: {prediction_text}")
+            chart_data = {
+                'barangay': {
+                    'labels': [barangay] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Barangay Incidents',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#FF6B6B'] or ['#999999'],
+                        'borderColor': ['#FF6B6B'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'health_type': {
+                    'labels': [data.get('health_type', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Health Emergency Type',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#4ECDC4'] or ['#999999'],
+                        'borderColor': ['#4ECDC4'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'health_cause': {
+                    'labels': [data.get('health_cause', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Health Emergency Cause',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#45B7D1'] or ['#999999'],
+                        'borderColor': ['#45B7D1'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'weather': {
+                    'labels': [data.get('weather', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Weather Conditions',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#96CEB4'] or ['#999999'],
+                        'borderColor': ['#96CEB4'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'patient_age': {
+                    'labels': [data.get('patient_age', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Age',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#FFEEAD'] or ['#999999'],
+                        'borderColor': ['#FFEEAD'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'patient_gender': {
+                    'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Gender',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                        'borderColor': ['#D4A5A5'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'patient_gender': {
+                    'labels': [data.get('patient_gender', 'Unknown')] or ['No Data'],
+                    'datasets': [{
+                        'label': 'Patient Gender',
+                        'data': [1] or [0],
+                        'backgroundColor': ['#D4A5A5'] or ['#999999'],
+                        'borderColor': ['#D4A5A5'] or ['#999999'],
+                        'borderWidth': 1
+                    }]
+                },
+                'barangay': barangay,
+                'assigned_hospital': assigned_hospital
+            }
+            logger.info(f"Emitting hospital_response_update with chart_data: {chart_data}")
+            emit('hospital_response_update', chart_data, room=hospital_room)
+            logger.info(f"Chart update emitted to room {hospital_room}")
+        else:
+            logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
+    except Exception as e:
+        logger.error(f"Error in handle_hospital_response: {e}")
+
+
+@socketio.on('barangay_fire_submitted')
+def handle_barangay_fire_submitted(data):
+    try:
+        logger.info(f"Received Barangay response: {data}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO barangay_fire_response (alert_id, fire_type, 
+            fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'),
+            data.get('fire_type'),
+            data.get('fire_cause'),
+            data.get('weather'),
+            data.get('fire_severity'),
+            data.get('lat'),
+            data.get('lon'),
+            data.get('barangay'),
+            data.get('emergency_type'),
+            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'),
+            data.get('responded', True)
+        ))
+        conn.commit()
+        conn.close()
+
+        # Emit response to dashboard for prediction
+        emit('barangay_fire_response', data, room=data.get('barangay', 'default_room'))
+    except Exception as e:
+        logger.error(f"Error storing bfp response: {e}")
+    
+    logger.info(f"Received fire response: {data}")
+    logger.debug(f"Processing fire response for alert_id: {data.get('alert_id')}")
+    default_values = {}
+    ftype_mapping = {
+        'Electrical Fire': 1,
+        'Grass Fire': 2,
+        'Residential Fire': 3,
+        'Natural Fire': 4,
+        'Other Fire': 5
+    }
+    fcause_mapping = {
+        'Arson': 1,
+        'Cooking': 2,
+        'Electrical': 3,
+        'Natural': 4
+    }
+    cleaned_data = {
+        'alert_id': data.get('alert_id'),  # Ensure alert_id is included
+        'fire_type': ftype_mapping.get(data.get('fire_type'), 0),
+        'fire_cause': fcause_mapping.get(data.get('fire_cause'), 0),
+        'weather': data.get('weather', 'Unknown'),
+        'fire_severity': data.get('fire_severity', 'Unknown'),
+        'lat': data.get('lat', 0.0),
+        'lon': data.get('lon', 0.0),
+        'barangay': data.get('barangay', 'Unknown'),
+        'emergency_type': data.get('emergency_type', 'Unknown')
+    }
+    cleaned_data.update(default_values)
+    
+    try:
+        if fire_accident_predictor:
+            feature_names = ['Fire_Type', 'Fire_Cause', 'Barangay', 'Year']
+            features = pd.DataFrame([[
+                cleaned_data['fire_type'],
+                cleaned_data['fire_cause'],
+                cleaned_data['barangay'],
+                datetime.now().year
+            ]], columns=feature_names)
+            prediction = fire_accident_predictor.predict(features)[0]
+            probability = fire_accident_predictor.predict_proba(features)[0][1]
+            cleaned_data['prediction'] = f"{probability*100:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            cleaned_data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        cleaned_data['prediction'] = 'prediction_error'
+    
+    responses.append(cleaned_data)
+    today_responses.append(cleaned_data)
+    municipality = get_municipality_from_barangay(cleaned_data['barangay'])
+    if not municipality:
+        logger.error(f"No municipality found for barangay: {cleaned_data['barangay']}")
+        municipality = 'unknown'
+    barangay_room = f"barangay_{municipality.lower()}"
+    emit('barangay_fire_submitted', cleaned_data, room=barangay_room)
+    logger.info(f"Fire response broadcasted to room {barangay_room}: {cleaned_data}")
+
+
+@socketio.on('barangay_health_response')
+def handle_barangay_health_response(data):
+    try:
+        manila = pytz.timezone('Asia/Manila')
+        base_time = datetime.now(manila)
+        logger.info(f"Handling hospital response for alert_id: {data.get('alert_id')}")
+        # Map incoming data to model expected columns
+        prediction_data = {
+            'Health_Type': data.get('health_type', 'Unknown'),
+            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Year': datetime.now().year  # Use current year as default
+        }
+        # Convert to DataFrame for prediction
+        prediction_df = pd.DataFrame([prediction_data])
+        if health_predictor:
+            prediction = health_predictor.predict_proba(prediction_df)[:, 1][0] * 100
+            prediction_text = f"{prediction:.1f}% chance in year {datetime.now().year}"
+        else:
+            prediction_text = "prediction_error"
+        barangay = data.get('barangay', 'Unknown')
+        municipality = get_municipality_from_barangay(barangay)
+        assigned_hospital = data.get('assigned_hospital', session.get('assigned_hospital', 'Unknown Hospital'))
+        if barangay == 'Unknown' or not municipality:
+            barangay = next(iter(barangay_coords.get(session.get('municipality', 'Unknown'), {})), 'Unknown')
+            logger.warning(f"Invalid barangay {data.get('barangay', 'Unknown')}, using default {barangay}")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO barangay_health_response (
                 alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -2752,6 +2984,39 @@ if __name__ == '__main__':
                 timestamp TEXT,
                 responded BOOLEAN DEFAULT TRUE,
                 assigned_hospital TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS barangay_fire_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                fire_type TEXT,
+                fire_cause TEXT,
+                weather TEXT,
+                fire_severity TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS barangay_health_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                health_type TEXT,
+                health_cause TEXT,
+                weather TEXT,
+                patient_age TEXT,
+                patient_gender TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
             )
         ''')
         conn.commit()

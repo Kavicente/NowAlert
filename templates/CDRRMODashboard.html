@@ -120,27 +120,34 @@
                 socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
+            });
+
             socket.on('connect_error', (error) => {
                 console.error('Connection error:', error);
             });
 
             socket.on('new_alert', (data) => {
-                console.log('New alert received:', data);
-                if (data.emergency_type.toLowerCase() === 'road accident') {
+                if (data.emergency_type === 'Road Accident') {
+                    console.log('New alert received:', data);
                     updateUIWithAlert(data);
                     notifyAlert(data);
                 }
             });
 
             socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                cdrrmoMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+                if (data.emergency_type === 'Road Accident') {
+                    console.log('Update map received:', data);
+                    const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                    const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                    cdrrmoMap.setView([lat, lon], 16);
+                    L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
+                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                    ).openPopup();
+                    document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+                }
             });
 
             socket.on('cdrrmo_response', (data) => {
