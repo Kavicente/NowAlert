@@ -105,7 +105,7 @@ socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*", max_h
 alerts = []
 responses = []
 today_responses = []
-
+pending_alerts = []
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -848,115 +848,91 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 # For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 
-
-
-
-@socketio.on('alert')
+@socketio.on('new_alert')
 def handle_new_alert(data):
+    logger.info(f"Received new_alert: {data}")
     try:
-        logger.info(f"New alert received: {data}")
-        alert_id = str(uuid.uuid4())
-        data['alert_id'] = alert_id
-        data['timestamp'] = datetime.utcnow().isoformat()
-        data['resident_barangay'] = data.get('barangay', 'Unknown')
+        alert_id = data.get('alert_id')
+        if not alert_id:  # Ensure alert_id is generated if not provided
+            alert_id = str(uuid.uuid4())
+            data['alert_id'] = alert_id
+        barangay = data.get('barangay', '').lower()
+        pending_alerts[alert_id] = data  # Store alert temporarily
+        emit('new_alert', data, room=f"barangay_{barangay}")
         
-        alerts.append(data)
-        
-        barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-        municipality = get_municipality_from_barangay(data.get('barangay'))
-        if municipality:
-            municipality = municipality.lower()
-            cdrrmo_room = f"cdrrmo_{municipality}"
-            pnp_room = f"pnp_{municipality}"
-            bfp_room = f"bfp_{municipality}"
-            health_room = f"health_{municipality}"  # Fixed typo: health__ to health_
-            hospital_room = f"hospital_{municipality}"
-        else:
-            logger.warning(f"Municipality not found for barangay: {data.get('barangay')}")
-            cdrrmo_room = None
-            pnp_room = None
-            bfp_room = None
-            health_room = None
-            hospital_room = None
-        
-        emit('new_alert', data, room=barangay_room)
-        logger.info(f"Alert emitted to room {barangay_room}")
-        if cdrrmo_room:
-            emit('new_alert', data, room=cdrrmo_room)
-            logger.info(f"Alert emitted to room {cdrrmo_room}")
-        if pnp_room:
-            emit('new_alert', data, room=pnp_room)
-            logger.info(f"Alert emitted to room {pnp_room}")
-        if bfp_room:
-            emit('new_alert', data, room=bfp_room)
-            logger.info(f"Alert emitted to room {bfp_room}")
-        if health_room:
-            emit('new_alert', data, room=health_room)
-            logger.info(f"Alert emitted to room {health_room}")
-        if hospital_room:
-            emit('new_alert', data, room=hospital_room)
-            logger.info(f"Alert emitted to room {hospital_room}")
-    
-        # Emit update_map to relevant rooms
         map_data = {
             'lat': data.get('lat'),
             'lon': data.get('lon'),
             'barangay': data.get('barangay'),
             'emergency_type': data.get('emergency_type')
         }
-        emit('update_map', map_data, room=barangay_room)
-        if cdrrmo_room:
-            emit('update_map', map_data, room=cdrrmo_room)
-        if pnp_room:
-            emit('update_map', map_data, room=pnp_room)
-        if bfp_room:
-            emit('update_map', map_data, room=bfp_room)
-        if health_room:
-            emit('update_map', map_data, room=health_room)
-        if hospital_room:
-            emit('update_map', map_data, room=hospital_room)
+        emit('update_map', map_data, room=f"barangay_{barangay}")  # Fixed: use f"barangay_{barangay}"
+        
+        logger.info(f"Alert {alert_id} sent to barangay {barangay} for acceptance")
     except Exception as e:
-        logger.error(f"Error handling alert: {e}")    
+        logger.error(f"Error processing new_alert: {e}")
 
-@socketio.on('forward_alert')
-def handle_forward_alert(data):
-    logger.info(f"Forward alert received: {data}")
-    municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality:
-        municipality = municipality.lower()
-    else:
-        logger.warning(f"Municipality not found for barangay in forward: {data.get('barangay')}")
-        return  # Skip if no municipality
-    
-    cdrrmo_room = f"cdrrmo_{municipality}"
-    pnp_room = f"pnp_{municipality}"
-    bfp_room = f"bfp_{municipality}"
-    health_room = f"health_{municipality}"
-    hospital_room = f"hospital_{municipality}"
-    
-    emit('new_alert', data, room=cdrrmo_room)
-    logger.info(f"Alert forwarded to room {cdrrmo_room}")
-    emit('new_alert', data, room=pnp_room)
-    logger.info(f"Alert forwarded to room {pnp_room}")
-    emit('new_alert', data, room=bfp_room)
-    logger.info(f"Alert forwarded to room {bfp_room}")
-    emit('new_alert', data, room=health_room)
-    logger.info(f"Alert forwarded to room {health_room}")
-    emit('new_alert', data, room=hospital_room)
-    logger.info(f"Alert forwarded to room {hospital_room}")
+@socketio.on('accept_alert')
+def handle_accept_alert(data):
+    logger.info(f"Received accept_alert: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        if alert_id in pending_alerts:
+            alert_data = pending_alerts[alert_id]
+            alerts.append(alert_data)  # Optional: keep if needed for storage
+            emergency_type = alert_data.get('emergency_type', '').lower()
+            barangay = alert_data.get('barangay', '').lower()
+            municipality = get_municipality_from_barangay(barangay)
+            map_data = {
+                'lat': alert_data.get('lat'),
+                'lon': alert_data.get('lon'),
+                'barangay': alert_data.get('barangay'),
+                'emergency_type': alert_data.get('emergency_type')
+            }
+            if municipality:
+                roles_to_notify = []
+                if emergency_type == 'road accident':
+                    roles_to_notify = ['cdrrmo', 'pnp']
+                elif emergency_type == 'fire incident':
+                    roles_to_notify = ['bfp', 'pnp']
+                elif emergency_type == 'crime incident':
+                    roles_to_notify = ['pnp']
+                elif emergency_type == 'health emergency':
+                    roles_to_notify = ['health', 'hospital']
+                for role in roles_to_notify:
+                    emit('new_alert', alert_data, room=f"{role}_{municipality}")
+                    emit('update_map', map_data, room=f"{role}_{municipality}")  # Added
+                    logger.info(f"Forwarded alert {alert_id} to {role} in {municipality}")
+                if emergency_type == 'health emergency':
+                    assigned_hospital = alert_data.get('assigned_hospital', '').lower()
+                    if assigned_hospital:
+                        emit('new_alert', alert_data, room=f"hospital_{assigned_hospital}")
+                        emit('update_map', map_data, room=f"hospital_{assigned_hospital}")  # Added
+                        logger.info(f"Forwarded alert {alert_id} to hospital {assigned_hospital}")
+            else:
+                logger.warning(f"Municipality not found for barangay: {barangay}")
+            del pending_alerts[alert_id]
+            logger.info(f"Alert {alert_id} forwarded after barangay acceptance")
+        else:
+            logger.warning(f"Alert {alert_id} not found in pending alerts")
+    except Exception as e:
+        logger.error(f"Error processing accept_alert: {e}")
 
-    map_data = {
-        'lat': data.get('lat'),
-        'lon': data.get('lon'),
-        'barangay': data.get('barangay'),
-        'emergency_type': data.get('emergency_type')
-    }
-    emit('update_map', map_data, room=cdrrmo_room)
-    emit('update_map', map_data, room=pnp_room)
-    emit('update_map', map_data, room=bfp_room)
-    emit('update_map', map_data, room=health_room)
-    emit('update_map', map_data, room=hospital_room)
-    
+@socketio.on('decline_alert')
+def handle_decline_alert(data):
+    logger.info(f"Received decline_alert: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        if alert_id in pending_alerts:
+            del pending_alerts[alert_id]
+            logger.info(f"Alert {alert_id} declined by barangay and removed from pending")
+        else:
+            logger.warning(f"Alert {alert_id} not found in pending alerts")
+    except Exception as e:
+        logger.error(f"Error processing decline_alert: {e}")
+
+
+
 
 # /For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 
