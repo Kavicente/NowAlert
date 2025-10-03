@@ -135,7 +135,7 @@
                     const alertContainer = document.getElementById('alert-container');
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
-                    alertDiv.style.backgroundColor = '#ffcccc';
+                    alertDiv.setAttribute('data-alert-id', data.alert_id);
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${data.barangay}</strong></p>
                         <p>Resident from: ${data.resident_barangay || data.barangay}</p>
@@ -147,65 +147,88 @@
                         img.src = data.image;
                         img.className = 'clickable-img';
                         img.onclick = () => {
-                            document.getElementById('modal-image').src = data.image;
-                            document.getElementById('image-modal').style.display = 'flex';
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modalImg.src = data.image;
+                            modal.style.display = 'flex';
                         };
                         alertDiv.appendChild(img);
                     }
-                    const form = document.createElement('div');
-                    form.className = 'response-form';
-                    form.innerHTML = `
-                        <select id="health_type_${data.alert_id}">
-                            <option value="Heart Attack">Heart Attack</option>
-                            <option value="Stroke">Stroke</option>
-                            <option value="Fall">Fall</option>
-                            <option value="Breathing Difficulty">Breathing Difficulty</option>
-                            <option value="Giving Birth">Giving Birth</option>
-                            <option value="Seizure">Seizure</option>
-                            <option value="Burn">Burn</option>
-                            <option value="Poisoning">Poisoning</option>
-                            <option value="Allergic Reaction">Allergic Reaction</option>
-                        </select>
-                        <select id="health_cause_${data.alert_id}">
-                            <option value="Pregnant">Pregnant</option>
-                            <option value="Chronic Illness">Chronic Illness</option>
-                            <option value="Accident">Accident</option>
-                            <option value="Allergy">Allergy</option>
-                            <option value="Infection">Infection</option>
-                            <option value="Overdose">Overdose</option>
-                            <option value="Heatstroke">Heatstroke</option>
-                        </select>
-                        <select id="weather_${data.alert_id}">
-                            <option value="Sunny">Sunny</option>
-                            <option value="Rainy">Rainy</option>
-                            <option value="Foggy">Foggy</option>
-                            <option value="Cloudy">Cloudy</option>
-                            <option value="Stormy">Stormy</option>
-                        </select>
-                        <select id="patient_age_${data.alert_id}">
-                            <option value="0-17">0-17</option>
-                            <option value="18-25">18-25</option>
-                            <option value="26-35">26-35</option>
-                            <option value="36-45">36-45</option>
-                            <option value="46-60">46-60</option>
-                            <option value="61+">61+</option>
-                        </select>
-                        <select id="patient_gender_${data.alert_id}">
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
-                        <select id="assigned_hospital_${data.alert_id}">
-                            <option value="N/A">N/A</option>
-                            <option value="Hospital A">Hospital A</option>
-                            <option value="Hospital B">Hospital B</option>
-                        </select>
-                        <button onclick="submitResponse('${data.alert_id}', 'health')">Submit Response</button>
-                    `;
-                    alertDiv.appendChild(form);
+                    const respondButton = document.createElement('button');
+                    respondButton.textContent = 'Respond';
+                    respondButton.onclick = () => {
+                        const form = document.createElement('form');
+                        form.className = 'response-form';
+                        form.innerHTML = `
+                            <select name="health_type">
+                                <option value="Heart Attack">Heart Attack</option>
+                                <option value="Stroke">Stroke</option>
+                                <option value="Fall">Fall</option>
+                                <option value="Breathing Difficulty">Breathing Difficulty</option>
+                                <option value="Giving Birth">Giving Birth</option>
+                                <option value="Seizure">Seizure</option>
+                                <option value="Burn">Burn</option>
+                                <option value="Poisoning">Poisoning</option>
+                                <option value="Allergic Reaction">Allergic Reaction</option>
+                            </select>
+                            <select name="health_cause">
+                                <option value="Pregnant">Pregnant</option>
+                                <option value="Chronic Illness">Chronic Illness</option>
+                                <option value="Accident">Accident</option>
+                                <option value="Allergy">Allergy</option>
+                                <option value="Infection">Infection</option>
+                                <option value="Overdose">Overdose</option>
+                                <option value="Heatstroke">Heatstroke</option>
+                            </select>
+                            <select name="weather">
+                                <option value="Sunny">Sunny</option>
+                                <option value="Rainy">Rainy</option>
+                                <option value="Foggy">Foggy</option>
+                                <option value="Cloudy">Cloudy</option>
+                                <option value="Stormy">Stormy</option>
+                            </select>
+                            <select name="patient_age">
+                                <option value="0-17">0-17</option>
+                                <option value="18-25">18-25</option>
+                                <option value="26-35">26-35</option>
+                                <option value="36-45">36-45</option>
+                                <option value="46-60">46-60</option>
+                                <option value="61+">61+</option>
+                            </select>
+                            <select name="patient_gender">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                            <button type="submit">Submit Response</button>
+                        `;
+                        form.onsubmit = (e) => {
+                            e.preventDefault();
+                            const responseData = {
+                                alert_id: data.alert_id,
+                                role: 'health',
+                                health_type: form.querySelector('select[name="health_type"]').value,
+                                health_cause: form.querySelector('select[name="health_cause"]').value,
+                                weather: form.querySelector('select[name="weather"]').value,
+                                patient_age: form.querySelector('select[name="patient_age"]').value,
+                                patient_gender: form.querySelector('select[name="patient_gender"]').value,
+                                lat: data.lat,
+                                lon: data.lon,
+                                barangay: data.barangay,
+                                emergency_type: data.emergency_type,
+                                municipality: '{{ municipality }}'.toLowerCase()
+                            };
+                            socket.emit('submit_response', responseData);
+                            alertDiv.removeChild(form);
+                            alertDiv.appendChild(document.createElement('p')).textContent = 'Response submitted';
+                        };
+                        alertDiv.appendChild(form);
+                        alertDiv.removeChild(respondButton);
+                    };
+                    alertDiv.appendChild(respondButton);
                     alertContainer.appendChild(alertDiv);
-                    L.marker([data.lat, data.lon]).addTo(healthMap)
-                        .bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`)
-                        .openPopup();
+
+                    const marker = L.marker([data.lat, data.lon]).addTo(healthMap);
+                    marker.bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`);
                 }
                 updateStats();
             });

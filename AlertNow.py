@@ -404,12 +404,79 @@ def handle_response(data):
     finally:
         conn.close()
 
+# [CHANGED: Modified handle_new_alert to only emit to barangay]
+@socketio.on('alert')
+def handle_new_alert(data):
+    try:
+        logger.info(f"New alert received: {data}")
+        alert_id = str(uuid.uuid4())
+        data['alert_id'] = alert_id
+        data['timestamp'] = datetime.utcnow().isoformat()
+        data['resident_barangay'] = data.get('barangay', 'Unknown')
+        
+        alerts.append(data)
+        
+        barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+        emit('new_alert', data, room=barangay_room)
+        logger.info(f"Alert emitted to room {barangay_room}")
+        
+        map_data = {
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type')
+        }
+        emit('update_map', map_data, room=barangay_room)
+    except Exception as e:
+        logger.error(f"Error handling alert: {e}")
+
+# [REVERTED: Restored your preferred handle_forward_alert]
+@socketio.on('forward_alert')
+def handle_forward_alert(data):
+    logger.info(f"Forward alert received: {data}")
+    municipality = get_municipality_from_barangay(data.get('barangay'))
+    if municipality:
+        municipality = municipality.lower()
+    else:
+        logger.warning(f"Municipality not found for barangay in forward: {data.get('barangay')}")
+        return  # Skip if no municipality
+    
+    cdrrmo_room = f"cdrrmo_{municipality}"
+    pnp_room = f"pnp_{municipality}"
+    bfp_room = f"bfp_{municipality}"
+    health_room = f"health_{municipality}"
+    hospital_room = f"hospital_{municipality}"
+    
+    emit('new_alert', data, room=cdrrmo_room)
+    logger.info(f"Alert forwarded to room {cdrrmo_room}")
+    emit('new_alert', data, room=pnp_room)
+    logger.info(f"Alert forwarded to room {pnp_room}")
+    emit('new_alert', data, room=bfp_room)
+    logger.info(f"Alert forwarded to room {bfp_room}")
+    emit('new_alert', data, room=health_room)
+    logger.info(f"Alert forwarded to room {health_room}")
+    emit('new_alert', data, room=hospital_room)
+    logger.info(f"Alert forwarded to room {hospital_room}")
+
+    map_data = {
+        'lat': data.get('lat'),
+        'lon': data.get('lon'),
+        'barangay': data.get('barangay'),
+        'emergency_type': data.get('emergency_type')
+    }
+    emit('update_map', map_data, room=cdrrmo_room)
+    emit('update_map', map_data, room=pnp_room)
+    emit('update_map', map_data, room=bfp_room)
+    emit('update_map', map_data, room=health_room)
+    emit('update_map', map_data, room=hospital_room)
+
+# [CHANGED: Updated handle_submit_response to fix errors and prevent duplicate predictions]
 @socketio.on('submit_response')
 def handle_submit_response(data):
     logging.debug(f"Response received: {data}")
     alert_id = data.get('alert_id')
     role = data.get('role')
-    prediction = 'N/A'
+    prediction = 'N/A'  # Initialize prediction with default value
     manila = pytz.timezone('Asia/Manila')
     timestamp = datetime.now(manila).strftime('%Y-%m-%d %H:%M:%S')  # [ADDED: Timestamp for all responses]
     try:
@@ -525,8 +592,8 @@ def handle_submit_response(data):
                     INSERT INTO bfp_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('fire_type'), data.get('fire_cause'), data.get('weather'),
-                    data.get('fire_severity'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    alert_id, data.get('fire_type', 'N/A'), data.get('fire_cause', 'N/A'), data.get('weather', 'N/A'),
+                    data.get('fire_severity', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -545,9 +612,9 @@ def handle_submit_response(data):
                     INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'),
-                    data.get('road_condition'), data.get('vehicle_type'), data.get('driver_age'), data.get('driver_gender'),
-                    data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    alert_id, data.get('road_accident_cause', 'N/A'), data.get('road_accident_type', 'N/A'), data.get('weather', 'N/A'),
+                    data.get('road_condition', 'N/A'), data.get('vehicle_type', 'N/A'), data.get('driver_age', 'N/A'),
+                    data.get('driver_gender', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -566,35 +633,36 @@ def handle_submit_response(data):
                     prediction = 'prediction_error'
             elif role == 'pnp':
                 c.execute('''
-                    INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                    INSERT INTO pnp_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'),
-                    data.get('road_condition'), data.get('vehicle_type'), data.get('driver_age'), data.get('driver_gender'),
-                    data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    alert_id, data.get('crime_type', 'N/A'), data.get('crime_cause', 'N/A'), data.get('level', 'N/A'),
+                    data.get('suspect_gender', 'N/A'), data.get('victim_gender', 'N/A'), data.get('suspect_age', 'N/A'),
+                    data.get('victim_age', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
-                        'road_accident_cause': data.get('road_accident_cause', 'N/A'),
-                        'road_accident_type': data.get('road_accident_type', 'N/A'),
-                        'weather': data.get('weather', 'N/A'),
-                        'road_condition': data.get('road_condition', 'N/A'),
-                        'vehicle_type': data.get('vehicle_type', 'N/A'),
-                        'driver_age': data.get('driver_age', 'N/A'),
-                        'driver_gender': data.get('driver_gender', 'N/A')
+                        'crime_type': data.get('crime_type', 'N/A'),
+                        'crime_cause': data.get('crime_cause', 'N/A'),
+                        'level': data.get('level', 'N/A'),
+                        'suspect_gender': data.get('suspect_gender', 'N/A'),
+                        'victim_gender': data.get('victim_gender', 'N/A'),
+                        'suspect_age': data.get('suspect_age', 'N/A'),
+                        'victim_age': data.get('victim_age', 'N/A')
                     }])
-                    prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
+                    prediction = crime_predictor.predict_proba(input_data)[:, 1][0] * 100
                     prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
                 except Exception as e:
-                    logging.error(f"Error predicting road accident for PNP: {e}")
+                    logging.error(f"Error predicting crime for PNP: {e}")
                     prediction = 'prediction_error'
             elif role == 'health':
                 c.execute('''
                     INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('health_type'), data.get('health_cause'), data.get('weather'), data.get('patient_age'),
-                    data.get('patient_gender'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'), data.get('weather', 'N/A'),
+                    data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'), data.get('lat'), data.get('lon'),
+                    data.get('barangay'), data.get('emergency_type'), timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -614,8 +682,9 @@ def handle_submit_response(data):
                     INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('health_type'), data.get('health_cause'), data.get('weather'), data.get('patient_age'),
-                    data.get('patient_gender'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True, data.get('assigned_hospital', 'N/A')
+                    alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'), data.get('weather', 'N/A'),
+                    data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'), data.get('lat'), data.get('lon'),
+                    data.get('barangay'), data.get('emergency_type'), timestamp, True, data.get('assigned_hospital', 'N/A')
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -635,8 +704,6 @@ def handle_submit_response(data):
             emit(f'{role}_response', {'alert_id': alert_id, 'prediction': prediction}, room=f"{role}_{data.get('municipality').lower()}")
     except Exception as e:
         logging.error(f"Error in handle_submit_response: {e}")
-
-
 
 # After @socketio.on('response_update')
 @socketio.on('hospital_response')
@@ -910,39 +977,6 @@ def role_declined(data):
     except Exception as e:
         logger.error(f"Error in role_declined: {e}")
 
-#New handle_forward_alert function
-
-@socketio.on('forward_alert')
-def handle_forward_alert(data):
-    alert_id = data.get('alert_id')
-    destinations = data.get('destinations', [])
-    hospital = data.get('hospital')
-    for alert in alerts:
-        if alert.get('alert_id') == alert_id:
-            if hospital:
-                alert['assigned_hospital'] = hospital
-            for dest in destinations:
-                if dest.startswith('bfp_'):
-                    emit('new_alert', alert, room=dest)
-                    emit('update_map', alert, room=dest)
-                    logger.info(f"Alert {alert_id} forwarded to {dest}")
-                elif dest.startswith('cdrrmo_'):
-                    emit('new_alert', alert, room=dest)
-                    emit('update_map', alert, room=dest)
-                    logger.info(f"Alert {alert_id} forwarded to {dest}")
-                elif dest.startswith('health_'):
-                    emit('new_alert', alert, room=dest)
-                    emit('update_map', alert, room=dest)
-                    logger.info(f"Alert {alert_id} forwarded to {dest}")
-                elif dest.startswith('hospital_'):
-                    emit('new_alert', alert, room=dest)
-                    emit('update_map', alert, room=dest)
-                    logger.info(f"Alert {alert_id} forwarded to {dest}")
-                elif dest.startswith('pnp_'):
-                    emit('new_alert', alert, room=dest)
-                    emit('update_map', alert, room=dest)
-                    logger.info(f"Alert {alert_id} forwarded to {dest}")
-
 
 
 
@@ -958,70 +992,7 @@ def handle_redirect_alert(data):
 
 #Old handle_new_alert function
 
-@socketio.on('alert')
-def handle_new_alert(data):
-    try:
-        logger.info(f"New alert received: {data}")
-        alert_id = str(uuid.uuid4())
-        data['alert_id'] = alert_id
-        data['timestamp'] = datetime.utcnow().isoformat()
-        data['resident_barangay'] = data.get('barangay', 'Unknown')
-        
-        alerts.append(data)
-        
-        barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-        emit('new_alert', data, room=barangay_room)
-        logger.info(f"Alert emitted to room {barangay_room}")
-        
-        map_data = {
-            'lat': data.get('lat'),
-            'lon': data.get('lon'),
-            'barangay': data.get('barangay'),
-            'emergency_type': data.get('emergency_type')
-        }
-        emit('update_map', map_data, room=barangay_room)
-    except Exception as e:
-        logger.error(f"Error handling alert: {e}")    
 
-@socketio.on('forward_alert')
-def handle_forward_alert(data):
-    logger.info(f"Forward alert received: {data}")
-    municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality:
-        municipality = municipality.lower()
-    else:
-        logger.warning(f"Municipality not found for barangay in forward: {data.get('barangay')}")
-        return  # Skip if no municipality
-    
-    cdrrmo_room = f"cdrrmo_{municipality}"
-    pnp_room = f"pnp_{municipality}"
-    bfp_room = f"bfp_{municipality}"
-    health_room = f"health_{municipality}"
-    hospital_room = f"hospital_{municipality}"
-    
-    
-    emit('new_alert', data, room=cdrrmo_room)
-    logger.info(f"Alert forwarded to room {cdrrmo_room}")
-    emit('new_alert', data, room=pnp_room)
-    logger.info(f"Alert forwarded to room {pnp_room}")
-    emit('new_alert', data, room=bfp_room)
-    logger.info(f"Alert forwarded to room {bfp_room}")
-    emit('new_alert', data, room=health_room)
-    logger.info(f"Alert forwarded to room {health_room}")
-    emit('new_alert', data, room=hospital_room)
-    logger.info(f"Alert forwarded to room {hospital_room}")
-
-    map_data = {
-        'lat': data.get('lat'),
-        'lon': data.get('lon'),
-        'barangay': data.get('barangay'),
-        'emergency_type': data.get('emergency_type')
-    }
-    emit('update_map', map_data, room=cdrrmo_room)
-    emit('update_map', map_data, room=pnp_room)
-    emit('update_map', map_data, room=bfp_room)
-    emit('update_map', map_data, room=health_room)
-    emit('update_map', map_data, room=hospital_room)
 
 # /For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 

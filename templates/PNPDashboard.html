@@ -143,7 +143,7 @@
                     const alertContainer = document.getElementById('alert-container');
                     const alertDiv = document.createElement('div');
                     alertDiv.className = 'alert-item';
-                    alertDiv.style.backgroundColor = '#ffcccc';
+                    alertDiv.setAttribute('data-alert-id', data.alert_id);
                     alertDiv.innerHTML = `
                         <p><strong>Emergency at ${data.barangay}</strong></p>
                         <p>Resident from: ${data.resident_barangay || data.barangay}</p>
@@ -155,27 +155,27 @@
                         img.src = data.image;
                         img.className = 'clickable-img';
                         img.onclick = () => {
-                            document.getElementById('modal-image').src = data.image;
-                            document.getElementById('image-modal').style.display = 'flex';
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modalImg.src = data.image;
+                            modal.style.display = 'flex';
                         };
                         alertDiv.appendChild(img);
                     }
-                    const form = document.createElement('div');
-                    form.className = 'response-form';
-                    if (data.emergency_type === 'Road Accident') {
-                        form.innerHTML = `
-                            <button onclick="showResponseForm('${data.alert_id}')">Respond</button>
-                            <div id="response-form-${data.alert_id}" style="display: none;">
-                                <select id="road_accident_type_${data.alert_id}">
+                    const respondButton = document.createElement('button');
+                    respondButton.textContent = 'Respond';
+                    respondButton.onclick = () => {
+                        const form = document.createElement('form');
+                        form.className = 'response-form';
+                        if (data.emergency_type === 'Road Accident') {
+                            form.innerHTML = `
+                                <select name="road_accident_type">
                                     <option value="Collision">Collision</option>
-                                    <option value="Single Vehicle Crash">Single Vehicle Crash</option>
-                                    <option value="Rear-End">Rear-End</option>
-                                    <option value="Side-Impact">Side-Impact</option>
-                                    <option value="Head-On">Head-On</option>
-                                    <option value="Rollover">Rollover</option>
+                                    <option value="Hit and Run">Hit and Run</option>
+                                    <option value="Vehicle Breakdown">Vehicle Breakdown</option>
                                     <option value="Pedestrian Accident">Pedestrian Accident</option>
                                 </select>
-                                <select id="road_accident_cause_${data.alert_id}">
+                                <select name="road_accident_cause">
                                     <option value="Overspeeding">Overspeeding</option>
                                     <option value="Distracted Driving">Distracted Driving</option>
                                     <option value="Drunk Driving">Drunk Driving</option>
@@ -186,28 +186,28 @@
                                     <option value="Poor Maintenance">Poor Maintenance</option>
                                     <option value="Overloading">Overloading</option>
                                 </select>
-                                <select id="weather_${data.alert_id}">
+                                <select name="weather">
                                     <option value="Sunny">Sunny</option>
                                     <option value="Rainy">Rainy</option>
                                     <option value="Foggy">Foggy</option>
                                     <option value="Cloudy">Cloudy</option>
                                     <option value="Stormy">Stormy</option>
                                 </select>
-                                <select id="road_condition_${data.alert_id}">
+                                <select name="road_condition">
                                     <option value="Dry">Dry</option>
                                     <option value="Wet">Wet</option>
                                     <option value="Icy">Icy</option>
                                     <option value="Potholes">Potholes</option>
                                     <option value="Gravel">Gravel</option>
                                 </select>
-                                <select id="vehicle_type_${data.alert_id}">
+                                <select name="vehicle_type">
                                     <option value="Car">Car</option>
                                     <option value="Motorcycle">Motorcycle</option>
                                     <option value="Truck">Truck</option>
                                     <option value="Bus">Bus</option>
                                     <option value="Bicycle">Bicycle</option>
                                 </select>
-                                <select id="driver_age_${data.alert_id}">
+                                <select name="driver_age">
                                     <option value="0-17">0-17</option>
                                     <option value="18-25">18-25</option>
                                     <option value="26-35">26-35</option>
@@ -215,47 +215,65 @@
                                     <option value="46-60">46-60</option>
                                     <option value="61+">61+</option>
                                 </select>
-                                <select id="driver_gender_${data.alert_id}">
+                                <select name="driver_gender">
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
                                 </select>
-                                <button onclick="submitResponse('${data.alert_id}', 'pnp', 'Road Accident')">Submit Response</button>
-                            </div>
-                        `;
-                    } else {
-                        form.innerHTML = `
-                            <button onclick="showResponseForm('${data.alert_id}')">Respond</button>
-                            <div id="response-form-${data.alert_id}" style="display: none;">
-                                <select id="crime_type_${data.alert_id}">
+                                <button type="submit">Submit Response</button>
+                            `;
+                            form.onsubmit = (e) => {
+                                e.preventDefault();
+                                const responseData = {
+                                    alert_id: data.alert_id,
+                                    role: 'pnp',
+                                    road_accident_type: form.querySelector('select[name="road_accident_type"]').value,
+                                    road_accident_cause: form.querySelector('select[name="road_accident_cause"]').value,
+                                    weather: form.querySelector('select[name="weather"]').value,
+                                    road_condition: form.querySelector('select[name="road_condition"]').value,
+                                    vehicle_type: form.querySelector('select[name="vehicle_type"]').value,
+                                    driver_age: form.querySelector('select[name="driver_age"]').value,
+                                    driver_gender: form.querySelector('select[name="driver_gender"]').value,
+                                    lat: data.lat,
+                                    lon: data.lon,
+                                    barangay: data.barangay,
+                                    emergency_type: data.emergency_type,
+                                    municipality: '{{ municipality }}'.toLowerCase()
+                                };
+                                socket.emit('submit_response', responseData);
+                                alertDiv.removeChild(form);
+                                alertDiv.appendChild(document.createElement('p')).textContent = 'Response submitted';
+                            };
+                        } else if (data.emergency_type === 'Crime') {
+                            form.innerHTML = `
+                                <select name="crime_type">
                                     <option value="Theft">Theft</option>
                                     <option value="Assault">Assault</option>
                                     <option value="Robbery">Robbery</option>
-                                    <option value="Vandalism">Vandalism</option>
                                     <option value="Burglary">Burglary</option>
+                                    <option value="Vandalism">Vandalism</option>
                                 </select>
-                                <select id="crime_cause_${data.alert_id}">
+                                <select name="crime_cause">
                                     <option value="Economic">Economic</option>
                                     <option value="Personal Dispute">Personal Dispute</option>
-                                    <option value="Gang-related">Gang-related</option>
-                                    <option value="Drug-related">Drug-related</option>
-                                    <option value="Alcohol-related">Alcohol-related</option>
+                                    <option value="Gang Activity">Gang Activity</option>
+                                    <option value="Substance Abuse">Substance Abuse</option>
                                 </select>
-                                <select id="level_${data.alert_id}">
-                                    <option value="Low">Low</option>
-                                    <option value="Medium">Medium</option>
-                                    <option value="High">High</option>
+                                <select name="level">
+                                    <option value="Minor">Minor</option>
+                                    <option value="Moderate">Moderate</option>
+                                    <option value="Severe">Severe</option>
                                 </select>
-                                <select id="suspect_gender_${data.alert_id}">
+                                <select name="suspect_gender">
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
                                     <option value="Unknown">Unknown</option>
                                 </select>
-                                <select id="victim_gender_${data.alert_id}">
+                                <select name="victim_gender">
                                     <option value="Male">Male</option>
                                     <option value="Female">Female</option>
                                     <option value="Unknown">Unknown</option>
                                 </select>
-                                <select id="suspect_age_${data.alert_id}">
+                                <select name="suspect_age">
                                     <option value="0-17">0-17</option>
                                     <option value="18-25">18-25</option>
                                     <option value="26-35">26-35</option>
@@ -264,7 +282,7 @@
                                     <option value="61+">61+</option>
                                     <option value="Unknown">Unknown</option>
                                 </select>
-                                <select id="victim_age_${data.alert_id}">
+                                <select name="victim_age">
                                     <option value="0-17">0-17</option>
                                     <option value="18-25">18-25</option>
                                     <option value="26-35">26-35</option>
@@ -273,15 +291,58 @@
                                     <option value="61+">61+</option>
                                     <option value="Unknown">Unknown</option>
                                 </select>
-                                <button onclick="submitResponse('${data.alert_id}', 'pnp', 'Crime')">Submit Response</button>
-                            </div>
-                        `;
-                    }
-                    alertDiv.appendChild(form);
+                                <button type="submit">Submit Response</button>
+                            `;
+                            form.onsubmit = (e) => {
+                                e.preventDefault();
+                                const responseData = {
+                                    alert_id: data.alert_id,
+                                    role: 'pnp',
+                                    crime_type: form.querySelector('select[name="crime_type"]').value,
+                                    crime_cause: form.querySelector('select[name="crime_cause"]').value,
+                                    level: form.querySelector('select[name="level"]').value,
+                                    suspect_gender: form.querySelector('select[name="suspect_gender"]').value,
+                                    victim_gender: form.querySelector('select[name="victim_gender"]').value,
+                                    suspect_age: form.querySelector('select[name="suspect_age"]').value,
+                                    victim_age: form.querySelector('select[name="victim_age"]').value,
+                                    lat: data.lat,
+                                    lon: data.lon,
+                                    barangay: data.barangay,
+                                    emergency_type: data.emergency_type,
+                                    municipality: '{{ municipality }}'.toLowerCase()
+                                };
+                                socket.emit('submit_response', responseData);
+                                alertDiv.removeChild(form);
+                                alertDiv.appendChild(document.createElement('p')).textContent = 'Response submitted';
+                            };
+                        } else {
+                            form.innerHTML = `
+                                <button type="submit">Submit Response</button>
+                            `;
+                            form.onsubmit = (e) => {
+                                e.preventDefault();
+                                const responseData = {
+                                    alert_id: data.alert_id,
+                                    role: 'pnp',
+                                    lat: data.lat,
+                                    lon: data.lon,
+                                    barangay: data.barangay,
+                                    emergency_type: data.emergency_type,
+                                    municipality: '{{ municipality }}'.toLowerCase()
+                                };
+                                socket.emit('submit_response', responseData);
+                                alertDiv.removeChild(form);
+                                alertDiv.appendChild(document.createElement('p')).textContent = 'Response submitted';
+                            };
+                        }
+                        alertDiv.appendChild(form);
+                        alertDiv.removeChild(respondButton);
+                    };
+                    alertDiv.appendChild(respondButton);
                     alertContainer.appendChild(alertDiv);
-                    L.marker([data.lat, data.lon]).addTo(pnpMap)
-                        .bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`)
-                        .openPopup();
+
+                    const marker = L.marker([data.lat, data.lon]).addTo(pnpMap);
+                    marker.bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`);
                 }
                 updateStats();
             });
