@@ -131,11 +131,83 @@
             });
 
             socket.on('redirected_alert', (data) => {
-                console.log('Redirected alert received:', data);
                 if (data.target_role === 'health') {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
+                    const alertContainer = document.getElementById('alert-container');
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert-item';
+                    alertDiv.style.backgroundColor = '#ffcccc';
+                    alertDiv.innerHTML = `
+                        <p><strong>Emergency at ${data.barangay}</strong></p>
+                        <p>Resident from: ${data.resident_barangay || data.barangay}</p>
+                        <p>Type: ${data.emergency_type}</p>
+                        <p>Time: ${new Date().toLocaleTimeString()}</p>
+                    `;
+                    if (data.image) {
+                        const img = document.createElement('img');
+                        img.src = data.image;
+                        img.className = 'clickable-img';
+                        img.onclick = () => {
+                            document.getElementById('modal-image').src = data.image;
+                            document.getElementById('image-modal').style.display = 'flex';
+                        };
+                        alertDiv.appendChild(img);
+                    }
+                    const form = document.createElement('div');
+                    form.className = 'response-form';
+                    form.innerHTML = `
+                        <select id="health_type_${data.alert_id}">
+                            <option value="Heart Attack">Heart Attack</option>
+                            <option value="Stroke">Stroke</option>
+                            <option value="Fall">Fall</option>
+                            <option value="Breathing Difficulty">Breathing Difficulty</option>
+                            <option value="Giving Birth">Giving Birth</option>
+                            <option value="Seizure">Seizure</option>
+                            <option value="Burn">Burn</option>
+                            <option value="Poisoning">Poisoning</option>
+                            <option value="Allergic Reaction">Allergic Reaction</option>
+                        </select>
+                        <select id="health_cause_${data.alert_id}">
+                            <option value="Pregnant">Pregnant</option>
+                            <option value="Chronic Illness">Chronic Illness</option>
+                            <option value="Accident">Accident</option>
+                            <option value="Allergy">Allergy</option>
+                            <option value="Infection">Infection</option>
+                            <option value="Overdose">Overdose</option>
+                            <option value="Heatstroke">Heatstroke</option>
+                        </select>
+                        <select id="weather_${data.alert_id}">
+                            <option value="Sunny">Sunny</option>
+                            <option value="Rainy">Rainy</option>
+                            <option value="Foggy">Foggy</option>
+                            <option value="Cloudy">Cloudy</option>
+                            <option value="Stormy">Stormy</option>
+                        </select>
+                        <select id="patient_age_${data.alert_id}">
+                            <option value="0-17">0-17</option>
+                            <option value="18-25">18-25</option>
+                            <option value="26-35">26-35</option>
+                            <option value="36-45">36-45</option>
+                            <option value="46-60">46-60</option>
+                            <option value="61+">61+</option>
+                        </select>
+                        <select id="patient_gender_${data.alert_id}">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <select id="assigned_hospital_${data.alert_id}">
+                            <option value="N/A">N/A</option>
+                            <option value="Hospital A">Hospital A</option>
+                            <option value="Hospital B">Hospital B</option>
+                        </select>
+                        <button onclick="submitResponse('${data.alert_id}', 'health')">Submit Response</button>
+                    `;
+                    alertDiv.appendChild(form);
+                    alertContainer.appendChild(alertDiv);
+                    L.marker([data.lat, data.lon]).addTo(healthMap)
+                        .bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`)
+                        .openPopup();
                 }
+                updateStats();
             });
 
             socket.on('update_map', (data) => {
@@ -173,51 +245,7 @@
                 }
             });
 
-            function updateUIWithAlert(data) {
-                const feed = document.getElementById('alert-container');
-                if (feed) {
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert-item';
-                    alertDiv.dataset.alertId = data.alert_id;
-                    alertElements.set(data.alert_id, alertDiv);
-                    let displayTime;
-                    try {
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
-                    } catch (e) {
-                        console.error('Error parsing timestamp:', e);
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
-                    }
-                    const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
-                    const emergencyBarangay = data.barangay || 'Unknown';
-                    const residentBarangay = data.resident_barangay || emergencyBarangay;
-                    alertDiv.innerHTML = `
-                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
-                    `;
-                    feed.prepend(alertDiv);
-
-                    if (data.image) {
-                        const img = alertDiv.querySelector('.clickable-img');
-                        img.addEventListener('click', () => {
-                            const modal = document.getElementById('image-modal');
-                            const modalImg = document.getElementById('modal-image');
-                            modalImg.src = `data:image/jpeg;base64,${data.image}`;
-                            modal.style.display = 'flex';
-                        });
-                    }
-
-                    if (data.lat && data.lon) {
-                        const marker = L.marker([data.lat, data.lon]).addTo(healthMap).bindPopup(
-                            `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                        ).openPopup();
-                        if (feed.children.length === 1) {
-                            healthMap.setView([data.lat, data.lon], 15);
-                        }
-                    }
-
-                    updateStats();
-                }
-            }
+            
 
             function notifyAlert(data) {
                 const notificationDiv = document.getElementById('notification');

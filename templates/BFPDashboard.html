@@ -138,15 +138,91 @@
                 }
             });
 
-            socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                bfpMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(bfpMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+            ocket.on('redirected_alert', (data) => {
+                if (data.target_role === 'bfp') {
+                    const alertContainer = document.getElementById('alert-container');
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert-item';
+                    alertDiv.style.backgroundColor = '#ffcccc';
+                    alertDiv.innerHTML = `
+                        <p><strong>Emergency at ${data.barangay}</strong></p>
+                        <p>Resident from: ${data.resident_barangay || data.barangay}</p>
+                        <p>Type: ${data.emergency_type}</p>
+                        <p>Time: ${new Date().toLocaleTimeString()}</p>
+                    `;
+                    if (data.image) {
+                        const img = document.createElement('img');
+                        img.src = data.image;
+                        img.className = 'clickable-img';
+                        img.onclick = () => {
+                            document.getElementById('modal-image').src = data.image;
+                            document.getElementById('image-modal').style.display = 'flex';
+                        };
+                        alertDiv.appendChild(img);
+                    }
+                    const form = document.createElement('div');
+                    form.className = 'response-form';
+                    form.innerHTML = `
+                        <select id="fire_type_${data.alert_id}">
+                            <option value="Residential Fire">Residential Fire</option>
+                            <option value="Structural Fire">Structural Fire</option>
+                            <option value="Commercial/Industrial Fire">Commercial/Industrial Fire</option>
+                            <option value="Electrical Fire">Electrical Fire</option>
+                            <option value="Vehicular Fire">Vehicular Fire</option>
+                            <option value="Grass Fire">Grass Fire</option>
+                            <option value="Forest/Wildfire">Forest/Wildfire</option>
+                            <option value="Rubbish/Garbage Fire">Rubbish/Garbage Fire</option>
+                            <option value="Kitchen/Grease Fire">Kitchen/Grease Fire</option>
+                            <option value="Gas/LPG Fire">Gas/LPG Fire</option>
+                            <option value="Explosion/Blast-related Fire">Explosion/Blast-related Fire</option>
+                            <option value="Post Fire">Post Fire</option>
+                        </select>
+                        <select id="fire_cause_${data.alert_id}">
+                            <option value="Unattended Cooking">Unattended Cooking</option>
+                            <option value="Electrical Short Circuit">Electrical Short Circuit</option>
+                            <option value="Candles Left Burning">Candles Left Burning</option>
+                            <option value="Overloaded Extension Cords">Overloaded Extension Cords</option>
+                            <option value="Smoking Materials">Smoking Materials</option>
+                            <option value="LPG/Gas Leak">LPG/Gas Leak</option>
+                            <option value="Faulty Wiring">Faulty Wiring</option>
+                            <option value="Flammable Materials">Flammable Materials</option>
+                            <option value="Welding Sparks">Welding Sparks</option>
+                            <option value="Arson">Arson</option>
+                            <option value="Machinery Overheating">Machinery Overheating</option>
+                            <option value="Chemical Reactions">Chemical Reactions</option>
+                            <option value="Boiler Failure">Boiler Failure</option>
+                            <option value="Improper Disposal">Improper Disposal</option>
+                            <option value="Exposed Wiring">Exposed Wiring</option>
+                            <option value="Lightning Strike">Lightning Strike</option>
+                            <option value="Engine Overheating">Engine Overheating</option>
+                            <option value="Fuel Leak">Fuel Leak</option>
+                        </select>
+                        <select id="weather_${data.alert_id}">
+                            <option value="Sunny">Sunny</option>
+                            <option value="Rainy">Rainy</option>
+                            <option value="Foggy">Foggy</option>
+                            <option value="Cloudy">Cloudy</option>
+                            <option value="Stormy">Stormy</option>
+                        </select>
+                        <select id="fire_severity_${data.alert_id}">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Minor Fire">Minor Fire</option>
+                            <option value="Moderate Fire">Moderate Fire</option>
+                            <option value="Major Fire">Major Fire</option>
+                            <option value="Severe Fire">Severe Fire</option>
+                            <option value="Catastrophic Fire">Catastrophic Fire</option>
+                        </select>
+                        <button onclick="submitResponse('${data.alert_id}', 'bfp')">Submit Response</button>
+                    `;
+                    alertDiv.appendChild(form);
+                    alertContainer.appendChild(alertDiv);
+                    L.marker([data.lat, data.lon]).addTo(bfpMap)
+                        .bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`)
+                        .openPopup();
+                }
+                updateStats();
             });
 
             socket.on('bfp_response', (data) => {
@@ -173,51 +249,10 @@
                 }
             });
 
-            function updateUIWithAlert(data) {
-                const feed = document.getElementById('alert-container');
-                if (feed) {
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert-item';
-                    alertDiv.dataset.alertId = data.alert_id;
-                    alertElements.set(data.alert_id, alertDiv);
-                    let displayTime;
-                    try {
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
-                    } catch (e) {
-                        console.error('Error parsing timestamp:', e);
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
-                    }
-                    const address = `${data.house_no || 'N/A'}, ${data.street_no || 'N/A'}, ${data.barangay || 'N/A'}`;
-                    const emergencyBarangay = data.barangay || 'Unknown';
-                    const residentBarangay = data.resident_barangay || emergencyBarangay;
-                    alertDiv.innerHTML = `
-                        <p><strong>Emergency at ${emergencyBarangay} Resident from ${residentBarangay}</strong> - ${data.emergency_type || 'Not Specified'} at ${displayTime}</p>
-                        ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
-                    `;
-                    feed.prepend(alertDiv);
+            
 
-                    if (data.image) {
-                        const img = alertDiv.querySelector('.clickable-img');
-                        img.addEventListener('click', () => {
-                            const modal = document.getElementById('image-modal');
-                            const modalImg = document.getElementById('modal-image');
-                            modalImg.src = `data:image/jpeg;base64,${data.image}`;
-                            modal.style.display = 'flex';
-                        });
-                    }
-
-                    if (data.lat && data.lon) {
-                        const marker = L.marker([data.lat, data.lon]).addTo(bfpMap).bindPopup(
-                            `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                        ).openPopup();
-                        if (feed.children.length === 1) {
-                            bfpMap.setView([data.lat, data.lon], 15);
-                        }
-                    }
-
-                    updateStats();
-                }
-            }
+                    
+            
 
             function notifyAlert(data) {
                 const notificationDiv = document.getElementById('notification');
