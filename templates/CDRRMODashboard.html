@@ -131,11 +131,92 @@
             });
 
             socket.on('redirected_alert', (data) => {
-                console.log('Redirected alert received:', data);
                 if (data.target_role === 'cdrrmo') {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
+                    const alertContainer = document.getElementById('alert-container');
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert-item';
+                    alertDiv.style.backgroundColor = '#ffcccc';
+                    alertDiv.innerHTML = `
+                        <p><strong>Emergency at ${data.barangay}</strong></p>
+                        <p>Resident from: ${data.resident_barangay || data.barangay}</p>
+                        <p>Type: ${data.emergency_type}</p>
+                        <p>Time: ${new Date().toLocaleTimeString()}</p>
+                    `;
+                    if (data.image) {
+                        const img = document.createElement('img');
+                        img.src = data.image;
+                        img.className = 'clickable-img';
+                        img.onclick = () => {
+                            document.getElementById('modal-image').src = data.image;
+                            document.getElementById('image-modal').style.display = 'flex';
+                        };
+                        alertDiv.appendChild(img);
+                    }
+                    const form = document.createElement('div');
+                    form.className = 'response-form';
+                    form.innerHTML = `
+                        <select id="road_accident_type_${data.alert_id}">
+                            <option value="Collision">Collision</option>
+                            <option value="Single Vehicle Crash">Single Vehicle Crash</option>
+                            <option value="Rear-End">Rear-End</option>
+                            <option value="Side-Impact">Side-Impact</option>
+                            <option value="Head-On">Head-On</option>
+                            <option value="Rollover">Rollover</option>
+                            <option value="Pedestrian Accident">Pedestrian Accident</option>
+                        </select>
+                        <select id="road_accident_cause_${data.alert_id}">
+                            <option value="Overspeeding">Overspeeding</option>
+                            <option value="Distracted Driving">Distracted Driving</option>
+                            <option value="Drunk Driving">Drunk Driving</option>
+                            <option value="Reckless Driving">Reckless Driving</option>
+                            <option value="Fatigue">Fatigue</option>
+                            <option value="Inexperience">Inexperience</option>
+                            <option value="Mechanical Failure">Mechanical Failure</option>
+                            <option value="Poor Maintenance">Poor Maintenance</option>
+                            <option value="Overloading">Overloading</option>
+                        </select>
+                        <select id="weather_${data.alert_id}">
+                            <option value="Sunny">Sunny</option>
+                            <option value="Rainy">Rainy</option>
+                            <option value="Foggy">Foggy</option>
+                            <option value="Cloudy">Cloudy</option>
+                            <option value="Stormy">Stormy</option>
+                        </select>
+                        <select id="road_condition_${data.alert_id}">
+                            <option value="Dry">Dry</option>
+                            <option value="Wet">Wet</option>
+                            <option value="Icy">Icy</option>
+                            <option value="Potholes">Potholes</option>
+                            <option value="Gravel">Gravel</option>
+                        </select>
+                        <select id="vehicle_type_${data.alert_id}">
+                            <option value="Car">Car</option>
+                            <option value="Motorcycle">Motorcycle</option>
+                            <option value="Truck">Truck</option>
+                            <option value="Bus">Bus</option>
+                            <option value="Bicycle">Bicycle</option>
+                        </select>
+                        <select id="driver_age_${data.alert_id}">
+                            <option value="0-17">0-17</option>
+                            <option value="18-25">18-25</option>
+                            <option value="26-35">26-35</option>
+                            <option value="36-45">36-45</option>
+                            <option value="46-60">46-60</option>
+                            <option value="61+">61+</option>
+                        </select>
+                        <select id="driver_gender_${data.alert_id}">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <button onclick="submitResponse('${data.alert_id}', 'cdrrmo')">Submit Response</button>
+                    `;
+                    alertDiv.appendChild(form);
+                    alertContainer.appendChild(alertDiv);
+                    L.marker([data.lat, data.lon]).addTo(cdrrmoMap)
+                        .bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`)
+                        .openPopup();
                 }
+                updateStats();
             });
 
             socket.on('update_map', (data) => {
