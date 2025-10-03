@@ -276,7 +276,6 @@ def handle_response(data):
     try:
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
-        destinations = data.get('destinations', []) 
         c.execute('''
             INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -388,31 +387,6 @@ def handle_response(data):
         ))
         conn.commit()
         logger.info(f"Response data inserted for alert_id: {data.get('alert_id')}")
-        
-        for role in destinations:
-            if role == 'barangay':
-                from BarangayCharts import handle_barangay_response
-                handle_barangay_response(data)
-            elif role == 'bfp':
-                from BFPCharts import handle_bfp_response
-                handle_bfp_response(data)
-            elif role == 'cdrrmo':
-                from CDRRMOCharts import handle_cdrrmo_response
-                handle_cdrrmo_response(data)
-            elif role == 'pnp':
-                from PNPCharts import handle_pnp_response
-                handle_pnp_response(data)
-            elif role == 'health':
-                from HealthCharts import handle_health_response
-                handle_health_response(data)
-            elif role == 'hospital':
-                from HospitalCharts import handle_hospital_response
-                handle_hospital_response(data)
-
-        # Emit the alert to the specified destinations
-        for role in destinations:
-            socketio.emit('new_alert', data, room=role)
-            
         # Emit updates to respective chart pages
         from BarangayCharts import handle_barangay_response
         from BFPCharts import handle_bfp_response
@@ -799,6 +773,8 @@ def role_declined(data):
     except Exception as e:
         logger.error(f"Error in role_declined: {e}")
 
+#New handle_forward_alert function
+
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
     alert_id = data.get('alert_id')
@@ -843,7 +819,7 @@ def handle_redirect_alert(data):
     else:
         logging.error(f"Invalid target role: {target_role}")
 
-
+#Old handle_new_alert function
 
 @socketio.on('alert')
 def handle_new_alert(data):
