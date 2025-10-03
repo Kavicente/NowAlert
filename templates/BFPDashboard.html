@@ -130,13 +130,7 @@
                 notifyAlert(data);
             });
 
-            socket.on('redirected_alert', (data) => {
-                console.log('Redirected alert received:', data);
-                if (data.target_role === 'bfp') {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                }
-            });
+            
 
             socket.on('redirected_alert', (data) => {
                 if (data.target_role === 'bfp') {
@@ -247,15 +241,15 @@
                     alertContainer.appendChild(alertDiv);
 
                     const marker = L.marker([data.lat, data.lon]).addTo(bfpMap);
-                    marker.bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`);
+                    marker.bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay} Resident from: ${data.resident_barangay || data.barangay}`);
                 }
                 updateStats();
             });
 
             socket.on('bfp_response', (data) => {
                 console.log('Response submitted:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
+                const alertDiv = document.querySelector(`[data-alert-id="${response.alert_id}"]`);
+                if (alertDiv) {
                     const predictionDiv = document.createElement('div');
                     predictionDiv.className = 'prediction';
                     const predictionText = data.prediction || 'N/A';
@@ -272,7 +266,7 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    alertItem.appendChild(predictionDiv);
+                    alertDiv.appendChild(predictionDiv);
                 }
             });
 

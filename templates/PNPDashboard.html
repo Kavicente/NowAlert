@@ -130,13 +130,7 @@
                 notifyAlert(data);
             });
 
-            socket.on('redirected_alert', (data) => {
-                console.log('Redirected alert received:', data);
-                if (data.target_role === 'pnp') {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                }
-            });
+            
 
             socket.on('redirected_alert', (data) => {
                 if (data.target_role === 'pnp') {
@@ -342,7 +336,7 @@
                     alertContainer.appendChild(alertDiv);
 
                     const marker = L.marker([data.lat, data.lon]).addTo(pnpMap);
-                    marker.bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay}`);
+                    marker.bindPopup(`Emergency: ${data.emergency_type} at ${data.barangay} Resident from: ${data.resident_barangay || data.barangay}`);
                 }
                 updateStats();
             });
