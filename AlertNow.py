@@ -269,6 +269,9 @@ def handle_heatmap_data(role):
         logger.error(f"Error in handle_heatmap_data: {e}")
         emit('heatmap_data', {'error': str(e)})
 
+
+
+# [CHANGED: Modified handle_new_alert to only emit to barangay]
 @socketio.on('response_update')
 def handle_response(data):
     conn = get_db_connection()
@@ -276,135 +279,104 @@ def handle_response(data):
     try:
         manila = pytz.timezone('Asia/Manila')
         base_time = datetime.now(manila)
-        c.execute('''
-            INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'),
-            data.get('road_accident_cause'),
-            data.get('road_accident_type'),
-            data.get('weather'),
-            data.get('road_condition'),
-            data.get('vehicle_type'),
-            data.get('driver_age'),
-            data.get('driver_gender'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
-        ))
+        timestamp = base_time.strftime('%Y-%m-%d %H:%M:%S')
+
+        # Handle different emergency types for barangay
+        if data.get('emergency_type') == 'Road Accident':
+            c.execute('''
+                INSERT INTO barangay_road_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), timestamp, True
+            ))
+        elif data.get('emergency_type') == 'Fire Incident':
+            c.execute('''
+                INSERT INTO barangay_fire_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
+                data.get('weather'), data.get('fire_severity'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), timestamp, True
+            ))
+        elif data.get('emergency_type') == 'Crime Incident':
+            c.execute('''
+                INSERT INTO barangay_crime_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'), data.get('level'),
+                data.get('suspect_gender'), data.get('victim_gender'), data.get('suspect_age'),
+                data.get('victim_age'), data.get('lat'), data.get('lon'), data.get('barangay'),
+                data.get('emergency_type'), timestamp, True
+            ))
+        elif data.get('emergency_type') == 'Health Emergency':
+            c.execute('''
+                INSERT INTO barangay_health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
+                data.get('weather'), data.get('patient_age'), data.get('patient_gender'),
+                data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
+                timestamp, True
+            ))
+
+        # Handle other roles
         c.execute('''
             INSERT INTO bfp_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('alert_id'),
-            data.get('fire_type'),
-            data.get('fire_cause'),
-            data.get('weather'),
-            data.get('fire_severity'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
+            data.get('weather'), data.get('fire_severity'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), timestamp, True
         ))
         c.execute('''
             INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('alert_id'),
-            data.get('road_accident_cause'),
-            data.get('road_accident_type'),
-            data.get('weather'),
-            data.get('road_condition'),
-            data.get('vehicle_type'),
-            data.get('driver_age'),
-            data.get('driver_gender'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), timestamp, True
         ))
         c.execute('''
-            INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            INSERT INTO pnp_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('alert_id'),
-            data.get('road_accident_cause'),
-            data.get('road_accident_type'),
-            data.get('weather'),
-            data.get('road_condition'),
-            data.get('vehicle_type'),
-            data.get('driver_age'),
-            data.get('driver_gender'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'), data.get('level'),
+            data.get('suspect_gender'), data.get('victim_gender'), data.get('suspect_age'),
+            data.get('victim_age'), data.get('lat'), data.get('lon'), data.get('barangay'),
+            data.get('emergency_type'), timestamp, True
         ))
         c.execute('''
-            INSERT INTO health_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('alert_id'),
-            data.get('health_type'),
-            data.get('health_cause'),
-            data.get('weather'),
-            data.get('patient_age'),
-            data.get('patient_gender'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
+            data.get('weather'), data.get('patient_age'), data.get('patient_gender'),
+            data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
+            timestamp, True
         ))
         c.execute('''
-            INSERT INTO hospital_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('alert_id'),
-            data.get('health_type'),
-            data.get('health_cause'),
-            data.get('weather'),
-            data.get('patient_age'),
-            data.get('patient_gender'),
-            data.get('lat'),
-            data.get('lon'),
-            data.get('barangay'),
-            data.get('emergency_type'),
-            base_time.strftime('%Y-%m-%d %H:%M:%S'),
-            data.get('responded', True)
+            data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
+            data.get('weather'), data.get('patient_age'), data.get('patient_gender'),
+            data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
+            timestamp, True, data.get('assigned_hospital', 'N/A')
         ))
+
         conn.commit()
         logger.info(f"Response data inserted for alert_id: {data.get('alert_id')}")
-        # Emit updates to respective chart pages
-        from BarangayCharts import handle_barangay_response
-        from BFPCharts import handle_bfp_response
-        from CDRRMOCharts import handle_cdrrmo_response
-        from PNPCharts import handle_pnp_response
-        handle_barangay_response(data)
-        handle_bfp_response(data)
-        handle_cdrrmo_response(data)
-        handle_pnp_response(data)
-        handle_health_response(data)
-        handle_hospital_response(data)
+        emit('response_update_success', {'alert_id': data.get('alert_id')}, room=f"barangay_{data.get('barangay').lower()}")
     except Exception as e:
         logger.error(f"Error inserting response data: {e}")
         conn.rollback()
     finally:
         conn.close()
 
-# [CHANGED: Modified handle_new_alert to only emit to barangay]
 @socketio.on('alert')
 def handle_new_alert(data):
     try:
@@ -413,13 +385,13 @@ def handle_new_alert(data):
         data['alert_id'] = alert_id
         data['timestamp'] = datetime.utcnow().isoformat()
         data['resident_barangay'] = data.get('barangay', 'Unknown')
-        
+
         alerts.append(data)
-        
+
         barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
         emit('new_alert', data, room=barangay_room)
         logger.info(f"Alert emitted to room {barangay_room}")
-        
+
         map_data = {
             'lat': data.get('lat'),
             'lon': data.get('lon'),
@@ -430,191 +402,41 @@ def handle_new_alert(data):
     except Exception as e:
         logger.error(f"Error handling alert: {e}")
 
-# [REVERTED: Restored your preferred handle_forward_alert]
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
     logger.info(f"Forward alert received: {data}")
-    municipality = get_municipality_from_barangay(data.get('barangay'))
-    if municipality:
-        municipality = municipality.lower()
-    else:
-        logger.warning(f"Municipality not found for barangay in forward: {data.get('barangay')}")
-        return  # Skip if no municipality
-    
-    cdrrmo_room = f"cdrrmo_{municipality}"
-    pnp_room = f"pnp_{municipality}"
-    bfp_room = f"bfp_{municipality}"
-    health_room = f"health_{municipality}"
-    hospital_room = f"hospital_{municipality}"
-    
-    emit('new_alert', data, room=cdrrmo_room)
-    logger.info(f"Alert forwarded to room {cdrrmo_room}")
-    emit('new_alert', data, room=pnp_room)
-    logger.info(f"Alert forwarded to room {pnp_room}")
-    emit('new_alert', data, room=bfp_room)
-    logger.info(f"Alert forwarded to room {bfp_room}")
-    emit('new_alert', data, room=health_room)
-    logger.info(f"Alert forwarded to room {health_room}")
-    emit('new_alert', data, room=hospital_room)
-    logger.info(f"Alert forwarded to room {hospital_room}")
+    try:
+        target_role = data.get('target_role').lower()
+        municipality = get_municipality_from_barangay(data.get('barangay', 'Unknown'))
+        alert_id = data.get('alert_id')
+        alert_data = next((alert for alert in alerts if alert['alert_id'] == alert_id), None)
+        if alert_data:
+            emit('redirected_alert', alert_data, room=f"{target_role}_{municipality.lower()}")
+            logger.info(f"Alert {alert_id} forwarded to {target_role}_{municipality.lower()}")
+    except Exception as e:
+        logger.error(f"Error forwarding alert: {e}")
 
-    map_data = {
-        'lat': data.get('lat'),
-        'lon': data.get('lon'),
-        'barangay': data.get('barangay'),
-        'emergency_type': data.get('emergency_type')
-    }
-    emit('update_map', map_data, room=cdrrmo_room)
-    emit('update_map', map_data, room=pnp_room)
-    emit('update_map', map_data, room=bfp_room)
-    emit('update_map', map_data, room=health_room)
-    emit('update_map', map_data, room=hospital_room)
-
-# [CHANGED: Updated handle_submit_response to fix errors and prevent duplicate predictions]
 @socketio.on('submit_response')
 def handle_submit_response(data):
-    logging.debug(f"Response received: {data}")
-    alert_id = data.get('alert_id')
-    role = data.get('role')
-    prediction = 'N/A'  # Initialize prediction with default value
-    manila = pytz.timezone('Asia/Manila')
-    timestamp = datetime.now(manila).strftime('%Y-%m-%d %H:%M:%S')  # [ADDED: Timestamp for all responses]
+    conn = get_db_connection()
+    c = conn.cursor()
     try:
+        manila = pytz.timezone('Asia/Manila')
+        timestamp = datetime.now(manila).strftime('%Y-%m-%d %H:%M:%S')
+        alert_id = data.get('alert_id')
+        role = data.get('role').lower()
+        prediction = 'N/A'
+
         if role == 'barangay':
-            conn = get_db_connection()
-            c = conn.cursor()
-            emergency_type = data.get('emergency_type')
-            if emergency_type == 'Road Accident':
+            if data.get('emergency_type') == 'Road Accident':
                 c.execute('''
-                    INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                    INSERT INTO barangay_road_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'),
-                    data.get('road_condition'), data.get('vehicle_type'), data.get('driver_age'), data.get('driver_gender'),
-                    data.get('lat'), data.get('lon'), data.get('barangay'), emergency_type, timestamp, True
-                ))
-                if not road_accident_df.empty:
-                    try:
-                        input_data = pd.DataFrame([{
-                            'road_accident_cause': data.get('road_accident_cause'),
-                            'road_accident_type': data.get('road_accident_type'),
-                            'weather': data.get('weather'),
-                            'road_condition': data.get('road_condition'),
-                            'vehicle_type': data.get('vehicle_type'),
-                            'driver_age': data.get('driver_age'),
-                            'driver_gender': data.get('driver_gender')
-                        }])
-                        prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
-                        prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
-                    except Exception as e:
-                        logging.error(f"Error predicting road accident: {e}")
-                        prediction = 'prediction_error'
-            elif emergency_type == 'Fire':
-                c.execute('''
-                    INSERT INTO barangay_fire_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    alert_id, data.get('fire_type'), data.get('fire_cause'), data.get('weather'),
-                    data.get('fire_severity'), data.get('lat'), data.get('lon'), data.get('barangay'), emergency_type, timestamp, True
-                ))
-                if not fire_incident_df.empty:
-                    try:
-                        input_data = pd.DataFrame([{
-                            'fire_type': data.get('fire_type'),
-                            'fire_cause': data.get('fire_cause'),
-                            'weather': data.get('weather'),
-                            'fire_severity': data.get('fire_severity')
-                        }])
-                        prediction = fire_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
-                        prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
-                    except Exception as e:
-                        logging.error(f"Error predicting fire incident: {e}")
-                        prediction = 'prediction_error'
-            elif emergency_type == 'Crime':
-                c.execute('''
-                    INSERT INTO barangay_crime_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    alert_id, data.get('crime_type'), data.get('crime_cause'), data.get('level'), data.get('suspect_gender'),
-                    data.get('victim_gender'), data.get('suspect_age'), data.get('victim_age'), data.get('lat'), data.get('lon'),
-                    data.get('barangay'), emergency_type, timestamp, True
-                ))
-                try:
-                    input_data = pd.DataFrame([{
-                        'crime_type': data.get('crime_type'),
-                        'crime_cause': data.get('crime_cause'),
-                        'level': data.get('level'),
-                        'suspect_gender': data.get('suspect_gender'),
-                        'victim_gender': data.get('victim_gender'),
-                        'suspect_age': data.get('suspect_age'),
-                        'victim_age': data.get('victim_age')
-                    }])
-                    prediction = crime_predictor.predict_proba(input_data)[:, 1][0] * 100
-                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
-                except Exception as e:
-                    logging.error(f"Error predicting crime: {e}")
-                    prediction = 'prediction_error'
-            elif emergency_type in ['Heart Attack', 'Stroke', 'Fall', 'Breathing Difficulty', 'Giving Birth', 'Seizure', 'Burn', 'Poisoning', 'Allergic Reaction']:
-                c.execute('''
-                    INSERT INTO barangay_health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    alert_id, data.get('health_type'), data.get('health_cause'), data.get('weather'), data.get('patient_age'),
-                    data.get('patient_gender'), data.get('lat'), data.get('lon'), data.get('barangay'), emergency_type, timestamp, True
-                ))
-                try:
-                    input_data = pd.DataFrame([{
-                        'health_type': data.get('health_type'),
-                        'health_cause': data.get('health_cause'),
-                        'weather': data.get('weather'),
-                        'patient_age': data.get('patient_age'),
-                        'patient_gender': data.get('patient_gender')
-                    }])
-                    prediction = health_predictor.predict_proba(input_data)[:, 1][0] * 100
-                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
-                except Exception as e:
-                    logging.error(f"Error predicting health incident: {e}")
-                    prediction = 'prediction_error'
-            else:
-                c.execute('''
-                    INSERT INTO barangay_response (alert_id, lat, lon, barangay, emergency_type, timestamp, responded)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (alert_id, data.get('lat'), data.get('lon'), data.get('barangay'), emergency_type, timestamp, True))
-                prediction = 'N/A'
-            conn.commit()
-            conn.close()
-            emit(f'{role}_response', {'alert_id': alert_id, 'prediction': prediction}, room=f"{role}_{data.get('barangay').lower()}")
-        elif role in ['bfp', 'cdrrmo', 'pnp', 'health', 'hospital']:
-            conn = get_db_connection()
-            c = conn.cursor()
-            if role == 'bfp':
-                c.execute('''
-                    INSERT INTO bfp_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    alert_id, data.get('fire_type', 'N/A'), data.get('fire_cause', 'N/A'), data.get('weather', 'N/A'),
-                    data.get('fire_severity', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
-                ))
-                try:
-                    input_data = pd.DataFrame([{
-                        'fire_type': data.get('fire_type', 'N/A'),
-                        'fire_cause': data.get('fire_cause', 'N/A'),
-                        'weather': data.get('weather', 'N/A'),
-                        'fire_severity': data.get('fire_severity', 'N/A')
-                    }])
-                    prediction = fire_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
-                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
-                except Exception as e:
-                    logging.error(f"Error predicting fire incident for BFP: {e}")
-                    prediction = 'prediction_error'
-            elif role == 'cdrrmo':
-                c.execute('''
-                    INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    alert_id, data.get('road_accident_cause', 'N/A'), data.get('road_accident_type', 'N/A'), data.get('weather', 'N/A'),
-                    data.get('road_condition', 'N/A'), data.get('vehicle_type', 'N/A'), data.get('driver_age', 'N/A'),
-                    data.get('driver_gender', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    alert_id, data.get('road_accident_cause', 'N/A'), data.get('road_accident_type', 'N/A'),
+                    data.get('weather', 'N/A'), data.get('road_condition', 'N/A'), data.get('vehicle_type', 'N/A'),
+                    data.get('driver_age', 'N/A'), data.get('driver_gender', 'N/A'), data.get('lat'), data.get('lon'),
+                    data.get('barangay'), data.get('emergency_type'), timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -626,19 +448,31 @@ def handle_submit_response(data):
                         'driver_age': data.get('driver_age', 'N/A'),
                         'driver_gender': data.get('driver_gender', 'N/A')
                     }])
-                    prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
-                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
+                    if road_accident_predictor:
+                        prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
+                        prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
                 except Exception as e:
-                    logging.error(f"Error predicting road accident for CDRRMO: {e}")
+                    logger.error(f"Error predicting road accident for barangay: {e}")
                     prediction = 'prediction_error'
-            elif role == 'pnp':
+            elif data.get('emergency_type') == 'Fire Incident':
                 c.execute('''
-                    INSERT INTO pnp_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
+                    INSERT INTO barangay_fire_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    alert_id, data.get('fire_type', 'N/A'), data.get('fire_cause', 'N/A'),
+                    data.get('weather', 'N/A'), data.get('fire_severity', 'N/A'), data.get('lat'), data.get('lon'),
+                    data.get('barangay'), data.get('emergency_type'), timestamp, True
+                ))
+                # No predictor for fire incidents
+            elif data.get('emergency_type') == 'Crime Incident':
+                c.execute('''
+                    INSERT INTO barangay_crime_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     alert_id, data.get('crime_type', 'N/A'), data.get('crime_cause', 'N/A'), data.get('level', 'N/A'),
                     data.get('suspect_gender', 'N/A'), data.get('victim_gender', 'N/A'), data.get('suspect_age', 'N/A'),
-                    data.get('victim_age', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    data.get('victim_age', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'),
+                    data.get('emergency_type'), timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -650,19 +484,21 @@ def handle_submit_response(data):
                         'suspect_age': data.get('suspect_age', 'N/A'),
                         'victim_age': data.get('victim_age', 'N/A')
                     }])
-                    prediction = crime_predictor.predict_proba(input_data)[:, 1][0] * 100
-                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
+                    if crime_predictor:
+                        prediction = crime_predictor.predict_proba(input_data)[:, 1][0] * 100
+                        prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
                 except Exception as e:
-                    logging.error(f"Error predicting crime for PNP: {e}")
+                    logger.error(f"Error predicting crime for barangay: {e}")
                     prediction = 'prediction_error'
-            elif role == 'health':
+            elif data.get('emergency_type') == 'Health Emergency':
                 c.execute('''
-                    INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                    INSERT INTO barangay_health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
-                    alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'), data.get('weather', 'N/A'),
-                    data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'), data.get('lat'), data.get('lon'),
-                    data.get('barangay'), data.get('emergency_type'), timestamp, True
+                    alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'),
+                    data.get('weather', 'N/A'), data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'),
+                    data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
+                    timestamp, True
                 ))
                 try:
                     input_data = pd.DataFrame([{
@@ -672,38 +508,176 @@ def handle_submit_response(data):
                         'patient_age': data.get('patient_age', 'N/A'),
                         'patient_gender': data.get('patient_gender', 'N/A')
                     }])
-                    prediction = health_predictor.predict_proba(input_data)[:, 1][0] * 100
-                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
+                    predictor = birth_predictor if data.get('health_type') == 'Giving Birth' or data.get('health_cause') == 'Pregnant' else health_predictor
+                    if predictor:
+                        prediction = predictor.predict_proba(input_data)[:, 1][0] * 100
+                        prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
                 except Exception as e:
-                    logging.error(f"Error predicting health incident for Health: {e}")
+                    logger.error(f"Error predicting health incident for barangay: {e}")
                     prediction = 'prediction_error'
-            elif role == 'hospital':
-                c.execute('''
-                    INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'), data.get('weather', 'N/A'),
-                    data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'), data.get('lat'), data.get('lon'),
-                    data.get('barangay'), data.get('emergency_type'), timestamp, True, data.get('assigned_hospital', 'N/A')
-                ))
-                try:
-                    input_data = pd.DataFrame([{
-                        'health_type': data.get('health_type', 'N/A'),
-                        'health_cause': data.get('health_cause', 'N/A'),
-                        'weather': data.get('weather', 'N/A'),
-                        'patient_age': data.get('patient_age', 'N/A'),
-                        'patient_gender': data.get('patient_gender', 'N/A')
-                    }])
-                    prediction = health_predictor.predict_proba(input_data)[:, 1][0] * 100
+        elif role == 'bfp':
+            c.execute('''
+                INSERT INTO bfp_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                alert_id, data.get('fire_type', 'N/A'), data.get('fire_cause', 'N/A'),
+                data.get('weather', 'N/A'), data.get('fire_severity', 'N/A'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), timestamp, True
+            ))
+            # No predictor for fire incidents
+        elif role == 'cdrrmo':
+            c.execute('''
+                INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                alert_id, data.get('road_accident_cause', 'N/A'), data.get('road_accident_type', 'N/A'),
+                data.get('weather', 'N/A'), data.get('road_condition', 'N/A'), data.get('vehicle_type', 'N/A'),
+                data.get('driver_age', 'N/A'), data.get('driver_gender', 'N/A'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), timestamp, True
+            ))
+            try:
+                input_data = pd.DataFrame([{
+                    'road_accident_cause': data.get('road_accident_cause', 'N/A'),
+                    'road_accident_type': data.get('road_accident_type', 'N/A'),
+                    'weather': data.get('weather', 'N/A'),
+                    'road_condition': data.get('road_condition', 'N/A'),
+                    'vehicle_type': data.get('vehicle_type', 'N/A'),
+                    'driver_age': data.get('driver_age', 'N/A'),
+                    'driver_gender': data.get('driver_gender', 'N/A')
+                }])
+                if road_accident_predictor:
+                    prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
                     prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
-                except Exception as e:
-                    logging.error(f"Error predicting health incident for Hospital: {e}")
-                    prediction = 'prediction_error'
-            conn.commit()
-            conn.close()
-            emit(f'{role}_response', {'alert_id': alert_id, 'prediction': prediction}, room=f"{role}_{data.get('municipality').lower()}")
+            except Exception as e:
+                logger.error(f"Error predicting road accident for CDRRMO: {e}")
+                prediction = 'prediction_error'
+        elif role == 'pnp':
+            c.execute('''
+                INSERT INTO pnp_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                alert_id, data.get('crime_type', 'N/A'), data.get('crime_cause', 'N/A'), data.get('level', 'N/A'),
+                data.get('suspect_gender', 'N/A'), data.get('victim_gender', 'N/A'), data.get('suspect_age', 'N/A'),
+                data.get('victim_age', 'N/A'), data.get('lat'), data.get('lon'), data.get('barangay'),
+                data.get('emergency_type'), timestamp, True
+            ))
+            try:
+                input_data = pd.DataFrame([{
+                    'crime_type': data.get('crime_type', 'N/A'),
+                    'crime_cause': data.get('crime_cause', 'N/A'),
+                    'level': data.get('level', 'N/A'),
+                    'suspect_gender': data.get('suspect_gender', 'N/A'),
+                    'victim_gender': data.get('victim_gender', 'N/A'),
+                    'suspect_age': data.get('suspect_age', 'N/A'),
+                    'victim_age': data.get('victim_age', 'N/A')
+                }])
+                if crime_predictor:
+                    prediction = crime_predictor.predict_proba(input_data)[:, 1][0] * 100
+                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Error predicting crime for PNP: {e}")
+                prediction = 'prediction_error'
+        elif role == 'health':
+            c.execute('''
+                INSERT INTO health_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'),
+                data.get('weather', 'N/A'), data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'),
+                data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
+                timestamp, True
+            ))
+            try:
+                input_data = pd.DataFrame([{
+                    'health_type': data.get('health_type', 'N/A'),
+                    'health_cause': data.get('health_cause', 'N/A'),
+                    'weather': data.get('weather', 'N/A'),
+                    'patient_age': data.get('patient_age', 'N/A'),
+                    'patient_gender': data.get('patient_gender', 'N/A')
+                }])
+                predictor = birth_predictor if data.get('health_type') == 'Giving Birth' or data.get('health_cause') == 'Pregnant' else health_predictor
+                if predictor:
+                    prediction = predictor.predict_proba(input_data)[:, 1][0] * 100
+                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Error predicting health incident for Health: {e}")
+                prediction = 'prediction_error'
+        elif role == 'hospital':
+            c.execute('''
+                INSERT INTO hospital_response (alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                alert_id, data.get('health_type', 'N/A'), data.get('health_cause', 'N/A'),
+                data.get('weather', 'N/A'), data.get('patient_age', 'N/A'), data.get('patient_gender', 'N/A'),
+                data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
+                timestamp, True, data.get('assigned_hospital', 'N/A')
+            ))
+            try:
+                input_data = pd.DataFrame([{
+                    'health_type': data.get('health_type', 'N/A'),
+                    'health_cause': data.get('health_cause', 'N/A'),
+                    'weather': data.get('weather', 'N/A'),
+                    'patient_age': data.get('patient_age', 'N/A'),
+                    'patient_gender': data.get('patient_gender', 'N/A')
+                }])
+                predictor = birth_predictor if data.get('health_type') == 'Giving Birth' or data.get('health_cause') == 'Pregnant' else health_predictor
+                if predictor:
+                    prediction = predictor.predict_proba(input_data)[:, 1][0] * 100
+                    prediction = f"{prediction:.2f}% chance in year {datetime.now().year + 1}"
+            except Exception as e:
+                logger.error(f"Error predicting health incident for Hospital: {e}")
+                prediction = 'prediction_error'
+
+        conn.commit()
+        emit(f'{role}_response', {'alert_id': alert_id, 'prediction': prediction}, room=f"{role}_{data.get('municipality').lower()}")
     except Exception as e:
-        logging.error(f"Error in handle_submit_response: {e}")
+        logger.error(f"Error in handle_submit_response: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
+@socketio.on('role_accepted')
+def role_accepted(data):
+    logger.info(f"Role {data['role']} accepted for alert {data['alert_id']}")
+    try:
+        alert_id = data['alert_id']
+        role = data['role'].lower()
+        if alert_id not in accepted_roles:
+            accepted_roles[alert_id] = []
+        if role not in accepted_roles[alert_id]:
+            accepted_roles[alert_id].append(role)
+            alert_data = next((alert for alert in alerts if alert['alert_id'] == alert_id), None)
+            if alert_data:
+                namespace = f'/{role}'
+                socketio.emit('new_alert', alert_data, namespace=namespace)
+                logger.info(f"Forwarded alert {alert_id} to {namespace}")
+    except Exception as e:
+        logger.error(f"Error in role_accepted: {e}")
+
+@socketio.on('role_declined')
+def role_declined(data):
+    logger.info(f"Role {data['role']} declined for alert {data['alert_id']}")
+    try:
+        alert_id = data['alert_id']
+        role = data['role'].lower()
+        if alert_id in accepted_roles and role in accepted_roles[alert_id]:
+            accepted_roles[alert_id].remove(role)
+            logger.info(f"Removed {role} from accepted roles for alert {alert_id}")
+    except Exception as e:
+        logger.error(f"Error in role_declined: {e}")
+
+@socketio.on('redirect_alert')
+def handle_redirect_alert(data):
+    logger.debug(f"Redirected alert received: {data}")
+    try:
+        target_role = data.get('target_role').lower()
+        municipality = data.get('municipality', '').lower()
+        if target_role in ['bfp', 'cdrrmo', 'health', 'hospital', 'pnp']:
+            emit('redirected_alert', data, room=f"{target_role}_{municipality}")
+        else:
+            logger.error(f"Invalid target role: {target_role}")
+    except Exception as e:
+        logger.error(f"Error in handle_redirect_alert: {e}")
 
 # After @socketio.on('response_update')
 @socketio.on('hospital_response')
@@ -947,48 +921,6 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 # For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 
 
-
-@socketio.on('role_accepted')
-def role_accepted(data):
-    logger.info(f"Role {data['role']} accepted for alert {data['alert_id']}")
-    try:
-        alert_id = data['alert_id']
-        role = data['role'].lower()
-        if alert_id in accepted_roles and role not in accepted_roles[alert_id]:
-            accepted_roles[alert_id].append(role)
-            # Find the alert data
-            alert_data = next((alert for alert in alerts if alert['alert_id'] == alert_id), None)
-            if alert_data:
-                namespace = f'/{role}'
-                socketio.emit('new_alert', alert_data, namespace=namespace)
-                logger.info(f"Forwarded alert {alert_id} to {namespace}")
-    except Exception as e:
-        logger.error(f"Error in role_accepted: {e}")
-
-@socketio.on('role_declined')
-def role_declined(data):
-    logger.info(f"Role {data['role']} declined for alert {data['alert_id']}")
-    try:
-        alert_id = data['alert_id']
-        role = data['role'].lower()
-        if alert_id in accepted_roles and role in accepted_roles[alert_id]:
-            accepted_roles[alert_id].remove(role)
-            logger.info(f"Removed {role} from accepted roles for alert {alert_id}")
-    except Exception as e:
-        logger.error(f"Error in role_declined: {e}")
-
-
-
-
-@socketio.on('redirect_alert')
-def handle_redirect_alert(data):
-    logging.debug(f"Redirected alert received: {data}")
-    target_role = data.get('target_role')
-    municipality = data.get('municipality', '').lower()
-    if target_role in ['bfp', 'cdrrmo', 'health', 'hospital', 'pnp']:
-        emit('redirected_alert', data, room=f"{target_role}_{municipality}")
-    else:
-        logging.error(f"Invalid target role: {target_role}")
 
 #Old handle_new_alert function
 
