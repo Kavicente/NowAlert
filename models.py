@@ -5,25 +5,49 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Load road accident model
-road_models_path = os.path.join(os.path.dirname(__file__), 'training', 'Road Models')
+road_accident_predictor = None
 try:
-    lr_road = joblib.load(os.path.join(road_models_path, 'lr_road_accident.pkl'))
-    logger.info("lr_road_accident.pkl loaded successfully.")
+    road_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'road_predictor_lr.pkl'))
+    logger.info("road_accident_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("lr_road_accident.pkl not found.")
-    lr_road = None
+    logger.error("road_accident_predictor_lr.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading lr_road_accident.pkl: {e}")
-    lr_road = None
+    logger.error(f"Error loading road_accident_predictor_lr.pkl: {e}")
+    
+fire_accident_predictor = None
+try:
+    fire_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Fire Models', 'fire_predictor_lr.pkl'))
+    logger.info("fire_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("fire_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
 
-# Load fire incident model
-fire_models_path = os.path.join(os.path.dirname(__file__), 'training', 'Fire Models')
+crime_predictor = None
 try:
-    lr_fire = joblib.load(os.path.join(fire_models_path, 'lr_fire_incident.pkl'))
-    logger.info("lr_fire_incident.pkl loaded successfully.")
+    crime_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Crime Models', 'crime_predictor_lr.pkl'))
+    logger.info("crime_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("lr_fire_incident.pkl not found.")
-    lr_fire = None
+    logger.error("crime_predictor_lr.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading lr_fire_incident.pkl: {e}")
-    lr_fire = None
+    logger.error(f"Error loading crime_predictor_lr.pkl: {e}")
+
+
+health_predictor = None
+try:
+    health_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Health Models', 'health_predictor_lr.pkl'))
+    logger.info("health_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("health_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading health_predictor_lr.pkl: {e}")
+
+
+birth_predictor = None
+try:
+    birth_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Birth Models', 'birth_predictor_lr.pkl'))
+    logger.info("birth_predictor_lr.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("birth_predictor_lr.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading birth_predictor_lr.pkl: {e}")

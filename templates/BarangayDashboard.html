@@ -130,6 +130,14 @@
                 notifyAlert(data);
             });
 
+            socket.on('redirected_alert', (data) => {
+                console.log('Redirected alert received:', data);
+                if (data.target_role === 'barangay') {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
+                }
+            });
+
             socket.on('update_map', (data) => {
                 console.log('Update map received:', data);
                 const lat = data.lat || {{ lat_coord|default(14.0549) }};
@@ -174,7 +182,7 @@
                     alertElements.set(data.alert_id, alertDiv);
                     let displayTime;
                     try {
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });  // Updated to current time
+                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
                     } catch (e) {
                         console.error('Error parsing timestamp:', e);
                         displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
@@ -238,23 +246,29 @@
                         <option value="Rainy">Rainy</option>
                         <option value="Foggy">Foggy</option>
                         <option value="Cloudy">Cloudy</option>
+                        <option value="Stormy">Stormy</option>
                     </select>
                     <select id="roadCondition">
                         <option value="Dry">Dry</option>
                         <option value="Wet">Wet</option>
                         <option value="Icy">Icy</option>
+                        <option value="Potholes">Potholes</option>
+                        <option value="Gravel">Gravel</option>
                     </select>
                     <select id="vehicleType">
                         <option value="Car">Car</option>
-                        <option value="Truck">Truck</option>
                         <option value="Motorcycle">Motorcycle</option>
+                        <option value="Truck">Truck</option>
                         <option value="Bus">Bus</option>
+                        <option value="Bicycle">Bicycle</option>
                     </select>
                     <select id="driverAge">
+                        <option value="0-17">0-17</option>
                         <option value="18-25">18-25</option>
                         <option value="26-35">26-35</option>
-                        <option value="36-50">36-50</option>
-                        <option value="51+">51+</option>
+                        <option value="36-45">36-45</option>
+                        <option value="46-60">46-60</option>
+                        <option value="61+">61+</option>
                     </select>
                     <select id="driverGender">
                         <option value="Male">Male</option>
@@ -269,7 +283,7 @@
             }
 
             function submitResponse(alertId, lat, lon, barangay, type) {
-                const response = {
+                const responseData = {
                     alert_id: alertId,
                     road_accident_cause: document.getElementById('roadAccidentCause').value,
                     road_accident_type: document.getElementById('road_accident_type').value,
@@ -281,61 +295,35 @@
                     lat: lat,
                     lon: lon,
                     barangay: barangay,
-                    emergency_type: type
+                    emergency_type: type,
+                    responded: true
                 };
-                socket.emit('response_submitted', response);
-                console.log('Response submitted:', response);
-                const form = document.querySelector('.response-form');
-                if (form) form.remove();
+                socket.emit('response_update', responseData);
             }
-
-            // Modified to use modal instead of new window
-            function viewImage(base64) {
-                const modal = document.getElementById('image-modal');
-                const modalImg = document.getElementById('modal-image');
-                modalImg.src = `data:image/jpeg;base64,${base64}`;
-                modal.style.display = 'flex';
-            }
-
-            // Added modal close functionality
-            const modal = document.getElementById('image-modal');
-            const closeBtn = document.querySelector('.close-btn');
-            closeBtn.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
 
             function notifyAlert(data) {
-                const notification = document.getElementById('notification');
-                const alertSound = new Audio('/static/audio/alert.mp3');
-                alertSound.play().catch(e => console.error('Error playing sound:', e));
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'notification';
-                alertDiv.innerHTML = `New ${data.emergency_type || 'Alert'} in ${data.barangay || 'Unknown'}`;
-                notification.appendChild(alertDiv);
-                setTimeout(() => alertDiv.remove(), 5000);
+                const notificationDiv = document.getElementById('notification');
+                notificationDiv.innerHTML = `<p>New ${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}</p>`;
+                setTimeout(() => {
+                    notificationDiv.innerHTML = '';
+                }, 5000);
             }
 
             function updateStats() {
-                fetch('/get_barangay_stats')
+                fetch('/barangay_stats')
                     .then(response => response.json())
                     .then(data => {
-                        document.getElementById('total-incidents').textContent = data.total_incidents || 0;
-                        document.getElementById('critical-incidents').textContent = data.critical_incidents || 0;
+                        document.getElementById('total-incidents').textContent = data.total || 0;
+                        document.getElementById('critical-incidents').textContent = data.critical || 0;
                     })
                     .catch(error => console.error('Error fetching stats:', error));
             }
 
-            // Separate heatmap code
             async function loadHeatmap() {
                 try {
                     const response = await fetch('/get_heatmap_data?table=barangay_response&barangay={{ barangay }}');
                     const data = await response.json();
-                    const heatData = data.map(item => [item.lat, item.lon, 1]); // Intensity set to 1 for each alert
+                    const heatData = data.map(item => [item.lat, item.lon, 1]);
                     const heatmapLayer = L.heatLayer(heatData, {
                         radius: 25,
                         blur: 15,
@@ -348,10 +336,11 @@
             }
             loadHeatmap();
 
-            
-
-            
-                
+            document.getElementById('image-modal').addEventListener('click', (e) => {
+                if (e.target.className === 'close-btn' || e.target.id === 'image-modal') {
+                    document.getElementById('image-modal').style.display = 'none';
+                }
+            });
         });
     </script>
 </body>
