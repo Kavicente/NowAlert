@@ -8,15 +8,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         .alert-item { margin-bottom: 10px; padding: 10px; border-radius: 5px; color: #333; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
         .response-form { margin-top: 10px; }
         .response-form select, .response-form button { margin: 5px; }
         .clickable-img { cursor: pointer; max-width: 200px; }
-        .prediction { margin-top: 10px; font-weight: bold; color: #030303ff;}
+        .prediction { margin-top: 10px; font-weight: bold; color: #000000ff;}
         .image-modal {
             display: none;
             position: fixed;
@@ -60,13 +60,13 @@
     </div>
     <div class="dashboard">
         <header>
-            <h1>CDRRMO {{ municipality }} Dashboard</h1>
+            <h1>CDRRMO Dashboard - {{ municipality }}</h1>
             <div class="filters">
             </div>
         </header>
     </div>
     <main class="main-content">
-        <h2 class="h2">CDRRMO {{ municipality }} Map</h2>
+        <h2 class="h2">Municipality {{ municipality }} Map</h2>
         <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div id="map"></div>
         <section class="stats">
@@ -120,60 +120,56 @@
                 socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
-            socket.on('connect', () => {
-                console.log('Connected to server');
-                socket.emit('register_role', { role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
-            });
-
             socket.on('connect_error', (error) => {
                 console.error('Connection error:', error);
             });
 
             socket.on('new_alert', (data) => {
-                if (data.emergency_type === 'Road Accident') {
-                    console.log('New alert received:', data);
+                console.log('New alert received:', data);
+                updateUIWithAlert(data);
+                notifyAlert(data);
+            });
+
+            socket.on('redirected_alert', (data) => {
+                console.log('Redirected alert received:', data);
+                if (data.target_role === 'cdrrmo') {
                     updateUIWithAlert(data);
                     notifyAlert(data);
                 }
             });
 
             socket.on('update_map', (data) => {
-                if (data.emergency_type === 'Road Accident') {
-                    console.log('Update map received:', data);
-                    const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                    const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                    cdrrmoMap.setView([lat, lon], 16);
-                    L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
-                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                    ).openPopup();
-                    document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-                }
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                cdrrmoMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             socket.on('cdrrmo_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
-                    const existingPrediction = alertItem.querySelector('.prediction');
-                    if (!existingPrediction) {  // Add prediction only if it doesn't exist
-                        const predictionDiv = document.createElement('div');
-                        predictionDiv.className = 'prediction';
-                        const predictionText = data.prediction || 'N/A';
-                        let formattedPrediction = 'N/A';
-                        if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                            if (match) {
-                                const percentage = match[1];
-                                const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
-                                const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                                formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
-                            } else {
-                                formattedPrediction = predictionText;
-                            }
+                    const predictionDiv = document.createElement('div');
+                    predictionDiv.className = 'prediction';
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Disaster Incident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
                         }
-                        predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                        alertItem.appendChild(predictionDiv);
                     }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    alertItem.appendChild(predictionDiv);
                 }
             });
 
@@ -186,7 +182,7 @@
                     alertElements.set(data.alert_id, alertDiv);
                     let displayTime;
                     try {
-                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });  // Updated to current time
+                        displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
                     } catch (e) {
                         console.error('Error parsing timestamp:', e);
                         displayTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Manila', hour12: true });
@@ -201,7 +197,7 @@
                     feed.prepend(alertDiv);
 
                     if (data.image) {
-                        const img = alertItem.querySelector('.clickable-img');
+                        const img = alertDiv.querySelector('.clickable-img');
                         img.addEventListener('click', () => {
                             const modal = document.getElementById('image-modal');
                             const modalImg = document.getElementById('modal-image');
@@ -223,41 +219,20 @@
                 }
             }
 
-            function showImageModal(base64) {
-                const modal = document.getElementById('image-modal');
-                const modalImg = document.getElementById('modal-image');
-                modalImg.src = `data:image/jpeg;base64,${base64}`;
-                modal.style.display = 'flex';
-            }
-
-            const modal = document.getElementById('image-modal');
-            const closeBtn = document.querySelector('.close-btn');
-            closeBtn.addEventListener('click', () => {
-                modal.style.display = 'none';
-            });
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
-            });
-
             function notifyAlert(data) {
-                const notification = document.getElementById('notification');
-                const alertSound = new Audio('/static/audio/alert.mp3');
-                alertSound.play().catch(e => console.error('Error playing sound:', e));
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'notification';
-                alertDiv.innerHTML = `New ${data.emergency_type || 'Alert'} in ${data.barangay || 'Unknown'}`;
-                notification.appendChild(alertDiv);
-                setTimeout(() => alertDiv.remove(), 5000);
+                const notificationDiv = document.getElementById('notification');
+                notificationDiv.innerHTML = `<p>New ${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}</p>`;
+                setTimeout(() => {
+                    notificationDiv.innerHTML = '';
+                }, 5000);
             }
 
             function updateStats() {
-                fetch('/get_cdrrmo_stats')
+                fetch('/cdrrmo_stats')
                     .then(response => response.json())
                     .then(data => {
-                        document.getElementById('total-incidents').textContent = data.total_incidents || 0;
-                        document.getElementById('critical-incidents').textContent = data.critical_incidents || 0;
+                        document.getElementById('total-incidents').textContent = data.total || 0;
+                        document.getElementById('critical-incidents').textContent = data.critical || 0;
                     })
                     .catch(error => console.error('Error fetching stats:', error));
             }
@@ -266,7 +241,7 @@
                 try {
                     const response = await fetch('/get_heatmap_data?table=cdrrmo_response&municipality={{ municipality }}');
                     const data = await response.json();
-                    const heatData = data.map(item => [item.lat, item.lon, 1]); // Intensity set to 1 for each alert
+                    const heatData = data.map(item => [item.lat, item.lon, 1]);
                     const heatmapLayer = L.heatLayer(heatData, {
                         radius: 25,
                         blur: 15,
@@ -279,9 +254,11 @@
             }
             loadHeatmap();
 
-            
-
-
+            document.getElementById('image-modal').addEventListener('click', (e) => {
+                if (e.target.className === 'close-btn' || e.target.id === 'image-modal') {
+                    document.getElementById('image-modal').style.display = 'none';
+                }
+            });
         });
     </script>
 </body>

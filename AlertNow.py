@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import pytz
 import pandas as pd
 import uuid
-from models import lr_road, lr_fire
+from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
 from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
@@ -32,53 +32,46 @@ import onnxruntime as ort
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-road_accident_predictor = None
+
+road_accident_predictor 
 try:
-    road_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'road_predictor_lr.pkl'))
     logger.info("road_accident_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("road_accident_predictor_lr.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading road_accident_predictor_lr.pkl: {e}")
+    logger.error(f"Error loading road_accident_predictor_lr.pkl: {e}") 
     
-fire_accident_predictor = None
+fire_accident_predictor
 try:
-    fire_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Fire Models', 'fire_predictor_lr.pkl'))
-    logger.info("fire_predictor_lr.pkl loaded successfully.")
+    logger.info("fire_accident_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("fire_predictor_lr.pkl not found.")
+    logger.error("fire_accident_predictor_lr.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading fire_predictor_lr.pkl: {e}")
-
-crime_predictor = None
+    logger.error(f"Error loading fire_accident_predictor_lr.pkl: {e}")
+    
+crime_predictor
 try:
-    crime_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Crime Models', 'crime_predictor_lr.pkl'))
     logger.info("crime_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("crime_predictor_lr.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading crime_predictor_lr.pkl: {e}")
 
-
-health_predictor = None
+health_predictor
 try:
-    health_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Health Models', 'health_predictor_lr.pkl'))
     logger.info("health_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("health_predictor_lr.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading health_predictor_lr.pkl: {e}")
-
-
-birth_predictor = None
+    
+birth_predictor
 try:
-    birth_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Birth Models', 'birth_predictor_lr.pkl'))
     logger.info("birth_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("birth_predictor_lr.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading birth_predictor_lr.pkl: {e}")
-    
 
 road_accident_df = pd.DataFrame()
 try:
@@ -930,7 +923,15 @@ def handle_decline_alert(data):
 
 
 
-    
+@socketio.on('redirect_alert')
+def handle_redirect_alert(data):
+    logging.debug(f"Redirected alert received: {data}")
+    target_role = data.get('target_role')
+    municipality = data.get('municipality', '').lower()
+    if target_role in ['bfp', 'cdrrmo', 'health', 'hospital', 'pnp']:
+        emit('redirected_alert', data, room=f"{target_role}_{municipality}")
+    else:
+        logging.error(f"Invalid target role: {target_role}")
 
 # /For Sending Receiving, Displaying, Pin Map on Alerts, and Display Prediction
 
@@ -2979,9 +2980,57 @@ if __name__ == '__main__':
                 responded BOOLEAN DEFAULT TRUE
             )
         ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS barangay_crime_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                crime_type TEXT,
+                crime_cause TEXT,
+                level TEXT,
+                suspect_gender TEXT,
+                victim_gender TEXT,
+                suspect_age TEXT,
+                victim_age TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS pnp_crime_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                crime_type TEXT,
+                crime_cause TEXT,
+                level TEXT,
+                suspect_gender TEXT,
+                victim_gender TEXT,
+                suspect_age TEXT,
+                victim_age TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        
         conn.commit()
         conn.close()
-        logger.info("Response tables initialized successfully in users_web.db")
+        logger.info("barangay_response initialized successfully in users_web.db")
+        logger.info("bfp_response initialized successfully in users_web.db")
+        logger.info("cdrrmo_response initialized successfully in users_web.db")
+        logger.info("pnp_response initialized successfully in users_web.db")
+        logger.info("health_response initialized successfully in users_web.db")
+        logger.info("hospital_response initialized successfully in users_web.db")
+        logger.info("barangay_fire_response initialized successfully in users_web.db")
+        logger.info("barangay_health_response initialized successfully in users_web.db")
+        logger.info("barangay_crime_response initialized successfully in users_web.db")
+        logger.info("All Tables Are Initialized Successfully In users_web.db")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
