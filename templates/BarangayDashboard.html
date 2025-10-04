@@ -11,12 +11,12 @@
     <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        .alert-item { margin-bottom: 10px; padding: 15px; border-radius: 5px; color: #fff; background-color: #1F3458; }
+        .alert-item { margin-bottom: 10px; padding: 15px; border-radius: 5px; color: #000000ff; background-color: #ffffffff; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
         .response-form { margin-top: 10px; display: none; }
         .response-form select, .response-form button { margin: 5px; padding: 5px; border-radius: 4px; }
         .clickable-img { cursor: pointer; max-width: 200px; border-radius: 5px; }
-        .prediction { margin-top: 10px; font-weight: bold; color: #fff; display: none; }
+        .prediction { margin-top: 10px; font-weight: bold; color: #000000ff; display: none; }
         .image-modal {
             display: none;
             position: fixed;
@@ -208,23 +208,25 @@
                 statusDiv.textContent = 'PENDING ALERT';
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
-                statusDiv.style.color = 'black';
+                statusDiv.style.color = 'white';
 
                 const alertText = document.createElement('div');
                 alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
+                alertText.style.color = 'white';
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
-                typeDiv.style.color = 'black';
+                typeDiv.style.color = 'white';
+                typeDiv.style.display = data.emergency_type ? 'block' : 'none';
 
                 const timeDiv = document.createElement('div');
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
                 timeDiv.style.fontWeight = 'bold';
                 timeDiv.style.fontSize = '16px';
-                timeDiv.style.color = 'black';
+                timeDiv.style.color = 'white';
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
@@ -265,49 +267,56 @@
                     responseForm.appendChild(select);
                 });
 
-                const acceptButton = document.createElement('button');
-                acceptButton.textContent = 'Accept';
-                acceptButton.addEventListener('click', () => {
+                const submitButton = document.createElement('button');
+                submitButton.textContent = 'Submit';
+                submitButton.addEventListener('click', () => {
+                    const responseData = {
+                        alert_id: data.alert_id,
+                        role: 'barangay',
+                        lat: data.lat,
+                        lon: data.lon,
+                        barangay: data.barangay,
+                        emergency_type: emergencyType,
+                        municipality: '{{ municipality }}'.toLowerCase()
+                    };
+                    responseForm.querySelectorAll('select').forEach(select => {
+                        responseData[select.name] = select.value;
+                    });
+                    socket.emit('submit_response', responseData);
+                    statusDiv.textContent = 'RESPONDED';
+                });
+                responseForm.appendChild(submitButton);
+
+                const respondButton = document.createElement('button');
+                respondButton.textContent = 'Respond';
+                respondButton.addEventListener('click', () => {
                     socket.emit('role_accepted', { alert_id: data.alert_id, role: 'barangay' });
                     responseForm.style.display = 'block';
+                    respondButton.style.display = 'none';
                 });
 
                 const declineButton = document.createElement('button');
                 declineButton.textContent = 'Decline';
                 declineButton.addEventListener('click', () => {
                     socket.emit('role_declined', { alert_id: data.alert_id, role: 'barangay' });
+                    alertItem.remove();
                 });
 
-                const submitButton = document.createElement('button');
-                submitButton.textContent = 'Submit Response';
-                submitButton.addEventListener('click', () => {
-                    const responseData = {
-                        alert_id: data.alert_id,
-                        role: 'barangay',
-                        barangay: data.barangay,
-                        emergency_type: emergencyType
-                    };
-                    responseForm.querySelectorAll('select').forEach(select => {
-                        responseData[select.name] = select.value;
-                    });
-                    responseData.lat = data.lat;
-                    responseData.lon = data.lon;
-                    socket.emit('submit_response', responseData);
-                    responseForm.style.display = 'none';
-                });
-
-                responseForm.appendChild(acceptButton);
-                responseForm.appendChild(declineButton);
-                responseForm.appendChild(submitButton);
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = 'PREDICTION: N/A';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
                 alertItem.appendChild(typeDiv);
                 alertItem.appendChild(timeDiv);
                 alertItem.appendChild(imageDiv);
+                alertItem.appendChild(respondButton);
+                alertItem.appendChild(declineButton);
                 alertItem.appendChild(responseForm);
+                alertItem.appendChild(predictionDiv);
 
-                alertContainer.appendChild(alertItem);
+                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
                 alertElements.set(data.alert_id, alertItem);
 
                 document.querySelector('.image-modal .close-btn').addEventListener('click', () => {

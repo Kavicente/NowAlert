@@ -11,12 +11,12 @@
     <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        .alert-item { margin-bottom: 10px; padding: 15px; border-radius: 5px; color: #fff; background-color: #1F3458; }
+        .alert-item { margin-bottom: 10px; padding: 15px; border-radius: 5px; color: #fff; background-color: #000000ff; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
         .response-form { margin-top: 10px; display: none; }
         .response-form select, .response-form button { margin: 5px; padding: 5px; border-radius: 4px; }
         .clickable-img { cursor: pointer; max-width: 200px; border-radius: 5px; }
-        .prediction { margin-top: 10px; font-weight: bold; color: #fff; display: none; }
+        .prediction { margin-top: 10px; font-weight: bold; color: #000000ff; display: none; }
         .image-modal {
             display: none;
             position: fixed;
@@ -113,6 +113,8 @@
             L.control.layers(baseLayers).addTo(cdrrmoMap);
 
             const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+            
+            
             const alertElements = new Map();
 
             // Fetch menu.txt for dropdown options
