@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        .alert-item { margin-bottom: 10px; padding: 15px; border-radius: 5px; color: #fff; background-color: #000000ff; }
+        .alert-item { margin-bottom: 10px; padding: 15px; border-radius: 5px; color: #000000ff; background-color: #fffefeff; }
         .notification { position: fixed; width: 50px; bottom: 10px; right: 10px; }
         .response-form { margin-top: 10px; display: none; }
         .response-form select, .response-form button { margin: 5px; padding: 5px; border-radius: 4px; }
@@ -171,7 +171,7 @@
                             formattedPrediction = predictionText;
                         }
                     }
-                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    
                     alertItem.appendChild(predictionDiv);
                 }
             });
@@ -202,17 +202,17 @@
                 statusDiv.textContent = 'PENDING ALERT';
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
-                statusDiv.style.color = 'white';
+                statusDiv.style.color = 'black';
 
                 const alertText = document.createElement('div');
                 alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
-                alertText.style.color = 'white';
+                alertText.style.color = 'black';
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
-                typeDiv.style.color = 'white';
+                typeDiv.style.color = 'black';
                 typeDiv.style.display = 'block';
 
                 const timeDiv = document.createElement('div');
@@ -220,7 +220,14 @@
                 timeDiv.textContent = `Time: ${timestamp}`;
                 timeDiv.style.fontWeight = 'bold';
                 timeDiv.style.fontSize = '16px';
-                timeDiv.style.color = 'white';
+                timeDiv.style.color = 'black';
+
+
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.fontColor = 'black';
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';

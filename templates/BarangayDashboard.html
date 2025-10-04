@@ -177,7 +177,7 @@
                             formattedPrediction = predictionText;
                         }
                     }
-                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    
                     alertItem.appendChild(predictionDiv);
                 }
             });
@@ -208,17 +208,17 @@
                 statusDiv.textContent = 'PENDING ALERT';
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
-                statusDiv.style.color = 'white';
+                statusDiv.style.color = 'black';
 
                 const alertText = document.createElement('div');
                 alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
-                alertText.style.color = 'white';
+                alertText.style.color = 'black';
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
-                typeDiv.style.color = 'white';
+                typeDiv.style.color = 'black';
                 typeDiv.style.display = data.emergency_type ? 'block' : 'none';
 
                 const timeDiv = document.createElement('div');
@@ -226,7 +226,14 @@
                 timeDiv.textContent = `Time: ${timestamp}`;
                 timeDiv.style.fontWeight = 'bold';
                 timeDiv.style.fontSize = '16px';
-                timeDiv.style.color = 'white';
+                timeDiv.style.color = 'black';
+
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.fontColor = 'black';
+                
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
@@ -246,8 +253,18 @@
                 responseForm.className = 'response-form';
                 responseForm.style.display = 'none';
 
-                const emergencyType = data.emergency_type || 'Health Emergency';
-                const dropdownData = menuData[emergencyType] || menuData['Health Emergency'];
+
+                let dropdownData;
+                if (data.emergency_type === 'Road Accident') {
+                    dropdownData = menuData['Road Accident'];
+                } else if (data.emergency_type === 'Fire Incident') {
+                    dropdownData = menuData['Fire Incident'];
+                } else if (data.emergency_type === 'Crime Incident') {
+                    dropdownData = menuData['Crime Incident'];
+                } else {
+                    dropdownData = menuData['Health Emergency'];
+                }
+                
 
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
@@ -302,9 +319,7 @@
                     alertItem.remove();
                 });
 
-                const predictionDiv = document.createElement('div');
-                predictionDiv.className = 'prediction';
-                predictionDiv.textContent = 'PREDICTION: N/A';
+                
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);

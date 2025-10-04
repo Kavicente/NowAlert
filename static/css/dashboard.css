@@ -141,6 +141,7 @@ main {
     background-color: #fdfeff;
     border-radius: 20px;
     border: 1px solid #000000;
+    color: #000000;
     padding: 15px;
     
    
@@ -148,6 +149,7 @@ main {
 .alert-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    color: #000000;
     gap: 25px;
 }
 

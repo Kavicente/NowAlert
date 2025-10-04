@@ -331,11 +331,11 @@ def handle_forward_alert(data):
         alert_id = data.get('alert_id')
         alert_data = next((alert for alert in alerts if alert['alert_id'] == alert_id), None)
         if alert_data:
-            if target_role == 'cdrrmo':
+            if target_role == 'cdrrmo_pnp':
                 emit('redirected_alert', alert_data, room=f"cdrrmo_{municipality.lower()}")
                 emit('redirected_alert', alert_data, room=f"pnp_{municipality.lower()}")
                 logger.info(f"Alert {alert_id} forwarded to cdrrmo_{municipality.lower()} and pnp_{municipality.lower()}")
-            elif target_role == 'bfp':
+            elif target_role == 'bfp_pnp':
                 emit('redirected_alert', alert_data, room=f"bfp_{municipality.lower()}")
                 emit('redirected_alert', alert_data, room=f"pnp_{municipality.lower()}")
                 logger.info(f"Alert {alert_id} forwarded to bfp_{municipality.lower()} and pnp_{municipality.lower()}")
