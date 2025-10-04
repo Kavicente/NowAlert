@@ -74,7 +74,7 @@
         </section>
         <section id="alerts">
             <h2 class="h2">Live Alerts</h2>
-            <div id="alert-container"></div>
+            <div id="alert-container" class='alert-grid'></div>
         </section>
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
@@ -202,6 +202,7 @@
                 statusDiv.textContent = 'PENDING ALERT';
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
+                statusDiv.style.fontColor = 'black';
 
                 const alertText = document.createElement('div');
                 alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
@@ -210,10 +211,14 @@
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
+                typeDiv.style.fontColor = 'black';
 
                 const timeDiv = document.createElement('div');
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
+                timeDiv.style.fontWeight = 'bold';
+                timeDiv.style.fontSize = '16px';
+                timeDiv.style.fontColor = 'black';
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
