@@ -172,7 +172,6 @@
                         }
                     }
                     
-                    alertItem.appendChild(predictionDiv);
                 }
             });
 
@@ -202,17 +201,17 @@
                 statusDiv.textContent = 'PENDING ALERT';
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
-                statusDiv.style.color = 'black';
+                statusDiv.style.color = 'white';
 
                 const alertText = document.createElement('div');
                 alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
-                alertText.style.color = 'black';
+                alertText.style.color = 'white';
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
-                typeDiv.style.color = 'black';
+                typeDiv.style.color = 'white';
                 typeDiv.style.display = 'block';
 
                 const timeDiv = document.createElement('div');
@@ -220,13 +219,17 @@
                 timeDiv.textContent = `Time: ${timestamp}`;
                 timeDiv.style.fontWeight = 'bold';
                 timeDiv.style.fontSize = '16px';
-                timeDiv.style.color = 'black';
+                timeDiv.style.color = 'white';
 
 
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                 predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.fontColor = 'black';
+  
+                predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                alertDiv.appendChild(predictionDiv);
                 predictionDiv.style.fontColor = 'black';
 
                 const imageDiv = document.createElement('img');

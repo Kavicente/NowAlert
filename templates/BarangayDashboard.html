@@ -208,17 +208,17 @@
                 statusDiv.textContent = 'PENDING ALERT';
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
-                statusDiv.style.color = 'black';
+                statusDiv.style.fontColor = 'black';
 
                 const alertText = document.createElement('div');
                 alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
-                alertText.style.color = 'black';
+                alertText.style.fontColor = 'black';
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
-                typeDiv.style.color = 'black';
+                typeDiv.style.fontColor = 'black';
                 typeDiv.style.display = data.emergency_type ? 'block' : 'none';
 
                 const timeDiv = document.createElement('div');
@@ -226,7 +226,7 @@
                 timeDiv.textContent = `Time: ${timestamp}`;
                 timeDiv.style.fontWeight = 'bold';
                 timeDiv.style.fontSize = '16px';
-                timeDiv.style.color = 'black';
+                timeDiv.style.fontColor = 'black';
 
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';

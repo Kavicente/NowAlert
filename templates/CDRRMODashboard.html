@@ -163,7 +163,6 @@
                         }
                     }
                     
-                    alertDiv.appendChild(predictionDiv);
                 }
             });
 
@@ -222,11 +221,8 @@
                 timeDiv.style.fontSize = '16px';
                 timeDiv.style.fontColor = 'black';
 
-
-                const predictionDiv = document.createElement('div');
-                predictionDiv.className = 'prediction';
                 predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                predictionDiv.style.fontSize = '16px';
+                alertDiv.appendChild(predictionDiv);
                 predictionDiv.style.fontColor = 'black';
 
                 const imageDiv = document.createElement('img');
