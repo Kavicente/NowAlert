@@ -236,8 +236,8 @@
                 responseForm.className = 'response-form';
                 responseForm.style.display = 'none';
 
-                const emergencyType = data.emergency_type || 'Crime Incident';
-                const dropdownData = menuData['Crime Incident'];
+                const emergencyType = data.emergency_type || 'Road Accident';
+                const dropdownData = menuData[emergencyType] || menuData['Road Accident'];
 
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
