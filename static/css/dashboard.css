@@ -150,7 +150,7 @@ main {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     color: #000000;
-    gap: 5px;
+    gap: 3px;
 }
 
 .alert-container p {
