@@ -303,17 +303,8 @@
                 predictionDiv.style.fontWeight = 'bold';
                 predictionDiv.style.fontSize = '16px';
 
-                alertItem.appendChild(statusDiv);
-                alertItem.appendChild(alertText);
-                alertItem.appendChild(typeDiv);
-                alertItem.appendChild(timeDiv);
-                alertItem.appendChild(imageDiv);
-                alertItem.appendChild(respondButton);
-                alertItem.appendChild(declineButton);
-                alertItem.appendChild(responseForm);
-                alertItem.appendChild(predictionDiv);
-
-                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
+                alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv);
+                alertContainer.prepend(alertItem);
                 alertElements.set(data.alert_id, alertItem);
 
                 document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
