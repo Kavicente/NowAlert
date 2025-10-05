@@ -90,6 +90,15 @@ except FileNotFoundError:
     logger.error("fire_incident.csv not found in dataset directory")
 except Exception as e:
     logger.error(f"Error loading fire_incident.csv: {e}")
+    
+health_emergencies_df = pd.DataFrame()
+try:
+    health_emergencies_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'health_emergencies.csv'))
+    logger.info("Successfully loaded fire_incident.csv")
+except FileNotFoundError:
+    logger.error("fire_incident.csv not found in dataset directory")
+except Exception as e:
+    logger.error(f"Error loading fire_incident.csv: {e}")
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
@@ -319,15 +328,19 @@ def handle_submit(data):
     try:
         manila = pytz.timezone('Asia/Manila')
         timestamp = datetime.now(manila).strftime('%Y-%m-%d %H:%M:%S')
-        current_year = datetime.now(manila).strftime('%Y')
+        current_year = int(datetime.now(manila).strftime('%Y'))
 
         prediction = 'N/A'
 
-        # Preprocess categorical variables to match predictor training data
+        # Preprocess categorical variables and handle numeric conversions
         def preprocess_input(input_data, required_columns):
             for col in required_columns:
                 if col in input_data and isinstance(input_data[col].iloc[0], str):
                     input_data[col] = input_data[col].astype('category').cat.codes
+            # Convert age columns to numeric, handling missing/invalid values
+            for col in ['Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
+                if col in input_data:
+                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
             return input_data
 
         if data.get('emergency_type') == 'Road Accident':
@@ -381,7 +394,8 @@ def handle_submit(data):
                 }])
                 required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
                 input_data = preprocess_input(input_data, required_columns)
-                prediction = road_accident_predictor.predict(input_data)[0]
+                raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{raw_prediction:.1f}% chance in year {current_year}"
             except Exception as e:
                 logger.error(f"Error predicting road accident: {e}")
                 prediction = 'prediction_error'
@@ -421,7 +435,8 @@ def handle_submit(data):
                 }])
                 required_columns = ['Weather', 'Fire_Cause', 'Fire_Type', 'Fire_Severity']
                 input_data = preprocess_input(input_data, required_columns)
-                prediction = fire_accident_predictor.predict(input_data)[0]
+                raw_prediction = fire_accident_predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{raw_prediction:.1f}% chance in year {current_year}"
             except Exception as e:
                 logger.error(f"Error predicting fire incident: {e}")
                 prediction = 'prediction_error'
@@ -465,7 +480,8 @@ def handle_submit(data):
                 }])
                 required_columns = ['Crime_Type', 'Crime_Cause', 'Level', 'Suspect_Gender', 'Victim_Gender']
                 input_data = preprocess_input(input_data, required_columns)
-                prediction = crime_predictor.predict(input_data)[0]
+                raw_prediction = crime_predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{raw_prediction:.1f}% chance in year {current_year}"
             except Exception as e:
                 logger.error(f"Error predicting crime incident: {e}")
                 prediction = 'prediction_error'
@@ -509,7 +525,8 @@ def handle_submit(data):
                 required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
                 input_data = preprocess_input(input_data, required_columns)
                 predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
-                prediction = predictor.predict(input_data)[0]
+                raw_prediction = predictor.predict_proba(input_data)[0][1] * 100
+                prediction = f"{raw_prediction:.1f}% chance in year {current_year}"
             except Exception as e:
                 logger.error(f"Error predicting {data.get('emergency_type')}: {e}")
                 prediction = 'prediction_error'
