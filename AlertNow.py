@@ -1243,12 +1243,12 @@ def handle_health_response(data):
         conn.execute('''
             INSERT INTO health_response (
                 alert_id, health_cause, health_type, patient_age, patient_gender, 
-                lat, lon, barangay, emergency_type, timestamp, assigned_hospital
+                lat, lon, barangay, emergency_type, timestamp
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
             data.get('patient_age'), data.get('patient_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), data['timestamp'], data.get('assigned_hospital')
+            data.get('barangay'), data.get('emergency_type'), data['timestamp']
         ))
         conn.commit()
         logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
@@ -1312,11 +1312,7 @@ def handle_health_response(data):
             cleaned_data['Year'],
             cleaned_data['Barangay'],
             cleaned_data['Health_Type'],
-            cleaned_data['Health_Cause'],
-            data.get('patient_age', 'Unknown'),
-            data.get('patient_gender', 'Unknown'),
-            data.get('lat', 0.0),
-            data.get('lon', 0.0)
+            cleaned_data['Health_Cause']
         ]
         
         # Call ML model
@@ -1480,11 +1476,7 @@ def handle_hospital_response(data):
             cleaned_data['Year'],
             cleaned_data['Barangay'],
             cleaned_data['Health_Type'],
-            cleaned_data['Health_Cause'],
-            data.get('patient_age', 'Unknown'),
-            data.get('patient_gender', 'Unknown'),
-            data.get('lat', 0.0),
-            data.get('lon', 0.0)
+            cleaned_data['Health_Cause']
         ]
         
         # Call ML model
