@@ -215,9 +215,7 @@
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
 
-                predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                predictionDiv.style.fontWeight = 'bold';
-                predictionDiv.style.fontSize = '16px';
+               
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
