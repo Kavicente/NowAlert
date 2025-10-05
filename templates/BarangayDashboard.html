@@ -288,7 +288,7 @@
                     responseForm.querySelectorAll('select').forEach(select => {
                         responseData[select.name] = select.value;
                     });
-                    socket.emit('submit_response', responseData);
+                    socket.emit('response_update', responseData);
                     statusDiv.textContent = 'RESPONDED';
                 });
                 responseForm.appendChild(submitButton);
