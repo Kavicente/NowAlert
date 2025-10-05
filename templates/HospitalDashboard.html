@@ -215,8 +215,6 @@
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
 
-
-                const alertItem = alertElements.get(data.alert_id);
                 predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                 predictionDiv.style.fontWeight = 'bold';
                 predictionDiv.style.fontSize = '16px';
