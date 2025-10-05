@@ -453,8 +453,6 @@ def handle_submit_response(data):
                 prediction = handle_barangay_health_response(data)
             elif emergency_type.lower().find('road accident') != -1:
                 prediction = handle_barangay_response_submitted(data)
-            elif emergency_type.lower().find('crime') != -1:
-                prediction = handle_barangay_crime_response(data)
         elif role == 'bfp':
             prediction = handle_fire_response_submitted(data)
         elif role == 'cdrrmo':
