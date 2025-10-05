@@ -519,6 +519,15 @@ def handle_redirect_alert(data):
         municipality = data.get('municipality', '').lower()
         if target_role in ['bfp', 'cdrrmo', 'health', 'hospital', 'pnp']:
             emit('redirected_alert', data, room=f"{target_role}_{municipality}")
+            # Emit update_map to pin alert on target dashboard
+            map_data = {
+                'lat': data.get('lat'),
+                'lon': data.get('lon'),
+                'barangay': data.get('barangay'),
+                'emergency_type': data.get('emergency_type')
+            }
+            emit('update_map', map_data, room=f"{target_role}_{municipality}")
+            logger.info(f"Alert redirected to {target_role}_{municipality} with map update")
         else:
             logger.error(f"Invalid target role: {target_role}")
     except Exception as e:

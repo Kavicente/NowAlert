@@ -138,6 +138,14 @@
                 if (data.target_role === 'bfp') {
                     updateUIWithAlert(data);
                     notifyAlert(data);
+
+                    const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                bfpMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(bfpMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
                 }
             });
 
@@ -161,7 +169,7 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    alertDiv.appendChild(predictionDiv);
+                    predictionDiv.style.display = 'block';
                 }
             });
 
@@ -235,8 +243,19 @@
                 responseForm.className = 'response-form';
                 responseForm.style.display = 'none';
 
-                const emergencyType = data.emergency_type || 'Fire Incident';
-                const dropdownData = menuData['Fire Incident'];
+                let emergencyType, dropdownData;
+                if (!data || !data.emergency_type) {
+                    console.error('Error: data or data.emergency_type is undefined');
+                    emergencyType = 'Unknown';
+                    dropdownData = menuData['Unknown'] || [];
+                } else if (data.emergency_type === 'Fire Incident') {
+                    emergencyType = 'Fire Incident';
+                    dropdownData = menuData['Fire Incident'] || [];
+                } else {
+                    console.warn(`Unknown emergency type: ${data.emergency_type}`);
+                    emergencyType = 'Unknown';
+                    dropdownData = menuData['Unknown'] || [];
+                }
 
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
@@ -294,6 +313,8 @@
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.textContent = 'PREDICTION: N/A';
+                predictionDiv.style.fontWeight = 'bold';
+                predictionDiv.style.fontSize = '16px';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);

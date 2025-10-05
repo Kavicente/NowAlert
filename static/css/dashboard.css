@@ -132,7 +132,7 @@ main {
 .alert-container {
    
     
-    height: 100px;
+    height: 150px;
     max-width: 60%; 
     overflow-y: auto; 
     position: relative;
@@ -150,7 +150,7 @@ main {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     color: #000000;
-    gap: 25px;
+    gap: 5px;
 }
 
 .alert-container p {

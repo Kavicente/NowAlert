@@ -138,6 +138,14 @@
                 if (data.target_role === 'hospital') {
                     updateUIWithAlert(data);
                     notifyAlert(data);
+
+                    const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                    const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                    hospitalMap.setView([lat, lon], 16);
+                    L.marker([lat, lon]).addTo(hospitalMap).bindPopup(
+                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                    ).openPopup();
+                    document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
                 }
             });
 
@@ -161,7 +169,7 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    alertDiv.appendChild(predictionDiv);
+                    predictionDiv.style.display = 'block';
                 }
             });
 
@@ -215,9 +223,7 @@
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
 
-                predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                predictionDiv.style.fontWeight = 'bold';
-                predictionDiv.style.fontSize = '16px';
+                
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
@@ -295,6 +301,8 @@
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.textContent = 'PREDICTION: N/A';
+                predictionDiv.style.fontWeight = 'bold';
+                predictionDiv.style.fontSize = '16px';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
