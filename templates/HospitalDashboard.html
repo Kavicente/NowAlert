@@ -277,7 +277,7 @@
                     responseForm.querySelectorAll('select').forEach(select => {
                         responseData[select.name] = select.value;
                     });
-                    socket.emit('response_update', responseData);
+                    socket.emit('submit_response', responseData);
                     statusDiv.textContent = 'RESPONDED';
                 });
                 responseForm.appendChild(submitButton);
@@ -302,6 +302,7 @@
                 predictionDiv.textContent = 'PREDICTION: N/A';
                 predictionDiv.style.fontWeight = 'bold';
                 predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.color = 'black';
 
                 alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv);
                 alertContainer.prepend(alertItem);
