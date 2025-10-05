@@ -448,21 +448,23 @@ def handle_submit_response(data):
         prediction = "N/A"
         if role == 'barangay':
             if emergency_type.lower().find('fire') != -1:
-                return handle_barangay_fire_submitted(data) 
+                prediction = handle_barangay_fire_submitted(data)
             elif emergency_type.lower().find('health') != -1 or emergency_type.lower().find('medical') != -1 or emergency_type.lower().find('birth') != -1:
-                return handle_barangay_health_response(data)
+                prediction = handle_barangay_health_response(data)
             elif emergency_type.lower().find('road accident') != -1:
-                return handle_barangay_response_submitted(data)
+                prediction = handle_barangay_response_submitted(data)
+            elif emergency_type.lower().find('crime') != -1:
+                prediction = handle_barangay_crime_response(data)
         elif role == 'bfp':
-            return handle_fire_response_submitted(data)
+            prediction = handle_fire_response_submitted(data)
         elif role == 'cdrrmo':
-            return handle_cdrrmo_response_submitted(data)
+            prediction = handle_cdrrmo_response_submitted(data)
         elif role == 'pnp':
-                return handle_pnp_response_submitted(data)
+            prediction = handle_pnp_response_submitted(data)
         elif role == 'health':
-            return handle_health_response(data)
+            prediction = handle_health_response(data)
         elif role == 'hospital':
-            return handle_hospital_response(data)
+            prediction = handle_hospital_response(data)
 
         conn.commit()
         conn.close()
@@ -474,10 +476,8 @@ def handle_submit_response(data):
             'emergency_type': emergency_type,
             'municipality': municipality
         }
-        emit(f'{role}_response', response_data, room=role)
-        if municipality:
-            emit(f'{role}_response', response_data, room=f'{role}_{municipality.lower()}')
-        logger.info(f"Response submitted for alert {alert_id} by {role}")
+        emit(f'{role}_response', response_data, room=f"{role}_{municipality.lower()}")
+        logger.info(f"Response submitted for alert {alert_id} by {role} with prediction {prediction}")
     except Exception as e:
         logger.error(f"Error submitting response: {e}")
 
