@@ -468,6 +468,15 @@ def handle_submit_response(data):
                     prediction = birth_predictor(data.get('health_type'), data.get('health_cause'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay)
                 else:
                     prediction = health_predictor(data.get('health_type'), data.get('health_cause'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay)
+            elif emergency_type.lower().find('road accident') != -1:
+                c.execute('''
+                    INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (alert_id, data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'), data.get('road_condition'), data.get('vehicle_type'), data.get('driver_age'), data.get('driver_gender'),lat, lon, barangay, emergency_type, timestamp))
+                if emergency_type.lower().find('road accident') != -1:
+                    prediction = road_accident_predictor(data.get('road_accident_cause'), data.get('road_accident_type'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay)
+                else:
+                    prediction = road_accident_predictor(data.get('road_accident_cause'), data.get('road_accident_type'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay)
         elif role == 'bfp':
             c.execute('''
                 INSERT INTO bfp_response (alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, emergency_type, timestamp)
@@ -476,21 +485,21 @@ def handle_submit_response(data):
             prediction = fire_accident_predictor(data.get('fire_type'), data.get('fire_cause'), data.get('weather'), data.get('fire_severity'), lat, lon, barangay)
         elif role == 'cdrrmo':
             c.execute('''
-                INSERT INTO cdrrmo_response (alert_id, road_type, road_cause, weather, road_severity, lat, lon, barangay, emergency_type, timestamp)
+                INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, data.get('road_type'), data.get('road_cause'), data.get('weather'), data.get('road_severity'), lat, lon, barangay, emergency_type, timestamp))
-            prediction = road_accident_predictor(data.get('road_type'), data.get('road_cause'), data.get('weather'), data.get('road_severity'), lat, lon, barangay)
+            ''', (alert_id, data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'), data.get('road_condition'), data.get('vehicle_type'), data.get('driver_age'), data.get('driver_gender'),lat, lon, barangay, emergency_type, timestamp))
+            prediction = road_accident_predictor(data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'), data.get('road_severity'), lat, lon, barangay)
         elif role == 'pnp':
             c.execute('''
-                INSERT INTO pnp_response (alert_id, crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, lat, lon, barangay, emergency_type, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, data.get('crime_type'), data.get('crime_cause'), data.get('level'), data.get('suspect_gender'), data.get('victim_gender'), data.get('suspect_age'), data.get('victim_age'), lat, lon, barangay, emergency_type, timestamp))
-            prediction = crime_predictor(data.get('crime_type'), data.get('crime_cause'), data.get('level'), data.get('suspect_gender'), data.get('victim_gender'), data.get('suspect_age'), data.get('victim_age'), lat, lon, barangay)
+                INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (alert_id, data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'), data.get('road_condition'), data.get('vehicle_type'), data.get('driver_age'), data.get('driver_gender'),lat, lon, barangay, emergency_type, timestamp))
+            prediction = road_accident_predictor(data.get('road_accident_cause'), data.get('road_accident_type'), data.get('weather'), data.get('road_severity'), lat, lon, barangay)
         elif role == 'health':
             c.execute('''
-                INSERT INTO health_response (alert_id, health_type, health_cause, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital)
+                INSERT INTO health_response (alert_id, health_cause, health_type, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, assigned_hospital)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, data.get('health_type'), data.get('health_cause'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay, emergency_type, timestamp, assigned_hospital))
+            ''', (alert_id, data.get('health_cause'), data.get('health_type'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay, emergency_type, timestamp, assigned_hospital))
             if emergency_type.lower().find('birth') != -1:
                 prediction = birth_predictor(data.get('health_type'), data.get('health_cause'), data.get('patient_age'), data.get('patient_gender'), lat, lon, barangay)
             else:
