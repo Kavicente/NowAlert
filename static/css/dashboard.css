@@ -150,7 +150,8 @@ main {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     color: #000000;
-    gap: 3px;
+    row-gap: 5px; /* Vertical spacing */
+    column-gap: 10px;
 }
 
 .alert-container p {
