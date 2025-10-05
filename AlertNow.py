@@ -318,11 +318,17 @@ def handle_submit(data):
     cursor = conn.cursor()
     try:
         manila = pytz.timezone('Asia/Manila')
-        base_time = datetime.now(manila)
-        timestamp = base_time.strftime('%Y-%m-%d %H:%M:%S')
-        current_year = base_time.strftime('%Y')
+        timestamp = datetime.now(manila).strftime('%Y-%m-%d %H:%M:%S')
+        current_year = datetime.now(manila).strftime('%Y')
 
         prediction = 'N/A'
+
+        # Preprocess categorical variables to match predictor training data
+        def preprocess_input(input_data, required_columns):
+            for col in required_columns:
+                if col in input_data and isinstance(input_data[col].iloc[0], str):
+                    input_data[col] = input_data[col].astype('category').cat.codes
+            return input_data
 
         if data.get('emergency_type') == 'Road Accident':
             cursor.execute('''
@@ -363,16 +369,18 @@ def handle_submit(data):
             ))
             try:
                 input_data = pd.DataFrame([{
-                    'Accident_Cause': data.get('road_accident_cause'),
-                    'Road_Accident_Type': data.get('road_accident_type'),
-                    'Weather': data.get('weather'),
-                    'Road_Condition': data.get('road_condition'),
-                    'Vehicle_Type': data.get('vehicle_type'),
-                    'Driver_Age': data.get('driver_age'),
-                    'Driver_Gender': data.get('driver_gender'),
                     'Year': current_year,
-                    'Barangay': data.get('barangay')
+                    'Barangay': data.get('barangay', 'Unknown'),
+                    'Weather': data.get('weather', 'Unknown'),
+                    'Road_Condition': data.get('road_condition', 'Unknown'),
+                    'Vehicle_Type': data.get('vehicle_type', 'Unknown'),
+                    'Driver_Age': data.get('driver_age', 0),
+                    'Driver_Gender': data.get('driver_gender', 'Unknown'),
+                    'Accident_Cause': data.get('road_accident_cause', 'Unknown'),
+                    'Road_Accident_Type': data.get('road_accident_type', 'Unknown')
                 }])
+                required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
+                input_data = preprocess_input(input_data, required_columns)
                 prediction = road_accident_predictor.predict(input_data)[0]
             except Exception as e:
                 logger.error(f"Error predicting road accident: {e}")
@@ -404,13 +412,15 @@ def handle_submit(data):
             ))
             try:
                 input_data = pd.DataFrame([{
-                    'Fire_Type': data.get('fire_type'),
-                    'Fire_Cause': data.get('fire_cause'),
-                    'Weather': data.get('weather'),
-                    'Fire_Severity': data.get('fire_severity'),
                     'Year': current_year,
-                    'Barangay': data.get('barangay')
+                    'Barangay': data.get('barangay', 'Unknown'),
+                    'Weather': data.get('weather', 'Unknown'),
+                    'Fire_Cause': data.get('fire_cause', 'Unknown'),
+                    'Fire_Type': data.get('fire_type', 'Unknown'),
+                    'Fire_Severity': data.get('fire_severity', 'Unknown')
                 }])
+                required_columns = ['Weather', 'Fire_Cause', 'Fire_Type', 'Fire_Severity']
+                input_data = preprocess_input(input_data, required_columns)
                 prediction = fire_accident_predictor.predict(input_data)[0]
             except Exception as e:
                 logger.error(f"Error predicting fire incident: {e}")
@@ -443,16 +453,18 @@ def handle_submit(data):
             ))
             try:
                 input_data = pd.DataFrame([{
-                    'Crime_Type': data.get('crime_type'),
-                    'Crime_Cause': data.get('crime_cause'),
-                    'Level': data.get('level'),
-                    'Suspect_Gender': data.get('suspect_gender'),
-                    'Victim_Gender': data.get('victim_gender'),
-                    'Suspect_Age': data.get('suspect_age'),
-                    'Victim_Age': data.get('victim_age'),
                     'Year': current_year,
-                    'Barangay': data.get('barangay')
+                    'Barangay': data.get('barangay', 'Unknown'),
+                    'Crime_Type': data.get('crime_type', 'Unknown'),
+                    'Crime_Cause': data.get('crime_cause', 'Unknown'),
+                    'Level': data.get('level', 'Unknown'),
+                    'Suspect_Gender': data.get('suspect_gender', 'Unknown'),
+                    'Victim_Gender': data.get('victim_gender', 'Unknown'),
+                    'Suspect_Age': data.get('suspect_age', 0),
+                    'Victim_Age': data.get('victim_age', 0)
                 }])
+                required_columns = ['Crime_Type', 'Crime_Cause', 'Level', 'Suspect_Gender', 'Victim_Gender']
+                input_data = preprocess_input(input_data, required_columns)
                 prediction = crime_predictor.predict(input_data)[0]
             except Exception as e:
                 logger.error(f"Error predicting crime incident: {e}")
@@ -468,7 +480,7 @@ def handle_submit(data):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
-                data.get('weather'), data.get('patient_age'), data.get('patient_gender'),
+                data.get('weather'), data.get('patient_age', 'Unknown'), data.get('patient_gender', 'Unknown'),
                 data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
                 timestamp, True
             ))
@@ -479,21 +491,25 @@ def handle_submit(data):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
-                data.get('weather'), data.get('patient_age'), data.get('patient_gender'),
+                data.get('weather'), data.get('patient_age', 'Unknown'), data.get('patient_gender', 'Unknown'),
                 data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
-                timestamp, True, data.get('assigned_hospital')
+                timestamp, True, data.get('assigned_hospital', 'Unknown')
             ))
             try:
                 input_data = pd.DataFrame([{
-                    'Health_Type': data.get('health_type'),
-                    'Health_Cause': data.get('health_cause'),
-                    'Weather': data.get('weather'),
-                    'Patient_Age': data.get('patient_age'),
-                    'Patient_Gender': data.get('patient_gender'),
                     'Year': current_year,
-                    'Barangay': data.get('barangay')
+                    'Barangay': data.get('barangay', 'Unknown'),
+                    'Weather': data.get('weather', 'Unknown'),
+                    'Health_Type': data.get('health_type', 'Unknown'),
+                    'Health_Cause': data.get('health_cause', 'Unknown'),
+                    'Severity': data.get('severity', 'Unknown'),
+                    'Patient_Age': data.get('patient_age', 'Unknown'),
+                    'Patient_Gender': data.get('patient_gender', 'Unknown')
                 }])
-                prediction = (health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor).predict(input_data)[0]
+                required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
+                input_data = preprocess_input(input_data, required_columns)
+                predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
+                prediction = predictor.predict(input_data)[0]
             except Exception as e:
                 logger.error(f"Error predicting {data.get('emergency_type')}: {e}")
                 prediction = 'prediction_error'
