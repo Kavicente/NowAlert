@@ -153,8 +153,7 @@
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
-                    const predictionDiv = document.createElement('div');
-                    predictionDiv.className = 'prediction';
+                    const predictionDiv = alertItem.querySelector('.prediction');
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
@@ -169,7 +168,7 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    alertItem.appendChild(predictionDiv);
+                    predictionDiv.style.display = 'block'; // Make prediction visible
                 }
             });
 
@@ -264,8 +263,7 @@
                     dropdownData = menuData['Unknown'] || [];
                 }
 
-                // Return or use emergencyType and dropdownData as needed
-                return { emergencyType, dropdownData };
+                
 
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');

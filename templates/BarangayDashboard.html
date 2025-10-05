@@ -163,8 +163,7 @@
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
-                    const predictionDiv = document.createElement('div');
-                    predictionDiv.className = 'prediction';
+                    const predictionDiv = alertItem.querySelector('.prediction');
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
@@ -173,13 +172,13 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    predictionDiv.style.display = 'block';
+                    predictionDiv.style.display = 'block'; // Make prediction visible
                 }
             });
 
