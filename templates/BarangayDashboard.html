@@ -255,10 +255,6 @@
                     dropdownData = menuData['Unknown'] || [];
                 }
 
-
-
-                
-
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
                     select.name = key.toLowerCase().replace(' ', '_');
@@ -267,7 +263,6 @@
                     placeholder.value = '';
                     placeholder.disabled = true;
                     placeholder.selected = true;
-                    
                     select.appendChild(placeholder);
                     dropdownData[key].forEach(option => {
                         const opt = document.createElement('option');
