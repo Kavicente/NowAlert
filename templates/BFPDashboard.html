@@ -151,10 +151,9 @@
 
             socket.on('bfp_response', (data) => {
                 console.log('Response submitted:', data);
-                const alertDiv = document.querySelector(`[data-alert-id="${response.alert_id}"]`);
-                if (alertDiv) {
-                    const predictionDiv = document.createElement('div');
-                    predictionDiv.className = 'prediction';
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
                     const predictionText = data.prediction || 'N/A';
                     let formattedPrediction = 'N/A';
                     if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
@@ -169,7 +168,7 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    predictionDiv.style.display = 'block';
+                    predictionDiv.style.display = 'block'; // Make prediction visible
                 }
             });
 
