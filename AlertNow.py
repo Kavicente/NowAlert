@@ -1487,6 +1487,7 @@ def handle_fire_response_submitted(data):
     emit('fire_response_submitted', cleaned_data, room=bfp_room)
     logger.info(f"Fire response broadcasted to room {bfp_room}: {cleaned_data}")
     
+@socketio.on('health_response')
 def handle_health_response(data):
     logger.info(f"Health response received: {data}")
     data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
@@ -1595,7 +1596,7 @@ def handle_health_response(data):
     barangay = data.get('barangay')
     conn = get_db_connection()
     try:
-        municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
+        municipality = conn.execute('SELECT municipality FROM barangay WHERE barangay = ?', (barangay,)).fetchone()
         municipality = municipality['municipality'] if municipality else None
     except Exception as e:
         logger.error(f"Error fetching municipality: {e}")
