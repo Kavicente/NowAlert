@@ -1528,7 +1528,7 @@ def handle_health_response(data):
             'Health_Type': data.get('health_type', 'Unknown'),
             'Health_Cause': data.get('health_cause', 'Unknown'),
             'Severity': data.get('severity', 'Unknown'),
-            'Patient_Age': data.get('patient_age', '0'),
+            'Patient_Age': pd.to_numeric(data.get('patient_age', '0'), errors='coerce').fillna(0),
             'Patient_Gender': data.get('patient_gender', 'Unknown')
         }
         # Map input values to dataset categories
@@ -1570,11 +1570,13 @@ def handle_health_response(data):
         # Preprocess input data
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
         input_df = preprocess_input(input_df, required_columns)
-        # Ensure all expected columns are present
+        # Ensure all expected columns are present and handle numeric conversion
         expected_columns = health_emergencies_df.columns.drop('Severity', errors='ignore')
         for col in expected_columns:
-            if col not in input_df:
+            if col not in input_df.columns:
                 input_df[col] = 0
+            elif col == 'Patient_Age':
+                input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
         # Make prediction
@@ -1596,7 +1598,7 @@ def handle_health_response(data):
     barangay = data.get('barangay')
     conn = get_db_connection()
     try:
-        municipality = conn.execute('SELECT municipality FROM barangay WHERE barangay = ?', (barangay,)).fetchone()
+        municipality = conn.execute('SELECT municipality FROM health_response WHERE barangay = ?', (barangay,)).fetchone()
         municipality = municipality['municipality'] if municipality else None
     except Exception as e:
         logger.error(f"Error fetching municipality: {e}")
