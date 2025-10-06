@@ -532,6 +532,10 @@ def handle_submit(data):
                 required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
                 input_data = preprocess_input(input_data, required_columns)
                 predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
+                for col in input_data.columns:
+                    if input_data[col].dtype == object:
+                        input_data[col] = input_data[col].astype('category').cat.codes
+                input_data = input_data.apply(pd.to_numeric, errors='coerce').fillna(0)
                 raw_prediction = predictor.predict_proba(input_data)[0][1] * 100
                 prediction = f"{raw_prediction:.1f}% chance in year {current_year}"
             except Exception as e:
@@ -1273,9 +1277,10 @@ def handle_cdrrmo_response_submitted(data):
             input_df = pd.DataFrame([cleaned_data])
             # Ensure all expected columns are present
             expected_columns = road_accident_df.columns
-            for col in expected_columns:
-                if col not in input_df.columns:
-                    input_df[col] = 0
+            for col in input_df.columns:
+                if input_df[col].dtype == object:
+                    input_df[col] = input_df[col].astype('category').cat.codes
+            input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
             # Reorder columns to match training data
             input_df = input_df[expected_columns]
             # Make prediction
@@ -1403,9 +1408,10 @@ def handle_pnp_response_submitted(data):
             input_df = pd.DataFrame([cleaned_data])
             # Ensure all expected columns are present
             expected_columns = road_accident_df.columns
-            for col in expected_columns:
-                if col not in input_df.columns:
-                    input_df[col] = 0
+            for col in input_df.columns:
+                if input_df[col].dtype == object:
+                    input_df[col] = input_df[col].astype('category').cat.codes
+            input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
             # Reorder columns to match training data
             input_df = input_df[expected_columns]
             # Make prediction
