@@ -1663,7 +1663,7 @@ def handle_health_response(data):
         'assigned_hospital': assigned_hospital
     })
     logger.info(f"Emitting health_response with chart_data: {chart_data}")
-    socketio.emit('health_response', chart_data, room=health_room)
+    socketio.emit('health_response', data, chart_data, room=health_room)
     logger.info(f"Chart update emitted to room {health_room}")
 
 # In handle_hospital_response (remove duplicate patient_gender and ensure JSON-serializable data)
