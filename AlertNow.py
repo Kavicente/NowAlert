@@ -1493,18 +1493,19 @@ def handle_health_response(data):
     
     conn = get_db_connection()
     try:
-        conn.execute('''
-            INSERT INTO health_response (
-                alert_id, health_cause, health_type, patient_age, patient_gender, 
-                lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
-            data.get('patient_age', '0'), data.get('patient_gender', ''), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), data['timestamp']
-        ))
-        conn.commit()
-        logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
+        if data.get('role') == 'health':
+            conn.execute('''
+                INSERT INTO health_response (
+                    alert_id, health_cause, health_type, patient_age, patient_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
+                data.get('patient_age', '0'), data.get('patient_gender', ''), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), data['timestamp']
+            ))
+            conn.commit()
+            logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error storing health response: {e}")
     finally:
@@ -1661,8 +1662,8 @@ def handle_health_response(data):
         'barangay': barangay,
         'assigned_hospital': assigned_hospital
     })
-    logger.info(f"Emitting health_response_update with chart_data: {chart_data}")
-    socketio.emit('health_response_update', chart_data, room=health_room)
+    logger.info(f"Emitting health_response with chart_data: {chart_data}")
+    socketio.emit('health_response', chart_data, room=health_room)
     logger.info(f"Chart update emitted to room {health_room}")
 
 # In handle_hospital_response (remove duplicate patient_gender and ensure JSON-serializable data)
