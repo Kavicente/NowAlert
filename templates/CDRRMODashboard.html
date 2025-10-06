@@ -86,12 +86,12 @@
     <script>
         let menuData = {};
         document.addEventListener('DOMContentLoaded', () => {
-            const lat = {{ lat_coord|default(14.5995) }};
-            const lon = {{ lon_coord|default(120.9842) }};
+            const lat = {{ lat_coord|default(14.0549) }};
+            const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-            const cdrrmoMap = L.map('map').setView([lat, lon], 13);
+            const cdrrmoMap = L.map('map').setView([lat, lon], 16);
 
             var satellite = L.tileLayer(tileLayerUrl, {
                 attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -133,29 +133,20 @@
                 console.error('Connection error:', error);
             });
 
-            socket.on('new_alert', (data) => {
-                console.log('New alert received:', data);
-                updateUIWithAlert(data);
-                notifyAlert(data);
-            });
-
             socket.on('redirected_alert', (data) => {
                 console.log('Redirected alert received:', data);
                 if (data.target_role === 'cdrrmo') {
                     updateUIWithAlert(data);
                     notifyAlert(data);
-                }
-            });
 
-            socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.5995) }};
-                const lon = data.lon || {{ lon_coord|default(120.9842) }};
-                cdrrmoMap.setView([lat, lon], 13);
-                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+                    const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                    const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                    cdrrmoMap.setView([lat, lon], 16);
+                    L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
+                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                    ).openPopup();
+                    document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+                }
             });
 
             socket.on('cdrrmo_response', (data) => {
@@ -171,7 +162,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type} Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -179,6 +170,17 @@
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
                 }
+            });
+
+            socket.on('update_map', (data) => {
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                cdrrmoMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             function parseMenuText(text) {
@@ -220,6 +222,8 @@
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
 
+                
+
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
                 imageDiv.style.display = 'none';
@@ -255,53 +259,68 @@
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
                     select.name = key.toLowerCase().replace(' ', '_');
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = '';
-                    defaultOption.textContent = `Select ${key}`;
-                    select.appendChild(defaultOption);
-                    dropdownData[key].forEach(value => {
-                        const option = document.createElement('option');
-                        option.value = value;
-                        option.textContent = value;
-                        select.appendChild(option);
+                    const placeholder = document.createElement('option');
+                    placeholder.text = `Select ${key}`;
+                    placeholder.value = '';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    select.appendChild(placeholder);
+                    dropdownData[key].forEach(option => {
+                        const opt = document.createElement('option');
+                        opt.value = option;
+                        opt.text = option;
+                        select.appendChild(opt);
                     });
                     responseForm.appendChild(select);
                 });
 
                 const submitButton = document.createElement('button');
-                submitButton.textContent = 'Submit Response';
+                submitButton.textContent = 'Submit';
                 submitButton.addEventListener('click', () => {
-                    const formData = { alert_id: data.alert_id, role: 'cdrrmo', emergency_type: data.emergency_type };
+                    const responseData = {
+                        alert_id: data.alert_id,
+                        role: 'cdrrmo',
+                        lat: data.lat,
+                        lon: data.lon,
+                        barangay: data.barangay,
+                        emergency_type: emergencyType,
+                        municipality: '{{ municipality }}'.toLowerCase()
+                    };
                     responseForm.querySelectorAll('select').forEach(select => {
-                        formData[select.name] = select.value;
+                        responseData[select.name] = select.value;
                     });
-                    formData.lat = data.lat || {{ lat_coord|default(14.5995) }};
-                    formData.lon = data.lon || {{ lon_coord|default(120.9842) }};
-                    formData.barangay = data.barangay || '{{ barangay }}';
-                    formData.municipality = '{{ municipality }}';
-                    socket.emit('cdrrmo_response', formData);
-                    responseForm.style.display = 'none';
+                    socket.emit('cdrrmo_response', responseData);
+                    statusDiv.textContent = 'RESPONDED';
                 });
                 responseForm.appendChild(submitButton);
 
-                const acceptButton = document.createElement('button');
-                acceptButton.textContent = 'Accept Alert';
-                acceptButton.addEventListener('click', () => {
-                    socket.emit('accept_alert', { alert_id: data.alert_id, role: 'cdrrmo', municipality: '{{ municipality }}'.toLowerCase() });
+                const respondButton = document.createElement('button');
+                respondButton.textContent = 'Respond';
+                respondButton.addEventListener('click', () => {
+                    socket.emit('role_accepted', { alert_id: data.alert_id, role: 'cdrrmo' });
                     responseForm.style.display = 'block';
-                    acceptButton.style.display = 'none';
+                    respondButton.style.display = 'none';
+                });
+
+                const declineButton = document.createElement('button');
+                declineButton.textContent = 'Decline';
+                declineButton.addEventListener('click', () => {
+                    socket.emit('role_declined', { alert_id: data.alert_id, role: 'cdrrmo' });
+                    alertItem.remove();
                 });
 
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
-                predictionDiv.textContent = 'Prediction: N/A';
-                predictionDiv.style.display = 'none';
+                predictionDiv.textContent = 'PREDICTION: N/A';
+                predictionDiv.style.fontWeight = 'bold';
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.color = 'black';
 
-                alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, responseForm, acceptButton, predictionDiv);
-                alertContainer.appendChild(alertItem);
+                alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv);
+                alertContainer.prepend(alertItem);
                 alertElements.set(data.alert_id, alertItem);
 
-                document.querySelector('.close-btn').addEventListener('click', () => {
+                document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
                     document.getElementById('image-modal').style.display = 'none';
                 });
             }
