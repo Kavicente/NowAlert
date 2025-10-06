@@ -1578,8 +1578,9 @@ def handle_health_response(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-            elif col == 'Patient_Age':
-                input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
+        # Convert all numeric columns to ensure compatibility
+        for col in input_df.select_dtypes(include=['object']).columns:
+            input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
         # Make prediction
@@ -1596,6 +1597,18 @@ def handle_health_response(data):
             'prediction': 'prediction_error'
         }
         logger.error(f"Error predicting health response: {e}")
+    
+    # Get municipality from database
+    barangay = data.get('barangay')
+    conn = get_db_connection()
+    try:
+        municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
+        municipality = municipality['municipality'] if municipality else None
+    except Exception as e:
+        logger.error(f"Error fetching municipality: {e}")
+        municipality = None
+    finally:
+        conn.close()
     
     # Get municipality from database
     barangay = data.get('barangay')
