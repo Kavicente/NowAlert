@@ -148,7 +148,7 @@
                 }
             });
 
-            socket.on('pnp_response', (data) => {
+            socket.on('barangay_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
@@ -289,7 +289,7 @@
                     responseForm.querySelectorAll('select').forEach(select => {
                         responseData[select.name] = select.value;
                     });
-                    socket.emit('pnp_response', responseData);
+                    socket.emit('barangay_response', responseData);
                     statusDiv.textContent = 'RESPONDED';
                 });
                 responseForm.appendChild(submitButton);
