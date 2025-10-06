@@ -115,6 +115,7 @@
             const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
+            // Fetch menu.txt for dropdown options
             fetch('/static/menu.txt')
                 .then(response => response.text())
                 .then(text => {
@@ -148,7 +149,7 @@
                 }
             });
 
-            socket.on('cdrrmo_response', (data) => {
+            socket.on('barangay_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
@@ -161,7 +162,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type} Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -221,6 +222,8 @@
                 const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 timeDiv.textContent = `Time: ${timestamp}`;
 
+                
+
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
                 imageDiv.style.display = 'none';
@@ -253,25 +256,22 @@
                     dropdownData = menuData['Unknown'] || [];
                 }
 
-                const keysOrder = ['Road Accident Cause', 'Road Accident Type', 'Weather Conditions', 'Road Conditions', 'Vehicle Types', 'Driver Ages', 'Driver Gender'];
-                keysOrder.forEach(key => {
-                    if (dropdownData[key]) {
-                        const select = document.createElement('select');
-                        select.name = key.toLowerCase().replace(' ', '_');
-                        const placeholder = document.createElement('option');
-                        placeholder.text = `Select ${key}`;
-                        placeholder.value = '';
-                        placeholder.disabled = true;
-                        placeholder.selected = true;
-                        select.appendChild(placeholder);
-                        dropdownData[key].forEach(option => {
-                            const opt = document.createElement('option');
-                            opt.value = option;
-                            opt.text = option;
-                            select.appendChild(opt);
-                        });
-                        responseForm.appendChild(select);
-                    }
+                Object.keys(dropdownData).forEach(key => {
+                    const select = document.createElement('select');
+                    select.name = key.toLowerCase().replace(' ', '_');
+                    const placeholder = document.createElement('option');
+                    placeholder.text = `Select ${key}`;
+                    placeholder.value = '';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    select.appendChild(placeholder);
+                    dropdownData[key].forEach(option => {
+                        const opt = document.createElement('option');
+                        opt.value = option;
+                        opt.text = option;
+                        select.appendChild(opt);
+                    });
+                    responseForm.appendChild(select);
                 });
 
                 const submitButton = document.createElement('button');
@@ -289,7 +289,7 @@
                     responseForm.querySelectorAll('select').forEach(select => {
                         responseData[select.name] = select.value;
                     });
-                    socket.emit('cdrrmo_response', responseData);
+                    socket.emit('barangay_response', responseData);
                     statusDiv.textContent = 'RESPONDED';
                 });
                 responseForm.appendChild(submitButton);
@@ -331,6 +331,6 @@
                 setTimeout(() => notification.textContent = '', 5000);
             }
         });
-</script>
+    </script>
 </body>
 </html>

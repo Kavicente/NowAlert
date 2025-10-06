@@ -1078,25 +1078,52 @@ def handle_barangay_response_submitted(data):
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     conn = get_db_connection()
-    try:
-        conn.execute('''
-            INSERT INTO barangay_response (
-                alert_id, road_accident_cause, road_accident_type, weather, 
-                road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
-            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
-            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        ))
-        conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing barangay response: {e}")
-    finally:
-        conn.close()
+    if data.get('emergency_type') == 'Road Accident':
+        if data.get('role') == 'barangay':
+            conn.execute('''
+                INSERT INTO barangay_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, 
+                    road_condition, vehicle_type, driver_age, driver_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            conn.commit()
+            logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
+        elif data.get('role') == 'cdrrmo':
+            conn.execute('''
+                INSERT INTO cdrrmo_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, 
+                    road_condition, vehicle_type, driver_age, driver_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            conn.commit()
+            logger.info(f"Stored cdrrmo response for alert_id: {data.get('alert_id')}")
+        elif data.get('role') == 'pnp':
+            conn.execute('''
+                INSERT INTO pnp_response (
+                    alert_id, road_accident_cause, road_accident_type, weather, 
+                    road_condition, vehicle_type, driver_age, driver_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+            ))
+            conn.commit()
+            logger.info(f"Stored pnp response for alert_id: {data.get('alert_id')}")
     
     
     # Check if response is today for analytics
