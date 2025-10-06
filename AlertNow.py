@@ -1570,16 +1570,13 @@ def handle_health_response(data):
                 cleaned_data[key] = default_values[key]
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
-        # Preprocess input data
-        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
-        input_df = preprocess_input(input_df, required_columns)
+        
         # Ensure all expected columns are present
-        expected_columns = health_emergencies_df.columns.drop('Severity', errors='ignore')
+        expected_columns = health_emergencies_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        # Convert all columns to numeric where applicable and handle NaN
-        input_df = input_df.astype(float, errors='ignore').fillna(0)
+        
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
         # Make prediction
