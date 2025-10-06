@@ -341,7 +341,7 @@ def preprocess_input(input_data, required_columns):
     input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
     return input_data
 
-
+"""
 @socketio.on('response')
 def handle_submit(data):
     conn = get_db_connection()
@@ -556,7 +556,7 @@ def handle_submit(data):
         logger.error(f"Error in handle_response: {e}")
     finally:
         conn.close()
-
+"""
 @socketio.on('response_update')
 def handle_response(data):
     conn = get_db_connection()
