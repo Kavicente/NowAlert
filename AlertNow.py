@@ -324,64 +324,6 @@ def handle_forward_alert(data):
         logger.error(f"Error forwarding alert: {e}")
 
 
-def predict_road_accident(data):
-    try:
-        # Create DataFrame from input data
-        df = pd.DataFrame([data])
-        
-        # Define features for road accident prediction
-        categorical_features = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
-        numeric_features = ['Driver_Age', 'Latitude', 'Longitude']
-        
-        # Handle missing values
-        for col in categorical_features:
-            df[col] = df[col].fillna('Unknown')
-        for col in numeric_features:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-        
-        # Load the preprocessor from the trained pipeline
-        pipe = joblib.load('road_predictor_lr.pkl')
-        preprocessor = pipe.named_steps['preprocessor']
-        
-        # Transform the data
-        X = preprocessor.transform(df)
-        
-        # Predict probability
-        probability = pipe.predict_proba(X)[0][1] * 100
-        return f"{probability:.2f}% chance in year {datetime.now().year + 1}"
-    except Exception as e:
-        logger.error(f"Error predicting road accident: {e}")
-        return "prediction_error"
-
-# Modified prediction logic for health_predictor
-def predict_health_emergency(data):
-    try:
-        # Create DataFrame from input data
-        df = pd.DataFrame([data])
-        
-        # Define features for health emergency prediction
-        categorical_features = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Day_of_Week']
-        numeric_features = ['Latitude', 'Longitude', 'Patient_Count', 'Response_Time', 'Treatment_Time']
-        
-        # Handle missing values
-        for col in categorical_features:
-            df[col] = df[col].fillna('Unknown')
-        for col in numeric_features:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-        
-        # Load the preprocessor from the trained pipeline
-        pipe = joblib.load('health_predictor_lr.pkl')
-        preprocessor = pipe.named_steps['preprocessor']
-        
-        # Transform the data
-        X = preprocessor.transform(df)
-        
-        # Predict probability
-        probability = pipe.predict_proba(X)[0][1] * 100
-        return f"{probability:.2f}% chance in year {datetime.now().year + 1}"
-    except Exception as e:
-        logger.error(f"Error predicting health emergency: {e}")
-        return "prediction_error"
 
 
 @socketio.on('response')
@@ -594,10 +536,6 @@ def handle_submit(data):
                 required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
                 input_data = preprocess_input(input_data, required_columns)
                 predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
-                for col in input_data.columns:
-                    if input_data[col].dtype == object:
-                        input_data[col] = input_data[col].astype('category').cat.codes
-                input_data = input_data.apply(pd.to_numeric, errors='coerce').fillna(0)
                 raw_prediction = predictor.predict_proba(input_data)[0][1] * 100
                 prediction = f"{raw_prediction:.1f}% chance in year {current_year}"
             except Exception as e:
@@ -1259,7 +1197,7 @@ def handle_cdrrmo_response_submitted(data):
             'vehicle_type': data.get('vehicle_type', 'N/A'),
             'driver_age': data.get('driver_age', 'N/A'),
             'driver_gender': data.get('driver_gender', 'N/A'),
-            'road_accident_type': data.get('accident_type', 'N/A'),
+            'road_accident_type': data.get('road_accident_type', 'N/A'),
             'cause': data.get('cause', 'N/A'),
             'lat': data.get('lat', 0.0),
             'lon': data.get('lon', 0.0),
@@ -1296,59 +1234,37 @@ def handle_cdrrmo_response_submitted(data):
             today_responses.append(response)
         # Compute prediction using ML model on form data
         try:
-            # Default values for expected model features
-            default_values = {
+            # Preprocess categorical and numeric variables
+            def preprocess_input(input_data, required_columns):
+                input_data = input_data.copy()
+                for col in required_columns:
+                    if col in input_data:
+                        if isinstance(input_data[col].iloc[0], str):
+                            input_data[col] = input_data[col].astype('category').cat.codes
+                        elif input_data[col].isna().any():
+                            input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
+                for col in ['Driver_Age']:
+                    if col in input_data:
+                        input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
+                input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
+                return input_data
+
+            input_data = pd.DataFrame([{
                 'Year': datetime.now().year,
                 'Barangay': response.get('barangay', 'Unknown'),
-                'Road_Accident_Type': 'Overspeeding',
-                'Accident_Cause': 'Head-on collision'
-            }
-            # Map input values to dataset categories
-            type_mapping = {
-                'collision': 'Head-on collision',
-                'head-on collision': 'Head-on collision',
-                'rear-end collision': 'Rear-end collision',
-                'side-impact collision': 'Side-impact collision',
-                'single vehicle accident': 'Single vehicle accident',
-                'pedestrian accident': 'Pedestrian accident'
-            }
-            cause_mapping = {
-                'speeding': 'Overspeeding',
-                'overspeeding': 'Overspeeding',
-                'drunk driving': 'Drunk Driving',
-                'reckless driving': 'Reckless Driving',
-                'overloading': 'Overloading',
-                'fatigue': 'Fatigue',
-                'distracted driving': 'Distracted Driving',
-                'poor maintenance': 'Poor Maintenance',
-                'mechanical failure': 'Mechanical Failure',
-                'inexperience': 'Inexperience'
-            }
-            # Validate and clean input data
-            cleaned_data = {}
-            for key in default_values:
-                if key == 'Year':
-                    cleaned_data[key] = default_values[key]
-                elif key == 'Barangay':
-                    cleaned_data[key] = response.get('barangay', default_values[key])
-                elif key == 'Road_Accident_Type':
-                    cleaned_data[key] = cause_mapping.get(response.get('road_accident_type', '').lower(), default_values[key])
-                elif key == 'Accident_Cause':
-                    cleaned_data[key] = type_mapping.get(response.get('cause', '').lower(), default_values[key])
-            # Prepare DataFrame for prediction
-            input_df = pd.DataFrame([cleaned_data])
-            # Ensure all expected columns are present
-            expected_columns = road_accident_df.columns
-            for col in input_df.columns:
-                if input_df[col].dtype == object:
-                    input_df[col] = input_df[col].astype('category').cat.codes
-            input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
-            # Reorder columns to match training data
-            input_df = input_df[expected_columns]
-            # Make prediction
+                'Weather': response.get('weather', 'Unknown'),
+                'Road_Condition': response.get('road_condition', 'Unknown'),
+                'Vehicle_Type': response.get('vehicle_type', 'Unknown'),
+                'Driver_Age': response.get('driver_age', '0'),
+                'Driver_Gender': response.get('driver_gender', 'Unknown'),
+                'Accident_Cause': response.get('cause', 'Unknown'),
+                'Road_Accident_Type': response.get('road_accident_type', 'Unknown')
+            }])
+            required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
+            input_data = preprocess_input(input_data, required_columns)
             if road_accident_predictor:
-                prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-                response['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+                raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
+                response['prediction'] = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
                 logger.info(f"Prediction for CDRRMO response: {response['prediction']}")
             else:
                 response['prediction'] = 'prediction_error'
@@ -1368,9 +1284,7 @@ def handle_cdrrmo_response_submitted(data):
         logger.info(f"CDRRMO response processed and emitted to cdrrmo_{municipality}")
     except Exception as e:
         logger.error(f"Error processing CDRRMO response: {e}")
-        
-        
-# Updated handle_pnp_response_submitted
+
 @socketio.on('pnp_response')
 def handle_pnp_response_submitted(data):
     data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
@@ -1390,7 +1304,7 @@ def handle_pnp_response_submitted(data):
             'vehicle_type': data.get('vehicle_type', 'N/A'),
             'driver_age': data.get('driver_age', 'N/A'),
             'driver_gender': data.get('driver_gender', 'N/A'),
-            'road_accident_type': data.get('accident_type', 'N/A'),
+            'road_accident_type': data.get('road_accident_type', 'N/A'),
             'cause': data.get('cause', 'N/A'),
             'lat': data.get('lat', 0.0),
             'lon': data.get('lon', 0.0),
@@ -1427,59 +1341,37 @@ def handle_pnp_response_submitted(data):
             today_responses.append(response)
         # Compute prediction using ML model on form data
         try:
-            # Default values for expected model features
-            default_values = {
+            # Preprocess categorical and numeric variables
+            def preprocess_input(input_data, required_columns):
+                input_data = input_data.copy()
+                for col in required_columns:
+                    if col in input_data:
+                        if isinstance(input_data[col].iloc[0], str):
+                            input_data[col] = input_data[col].astype('category').cat.codes
+                        elif input_data[col].isna().any():
+                            input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
+                for col in ['Driver_Age']:
+                    if col in input_data:
+                        input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
+                input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
+                return input_data
+
+            input_data = pd.DataFrame([{
                 'Year': datetime.now().year,
                 'Barangay': response.get('barangay', 'Unknown'),
-                'Road_Accident_Type': 'Overspeeding',
-                'Accident_Cause': 'Head-on collision'
-            }
-            # Map input values to dataset categories
-            type_mapping = {
-                'collision': 'Head-on collision',
-                'head-on collision': 'Head-on collision',
-                'rear-end collision': 'Rear-end collision',
-                'side-impact collision': 'Side-impact collision',
-                'single vehicle accident': 'Single vehicle accident',
-                'pedestrian accident': 'Pedestrian accident'
-            }
-            cause_mapping = {
-                'speeding': 'Overspeeding',
-                'overspeeding': 'Overspeeding',
-                'drunk driving': 'Drunk Driving',
-                'reckless driving': 'Reckless Driving',
-                'overloading': 'Overloading',
-                'fatigue': 'Fatigue',
-                'distracted driving': 'Distracted Driving',
-                'poor maintenance': 'Poor Maintenance',
-                'mechanical failure': 'Mechanical Failure',
-                'inexperience': 'Inexperience'
-            }
-            # Validate and clean input data
-            cleaned_data = {}
-            for key in default_values:
-                if key == 'Year':
-                    cleaned_data[key] = default_values[key]
-                elif key == 'Barangay':
-                    cleaned_data[key] = response.get('barangay', default_values[key])
-                elif key == 'Road_Accident_Type':
-                    cleaned_data[key] = cause_mapping.get(response.get('road_accident_type', '').lower(), default_values[key])
-                elif key == 'Accident_Cause':
-                    cleaned_data[key] = type_mapping.get(response.get('cause', '').lower(), default_values[key])
-            # Prepare DataFrame for prediction
-            input_df = pd.DataFrame([cleaned_data])
-            # Ensure all expected columns are present
-            expected_columns = road_accident_df.columns
-            for col in input_df.columns:
-                if input_df[col].dtype == object:
-                    input_df[col] = input_df[col].astype('category').cat.codes
-            input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
-            # Reorder columns to match training data
-            input_df = input_df[expected_columns]
-            # Make prediction
+                'Weather': response.get('weather', 'Unknown'),
+                'Road_Condition': response.get('road_condition', 'Unknown'),
+                'Vehicle_Type': response.get('vehicle_type', 'Unknown'),
+                'Driver_Age': response.get('driver_age', '0'),
+                'Driver_Gender': response.get('driver_gender', 'Unknown'),
+                'Accident_Cause': response.get('cause', 'Unknown'),
+                'Road_Accident_Type': response.get('road_accident_type', 'Unknown')
+            }])
+            required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
+            input_data = preprocess_input(input_data, required_columns)
             if road_accident_predictor:
-                prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-                response['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+                raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
+                response['prediction'] = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
                 logger.info(f"Prediction for PNP response: {response['prediction']}")
             else:
                 response['prediction'] = 'prediction_error'
@@ -1600,7 +1492,7 @@ def handle_health_response(data):
             INSERT INTO health_response (
                 alert_id, health_cause, health_type, patient_age, patient_gender, 
                 lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
             data.get('patient_age'), data.get('patient_gender'), data.get('lat'), data.get('lon'),
@@ -1621,137 +1513,118 @@ def handle_health_response(data):
     
     # Compute prediction using ML model on form data
     try:
-        # Default values for expected model features
-        default_values = {
+        # Preprocess categorical and numeric variables
+        def preprocess_input(input_data, required_columns):
+            input_data = input_data.copy()
+            for col in required_columns:
+                if col in input_data:
+                    if isinstance(input_data[col].iloc[0], str):
+                        input_data[col] = input_data[col].astype('category').cat.codes
+                    elif input_data[col].isna().any():
+                        input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
+            for col in ['Patient_Age']:
+                if col in input_data:
+                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
+            input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
+            return input_data
+
+        input_data = pd.DataFrame([{
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Health_Type': 'Heart Attack',
-            'Health_Cause': 'Chronic Illness'
-        }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'heart attack': 'Heart Attack',
-            'stroke': 'Stroke',
-            'fall': 'Fall',
-            'breathing difficulty': 'Breathing Difficulty',
-            'giving birth': 'Giving Birth',
-            'seizure': 'Seizure',
-            'burn': 'Burn',
-            'poisoning': 'Poisoning',
-            'allergic reaction': 'Allergic Reaction'
-        }
-        cause_mapping = {
-            'chronic illness': 'Chronic Illness',
-            'accident': 'Accident',
-            'allergy': 'Allergy',
-            'infection': 'Infection',
-            'pregnant': 'Pregnant',
-            'overdose': 'Overdose',
-            'heatstroke': 'Heatstroke'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Health_Type':
-                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
-            elif key == 'Health_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
-        
-        # Prepare features for prediction
-        features = [
-            cleaned_data['Year'],
-            cleaned_data['Barangay'],
-            cleaned_data['Health_Type'],
-            cleaned_data['Health_Cause']
-        ]
-        
-        # Call ML model
-        prediction = health_predictor.predict([features])[0] if 'health' in data.get('emergency_type').lower() else birth_predictor.predict([features])[0]
-        
-        # Get municipality from database
-        barangay = data.get('barangay')
-        conn = get_db_connection()
-        try:
-            municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
-            municipality = municipality['municipality'] if municipality else None
-        except Exception as e:
-            logger.error(f"Error fetching municipality: {e}")
-            municipality = None
-        finally:
-            conn.close()
-        
-        # Prepare response data
-        assigned_hospital = data.get('assigned_hospital', 'Unknown')
-        health_room = f"health_{municipality.lower()}" if municipality else "health"
-        
-        # Prepare chart data
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'health_type': {
-                'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
-                'datasets': [{
-                    'label': 'Health Emergency Type',
-                    'data': [1] if data.get('health_type') else [0],
-                    'backgroundColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                    'borderColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'health_cause': {
-                'labels': [data.get('health_cause', 'Unknown')] if data.get('health_cause') else ['No Data'],
-                'datasets': [{
-                    'label': 'Health Emergency Cause',
-                    'data': [1] if data.get('health_cause') else [0],
-                    'backgroundColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                    'borderColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'weather': {
-                'labels': [data.get('weather', 'Unknown')] if data.get('weather') else ['No Data'],
-                'datasets': [{
-                    'label': 'Weather Conditions',
-                    'data': [1] if data.get('weather') else [0],
-                    'backgroundColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                    'borderColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'patient_age': {
-                'labels': [data.get('patient_age', 'Unknown')] if data.get('patient_age') else ['No Data'],
-                'datasets': [{
-                    'label': 'Patient Age',
-                    'data': [1] if data.get('patient_age') else [0],
-                    'backgroundColor': ['#FFEEAD'] if data.get('patient_age') else ['#999999'],
-                    'borderColor': ['#FFEEAD'] if data.get('patient_age') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'patient_gender': {
-                'labels': [data.get('patient_gender', 'Unknown')] if data.get('patient_gender') else ['No Data'],
-                'datasets': [{
-                    'label': 'Patient Gender',
-                    'data': [1] if data.get('patient_gender') else [0],
-                    'backgroundColor': ['#D4A5A5'] if data.get('patient_gender') else ['#999999'],
-                    'borderColor': ['#D4A5A5'] if data.get('patient_gender') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'barangay': barangay,
-            'assigned_hospital': assigned_hospital,
-            'prediction': str(prediction)  # Ensure prediction is a string
-        }
-        logger.info(f"Emitting health_response_update with chart_data: {chart_data}")
-        emit('health_response_update', chart_data, room=health_room)
-        logger.info(f"Chart update emitted to room {health_room}")
+            'Weather': data.get('weather', 'Unknown'),
+            'Health_Type': data.get('health_type', 'Unknown'),
+            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Severity': data.get('severity', 'Unknown'),
+            'Patient_Age': data.get('patient_age', '0'),
+            'Patient_Gender': data.get('patient_gender', 'Unknown')
+        }])
+        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
+        input_data = preprocess_input(input_data, required_columns)
+        predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
+        raw_prediction = predictor.predict_proba(input_data)[0][1] * 100
+        prediction = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
+        data['prediction'] = prediction
+        logger.info(f"Prediction for Health response: {data['prediction']}")
     except Exception as e:
-        logger.error(f"Error in handle_health_response: {e}")
+        data['prediction'] = 'prediction_error'
+        logger.error(f"Error predicting health response: {e}")
+
+    # Get municipality from database
+    barangay = data.get('barangay')
+    conn = get_db_connection()
+    try:
+        municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
+        municipality = municipality['municipality'] if municipality else None
+    except Exception as e:
+        logger.error(f"Error fetching municipality: {e}")
+        municipality = None
+    finally:
+        conn.close()
+    
+    # Prepare response data
+    assigned_hospital = data.get('assigned_hospital', 'Unknown')
+    health_room = f"health_{municipality.lower()}" if municipality else "health"
+    
+    # Prepare chart data
+    chart_data = {
+        'alert_id': data.get('alert_id'),
+        'health_type': {
+            'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
+            'datasets': [{
+                'label': 'Health Emergency Type',
+                'data': [1] if data.get('health_type') else [0],
+                'backgroundColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
+                'borderColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
+                'borderWidth': 1
+            }]
+        },
+        'health_cause': {
+            'labels': [data.get('health_cause', 'Unknown')] if data.get('health_cause') else ['No Data'],
+            'datasets': [{
+                'label': 'Health Emergency Cause',
+                'data': [1] if data.get('health_cause') else [0],
+                'backgroundColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
+                'borderColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
+                'borderWidth': 1
+            }]
+        },
+        'weather': {
+            'labels': [data.get('weather', 'Unknown')] if data.get('weather') else ['No Data'],
+            'datasets': [{
+                'label': 'Weather Conditions',
+                'data': [1] if data.get('weather') else [0],
+                'backgroundColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
+                'borderColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
+                'borderWidth': 1
+            }]
+        },
+        'patient_age': {
+            'labels': [data.get('patient_age', 'Unknown')] if data.get('patient_age') else ['No Data'],
+            'datasets': [{
+                'label': 'Patient Age',
+                'data': [1] if data.get('patient_age') else [0],
+                'backgroundColor': ['#FFEEAD'] if data.get('patient_age') else ['#999999'],
+                'borderColor': ['#FFEEAD'] if data.get('patient_age') else ['#999999'],
+                'borderWidth': 1
+            }]
+        },
+        'patient_gender': {
+            'labels': [data.get('patient_gender', 'Unknown')] if data.get('patient_gender') else ['No Data'],
+            'datasets': [{
+                'label': 'Patient Gender',
+                'data': [1] if data.get('patient_gender') else [0],
+                'backgroundColor': ['#D4A5A5'] if data.get('patient_gender') else ['#999999'],
+                'borderColor': ['#D4A5A5'] if data.get('patient_gender') else ['#999999'],
+                'borderWidth': 1
+            }]
+        },
+        'barangay': barangay,
+        'assigned_hospital': assigned_hospital,
+        'prediction': str(data['prediction'])
+    }
+    logger.info(f"Emitting health_response_update with chart_data: {chart_data}")
+    socketio.emit('health_response_update', chart_data, room=health_room)
+    logger.info(f"Chart update emitted to room {health_room}")
 
 # In handle_hospital_response (remove duplicate patient_gender and ensure JSON-serializable data)
 def handle_hospital_response(data):
