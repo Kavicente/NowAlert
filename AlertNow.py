@@ -334,20 +334,19 @@ def handle_submit(data):
 
         # Preprocess categorical and numeric variables
         def preprocess_input(input_data, required_columns):
-            # Convert categorical columns to codes
+            input_data = input_data.copy()  # Create a copy to avoid modifying original data
             for col in required_columns:
                 if col in input_data:
-                    if input_data[col].dtype == 'object' or isinstance(input_data[col].iloc[0], str):
+                    if isinstance(input_data[col].iloc[0], str):
                         input_data[col] = input_data[col].astype('category').cat.codes
+                    elif input_data[col].isna().any():
+                        input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
             # Convert age columns to numeric, handling missing/invalid values
             for col in ['Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
                 if col in input_data:
-                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0).astype(int)
-            # Ensure all other columns are numeric where expected
-            for col in input_data.columns:
-                if col not in ['Year', 'Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
-                    if input_data[col].dtype == 'object':
-                        input_data[col] = input_data[col].astype('category').cat.codes
+                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
+            # Fill any remaining NaN values with defaults
+            input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
             return input_data
 
         if data.get('emergency_type') == 'Road Accident':
