@@ -1183,7 +1183,7 @@ def handle_barangay_response_submitted(data):
     
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
-    logger.info(f"Barangay response received: {data}")
+    logger.info(f"CDRRMO response received: {data}")
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     conn = get_db_connection()
@@ -1274,17 +1274,24 @@ def handle_cdrrmo_response_submitted(data):
         if road_accident_predictor:
             prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
             data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for barangay response: {data['prediction']}")
+            logger.info(f"Prediction for cdrrmo response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
             logger.error("Road accident predictor not loaded")
     except Exception as e:
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for barangay response: {e}")
+        logger.error(f"Error in prediction for cdrrmo response: {e}")
+    
+    responses.append(data)
+    
+    # Emit response to cdrrmo room
+    cdrrmo_room = f"cdrrmo_{data.get('municipality').lower() if data.get('municipality') else ''}"
+    emit('cdrrmo_response', data, room=cdrrmo_room)
+    logger.info(f"CDRRMO response emitted to room {cdrrmo_room}")
 
 @socketio.on('pnp_response')
 def handle_pnp_response_submitted(data):
-    logger.info(f"Barangay response received: {data}")
+    logger.info(f"PNP response received: {data}")
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     conn = get_db_connection()
@@ -1375,13 +1382,20 @@ def handle_pnp_response_submitted(data):
         if road_accident_predictor:
             prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
             data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for barangay response: {data['prediction']}")
+            logger.info(f"Prediction for pnp response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
             logger.error("Road accident predictor not loaded")
     except Exception as e:
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for barangay response: {e}")
+        logger.error(f"Error in prediction for pnp response: {e}")
+    
+    responses.append(data)
+    
+    # Emit response to pnp room
+    pnp_room = f"pnp_{data.get('municipality').lower() if data.get('municipality') else ''}"
+    emit('pnp_response', data, room=pnp_room)
+    logger.info(f"PNP response emitted to room {pnp_room}")
 
         
         
