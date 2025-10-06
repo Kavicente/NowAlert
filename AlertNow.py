@@ -1241,32 +1241,25 @@ def handle_cdrrmo_response_submitted(data):
         try:
             input_data = pd.DataFrame([{
                 'Year': datetime.now().year,
-                'Barangay': data.get('barangay', 'Unknown'),
-                'Weather': data.get('weather', 'Unknown'),
-                'Road_Condition': data.get('road_condition', 'Unknown'),
-                'Vehicle_Type': data.get('vehicle_type', 'Unknown'),
-                'Driver_Age': data.get('driver_age', '0'),
-                'Driver_Gender': data.get('driver_gender', 'Unknown'),
-                'Accident_Cause': data.get('cause', 'Unknown'),
-                'Road_Accident_Type': data.get('road_accident_type', 'Unknown')
+                'Barangay': response.get('barangay', 'Unknown'),
+                'Weather': response.get('weather', 'Unknown'),
+                'Road_Condition': response.get('road_condition', 'Unknown'),
+                'Vehicle_Type': response.get('vehicle_type', 'Unknown'),
+                'Driver_Age': response.get('driver_age', '0'),
+                'Driver_Gender': response.get('driver_gender', 'Unknown'),
+                'Accident_Cause': response.get('road_accident_cause', 'Unknown'),
+                'Road_Accident_Type': response.get('road_accident_type', 'Unknown')
             }])
             required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
             input_data = preprocess_input(input_data, required_columns)
-            raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
-            prediction = f"{raw_prediction:.1f}% chance in year {datetime.now().year,}"
+            if road_accident_predictor:
+                prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
+                response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year}"
+            else:
+                response['prediction'] = 'prediction_error'
         except Exception as e:
-            logger.error(f"Error predicting road accident: {e}")
-            prediction = 'prediction_error'
-        responses.append(response)
-        socketio.emit('cdrrmo_response', response, room=f'cdrrmo_{municipality}')
-        socketio.emit('update_analytics', response, room=f'cdrrmo_{municipality}')
-        logger.info(f"Analytics update emitted to cdrrmo_{municipality}")
-        socketio.emit('stats_update', {
-            'total_alerts': len(alerts),
-            'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
-            'today_responses': len(today_responses)
-        }, room=f'cdrrmo_{municipality}')
-        logger.info(f"CDRRMO response processed and emitted to cdrrmo_{municipality}")
+            response['prediction'] = 'prediction_error'
+            logger.error(f"Prediction error for CDRRMO response: {e}")
     except Exception as e:
         logger.error(f"Error processing CDRRMO response: {e}")
 
@@ -1328,31 +1321,25 @@ def handle_pnp_response_submitted(data):
         try:
             input_data = pd.DataFrame([{
                 'Year': datetime.now().year,
-                'Barangay': data.get('barangay', 'Unknown'),
-                'Weather': data.get('weather', 'Unknown'),
-                'Road_Condition': data.get('road_condition', 'Unknown'),
-                'Vehicle_Type': data.get('vehicle_type', 'Unknown'),
-                'Driver_Age': data.get('driver_age', '0'),
-                'Driver_Gender': data.get('driver_gender', 'Unknown'),
-                'Accident_Cause': data.get('cause', 'Unknown'),
-                'Road_Accident_Type': data.get('road_accident_type', 'Unknown')
+                'Barangay': response.get('barangay', 'Unknown'),
+                'Weather': response.get('weather', 'Unknown'),
+                'Road_Condition': response.get('road_condition', 'Unknown'),
+                'Vehicle_Type': response.get('vehicle_type', 'Unknown'),
+                'Driver_Age': response.get('driver_age', '0'),
+                'Driver_Gender': response.get('driver_gender', 'Unknown'),
+                'Accident_Cause': response.get('road_accident_cause', 'Unknown'),
+                'Road_Accident_Type': response.get('road_accident_type', 'Unknown')
             }])
             required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
             input_data = preprocess_input(input_data, required_columns)
-            raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
-            prediction = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
+            if road_accident_predictor:
+                prediction = road_accident_predictor.predict_proba(input_data)[:, 1][0] * 100
+                response['prediction'] = f"{prediction:.1f}% chance in year {datetime.now().year}"
+            else:
+                response['prediction'] = 'prediction_error'
         except Exception as e:
-            logger.error(f"Error predicting road accident: {e}")
-            prediction = 'prediction_error'
-        responses.append(response)
-        socketio.emit('pnp_response', response, room=f'pnp_{municipality}')
-        socketio.emit('update_analytics', response, room=f'pnp_{municipality}')
-        logger.info(f"Analytics update emitted to pnp_{municipality}")
-        socketio.emit('stats_update', {
-            'total_alerts': len(alerts),
-            'today_alerts': len([a for a in alerts if a.get('timestamp', '').startswith(datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d'))]),
-            'today_responses': len(today_responses)
-        }, room=f'pnp_{municipality}')
+            response['prediction'] = 'prediction_error'
+            logger.error(f"Prediction error for PNP response: {e}")
         logger.info(f"PNP response processed and emitted to pnp_{municipality}")
     except Exception as e:
         logger.error(f"Error processing PNP response: {e}")
