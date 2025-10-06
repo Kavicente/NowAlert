@@ -324,6 +324,21 @@ def handle_forward_alert(data):
         logger.error(f"Error forwarding alert: {e}")
 
 
+def preprocess_input(input_data, required_columns):
+    input_data = input_data.copy()  # Create a copy to avoid modifying original data
+    for col in required_columns:
+        if col in input_data:
+            if input_data[col].dtype == object:
+                input_data[col] = input_data[col].astype(str).replace('Unknown', '').astype('category').cat.codes
+            elif input_data[col].isna().any():
+                input_data[col] = input_data[col].fillna('').astype(str).astype('category').cat.codes
+    # Convert age columns to numeric, handling missing/invalid values
+    for col in ['Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
+        if col in input_data:
+            input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0).astype(int)
+    # Fill any remaining NaN values with defaults
+    input_data = input_data.fillna({'Barangay': '', 'Weather': '', 'Year': 0})
+    return input_data
 
 
 @socketio.on('response')
@@ -336,23 +351,6 @@ def handle_submit(data):
         current_year = int(datetime.now(manila).strftime('%Y'))
 
         prediction = 'N/A'
-
-        # Preprocess categorical and numeric variables
-        def preprocess_input(input_data, required_columns):
-            input_data = input_data.copy()  # Create a copy to avoid modifying original data
-            for col in required_columns:
-                if col in input_data:
-                    if isinstance(input_data[col].iloc[0], str):
-                        input_data[col] = input_data[col].astype('category').cat.codes
-                    elif input_data[col].isna().any():
-                        input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
-            # Convert age columns to numeric, handling missing/invalid values
-            for col in ['Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
-                if col in input_data:
-                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
-            # Fill any remaining NaN values with defaults
-            input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
-            return input_data
 
         if data.get('emergency_type') == 'Road Accident':
             cursor.execute('''
@@ -394,14 +392,14 @@ def handle_submit(data):
             try:
                 input_data = pd.DataFrame([{
                     'Year': current_year,
-                    'Barangay': data.get('barangay', 'Unknown'),
-                    'Weather': data.get('weather', 'Unknown'),
-                    'Road_Condition': data.get('road_condition', 'Unknown'),
-                    'Vehicle_Type': data.get('vehicle_type', 'Unknown'),
+                    'Barangay': data.get('barangay', ''),
+                    'Weather': data.get('weather', ''),
+                    'Road_Condition': data.get('road_condition', ''),
+                    'Vehicle_Type': data.get('vehicle_type', ''),
                     'Driver_Age': data.get('driver_age', '0'),
-                    'Driver_Gender': data.get('driver_gender', 'Unknown'),
-                    'Accident_Cause': data.get('road_accident_cause', 'Unknown'),
-                    'Road_Accident_Type': data.get('road_accident_type', 'Unknown')
+                    'Driver_Gender': data.get('driver_gender', ''),
+                    'Accident_Cause': data.get('road_accident_cause', ''),
+                    'Road_Accident_Type': data.get('road_accident_type', '')
                 }])
                 required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
                 input_data = preprocess_input(input_data, required_columns)
@@ -438,11 +436,11 @@ def handle_submit(data):
             try:
                 input_data = pd.DataFrame([{
                     'Year': current_year,
-                    'Barangay': data.get('barangay', 'Unknown'),
-                    'Weather': data.get('weather', 'Unknown'),
-                    'Fire_Cause': data.get('fire_cause', 'Unknown'),
-                    'Fire_Type': data.get('fire_type', 'Unknown'),
-                    'Fire_Severity': data.get('fire_severity', 'Unknown')
+                    'Barangay': data.get('barangay', ''),
+                    'Weather': data.get('weather', ''),
+                    'Fire_Cause': data.get('fire_cause', ''),
+                    'Fire_Type': data.get('fire_type', ''),
+                    'Fire_Severity': data.get('fire_severity', '')
                 }])
                 required_columns = ['Weather', 'Fire_Cause', 'Fire_Type', 'Fire_Severity']
                 input_data = preprocess_input(input_data, required_columns)
@@ -480,12 +478,12 @@ def handle_submit(data):
             try:
                 input_data = pd.DataFrame([{
                     'Year': current_year,
-                    'Barangay': data.get('barangay', 'Unknown'),
-                    'Crime_Type': data.get('crime_type', 'Unknown'),
-                    'Crime_Cause': data.get('crime_cause', 'Unknown'),
-                    'Level': data.get('level', 'Unknown'),
-                    'Suspect_Gender': data.get('suspect_gender', 'Unknown'),
-                    'Victim_Gender': data.get('victim_gender', 'Unknown'),
+                    'Barangay': data.get('barangay', ''),
+                    'Crime_Type': data.get('crime_type', ''),
+                    'Crime_Cause': data.get('crime_cause', ''),
+                    'Level': data.get('level', ''),
+                    'Suspect_Gender': data.get('suspect_gender', ''),
+                    'Victim_Gender': data.get('victim_gender', ''),
                     'Suspect_Age': data.get('suspect_age', '0'),
                     'Victim_Age': data.get('victim_age', '0')
                 }])
@@ -507,7 +505,7 @@ def handle_submit(data):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
-                data.get('weather'), data.get('patient_age', '0'), data.get('patient_gender', 'Unknown'),
+                data.get('weather'), data.get('patient_age', '0'), data.get('patient_gender', ''),
                 data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
                 timestamp, True
             ))
@@ -518,20 +516,20 @@ def handle_submit(data):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
-                data.get('weather'), data.get('patient_age', '0'), data.get('patient_gender', 'Unknown'),
+                data.get('weather'), data.get('patient_age', '0'), data.get('patient_gender', ''),
                 data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
-                timestamp, True, data.get('assigned_hospital', 'Unknown')
+                timestamp, True, data.get('assigned_hospital', '')
             ))
             try:
                 input_data = pd.DataFrame([{
                     'Year': current_year,
-                    'Barangay': data.get('barangay', 'Unknown'),
-                    'Weather': data.get('weather', 'Unknown'),
-                    'Health_Type': data.get('health_type', 'Unknown'),
-                    'Health_Cause': data.get('health_cause', 'Unknown'),
-                    'Severity': data.get('severity', 'Unknown'),
+                    'Barangay': data.get('barangay', ''),
+                    'Weather': data.get('weather', ''),
+                    'Health_Type': data.get('health_type', ''),
+                    'Health_Cause': data.get('health_cause', ''),
+                    'Severity': data.get('severity', ''),
                     'Patient_Age': data.get('patient_age', '0'),
-                    'Patient_Gender': data.get('patient_gender', 'Unknown')
+                    'Patient_Gender': data.get('patient_gender', '')
                 }])
                 required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
                 input_data = preprocess_input(input_data, required_columns)
@@ -1197,7 +1195,7 @@ def handle_cdrrmo_response_submitted(data):
             'vehicle_type': data.get('vehicle_type', 'N/A'),
             'driver_age': data.get('driver_age', 'N/A'),
             'driver_gender': data.get('driver_gender', 'N/A'),
-            'road_accident_type': data.get('road_accident_type', 'N/A'),
+            'road_accident_type': data.get('accident_type', 'N/A'),
             'cause': data.get('cause', 'N/A'),
             'lat': data.get('lat', 0.0),
             'lon': data.get('lon', 0.0),
@@ -1234,37 +1232,68 @@ def handle_cdrrmo_response_submitted(data):
             today_responses.append(response)
         # Compute prediction using ML model on form data
         try:
-            # Preprocess categorical and numeric variables
-            def preprocess_input(input_data, required_columns):
-                input_data = input_data.copy()
-                for col in required_columns:
-                    if col in input_data:
-                        if isinstance(input_data[col].iloc[0], str):
-                            input_data[col] = input_data[col].astype('category').cat.codes
-                        elif input_data[col].isna().any():
-                            input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
-                for col in ['Driver_Age']:
-                    if col in input_data:
-                        input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
-                input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
-                return input_data
-
-            input_data = pd.DataFrame([{
+            # Default values for expected model features
+            default_values = {
                 'Year': datetime.now().year,
-                'Barangay': response.get('barangay', 'Unknown'),
-                'Weather': response.get('weather', 'Unknown'),
-                'Road_Condition': response.get('road_condition', 'Unknown'),
-                'Vehicle_Type': response.get('vehicle_type', 'Unknown'),
+                'Barangay': response.get('barangay', ''),
+                'Weather': response.get('weather', ''),
+                'Road_Condition': response.get('road_condition', ''),
+                'Vehicle_Type': response.get('vehicle_type', ''),
                 'Driver_Age': response.get('driver_age', '0'),
-                'Driver_Gender': response.get('driver_gender', 'Unknown'),
-                'Accident_Cause': response.get('cause', 'Unknown'),
-                'Road_Accident_Type': response.get('road_accident_type', 'Unknown')
-            }])
+                'Driver_Gender': response.get('driver_gender', ''),
+                'Accident_Cause': response.get('cause', ''),
+                'Road_Accident_Type': response.get('road_accident_type', '')
+            }
+            # Map input values to dataset categories
+            type_mapping = {
+                'collision': 'Head-on collision',
+                'head-on collision': 'Head-on collision',
+                'rear-end collision': 'Rear-end collision',
+                'side-impact collision': 'Side-impact collision',
+                'single vehicle accident': 'Single vehicle accident',
+                'pedestrian accident': 'Pedestrian accident'
+            }
+            cause_mapping = {
+                'speeding': 'Overspeeding',
+                'overspeeding': 'Overspeeding',
+                'drunk driving': 'Drunk Driving',
+                'reckless driving': 'Reckless Driving',
+                'overloading': 'Overloading',
+                'fatigue': 'Fatigue',
+                'distracted driving': 'Distracted Driving',
+                'poor maintenance': 'Poor Maintenance',
+                'mechanical failure': 'Mechanical Failure',
+                'inexperience': 'Inexperience'
+            }
+            # Validate and clean input data
+            cleaned_data = {}
+            for key in default_values:
+                if key == 'Year':
+                    cleaned_data[key] = default_values[key]
+                elif key == 'Barangay':
+                    cleaned_data[key] = response.get('barangay', default_values[key])
+                elif key == 'Road_Accident_Type':
+                    cleaned_data[key] = type_mapping.get(response.get('road_accident_type', '').lower(), default_values[key])
+                elif key == 'Accident_Cause':
+                    cleaned_data[key] = cause_mapping.get(response.get('cause', '').lower(), default_values[key])
+                else:
+                    cleaned_data[key] = default_values[key]
+            # Prepare DataFrame for prediction
+            input_df = pd.DataFrame([cleaned_data])
+            # Preprocess input data
             required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
-            input_data = preprocess_input(input_data, required_columns)
+            input_df = preprocess_input(input_df, required_columns)
+            # Ensure all expected columns are present
+            expected_columns = road_accident_df.columns
+            for col in expected_columns:
+                if col not in input_df:
+                    input_df[col] = 0
+            # Reorder columns to match training data
+            input_df = input_df[expected_columns]
+            # Make prediction
             if road_accident_predictor:
-                raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
-                response['prediction'] = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
+                prediction = road_accident_predictor.predict_proba(input_df)[0][1] * 100
+                response['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
                 logger.info(f"Prediction for CDRRMO response: {response['prediction']}")
             else:
                 response['prediction'] = 'prediction_error'
@@ -1304,7 +1333,7 @@ def handle_pnp_response_submitted(data):
             'vehicle_type': data.get('vehicle_type', 'N/A'),
             'driver_age': data.get('driver_age', 'N/A'),
             'driver_gender': data.get('driver_gender', 'N/A'),
-            'road_accident_type': data.get('road_accident_type', 'N/A'),
+            'road_accident_type': data.get('accident_type', 'N/A'),
             'cause': data.get('cause', 'N/A'),
             'lat': data.get('lat', 0.0),
             'lon': data.get('lon', 0.0),
@@ -1341,37 +1370,68 @@ def handle_pnp_response_submitted(data):
             today_responses.append(response)
         # Compute prediction using ML model on form data
         try:
-            # Preprocess categorical and numeric variables
-            def preprocess_input(input_data, required_columns):
-                input_data = input_data.copy()
-                for col in required_columns:
-                    if col in input_data:
-                        if isinstance(input_data[col].iloc[0], str):
-                            input_data[col] = input_data[col].astype('category').cat.codes
-                        elif input_data[col].isna().any():
-                            input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
-                for col in ['Driver_Age']:
-                    if col in input_data:
-                        input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
-                input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
-                return input_data
-
-            input_data = pd.DataFrame([{
+            # Default values for expected model features
+            default_values = {
                 'Year': datetime.now().year,
-                'Barangay': response.get('barangay', 'Unknown'),
-                'Weather': response.get('weather', 'Unknown'),
-                'Road_Condition': response.get('road_condition', 'Unknown'),
-                'Vehicle_Type': response.get('vehicle_type', 'Unknown'),
+                'Barangay': response.get('barangay', ''),
+                'Weather': response.get('weather', ''),
+                'Road_Condition': response.get('road_condition', ''),
+                'Vehicle_Type': response.get('vehicle_type', ''),
                 'Driver_Age': response.get('driver_age', '0'),
-                'Driver_Gender': response.get('driver_gender', 'Unknown'),
-                'Accident_Cause': response.get('cause', 'Unknown'),
-                'Road_Accident_Type': response.get('road_accident_type', 'Unknown')
-            }])
+                'Driver_Gender': response.get('driver_gender', ''),
+                'Accident_Cause': response.get('cause', ''),
+                'Road_Accident_Type': response.get('road_accident_type', '')
+            }
+            # Map input values to dataset categories
+            type_mapping = {
+                'collision': 'Head-on collision',
+                'head-on collision': 'Head-on collision',
+                'rear-end collision': 'Rear-end collision',
+                'side-impact collision': 'Side-impact collision',
+                'single vehicle accident': 'Single vehicle accident',
+                'pedestrian accident': 'Pedestrian accident'
+            }
+            cause_mapping = {
+                'speeding': 'Overspeeding',
+                'overspeeding': 'Overspeeding',
+                'drunk driving': 'Drunk Driving',
+                'reckless driving': 'Reckless Driving',
+                'overloading': 'Overloading',
+                'fatigue': 'Fatigue',
+                'distracted driving': 'Distracted Driving',
+                'poor maintenance': 'Poor Maintenance',
+                'mechanical failure': 'Mechanical Failure',
+                'inexperience': 'Inexperience'
+            }
+            # Validate and clean input data
+            cleaned_data = {}
+            for key in default_values:
+                if key == 'Year':
+                    cleaned_data[key] = default_values[key]
+                elif key == 'Barangay':
+                    cleaned_data[key] = response.get('barangay', default_values[key])
+                elif key == 'Road_Accident_Type':
+                    cleaned_data[key] = type_mapping.get(response.get('road_accident_type', '').lower(), default_values[key])
+                elif key == 'Accident_Cause':
+                    cleaned_data[key] = cause_mapping.get(response.get('cause', '').lower(), default_values[key])
+                else:
+                    cleaned_data[key] = default_values[key]
+            # Prepare DataFrame for prediction
+            input_df = pd.DataFrame([cleaned_data])
+            # Preprocess input data
             required_columns = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
-            input_data = preprocess_input(input_data, required_columns)
+            input_df = preprocess_input(input_df, required_columns)
+            # Ensure all expected columns are present
+            expected_columns = road_accident_df.columns
+            for col in expected_columns:
+                if col not in input_df:
+                    input_df[col] = 0
+            # Reorder columns to match training data
+            input_df = input_df[expected_columns]
+            # Make prediction
             if road_accident_predictor:
-                raw_prediction = road_accident_predictor.predict_proba(input_data)[0][1] * 100
-                response['prediction'] = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
+                prediction = road_accident_predictor.predict_proba(input_df)[0][1] * 100
+                response['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
                 logger.info(f"Prediction for PNP response: {response['prediction']}")
             else:
                 response['prediction'] = 'prediction_error'
@@ -1495,7 +1555,7 @@ def handle_health_response(data):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
-            data.get('patient_age'), data.get('patient_gender'), data.get('lat'), data.get('lon'),
+            data.get('patient_age', '0'), data.get('patient_gender', ''), data.get('lat'), data.get('lon'),
             data.get('barangay'), data.get('emergency_type'), data['timestamp']
         ))
         conn.commit()
@@ -1513,42 +1573,81 @@ def handle_health_response(data):
     
     # Compute prediction using ML model on form data
     try:
-        # Preprocess categorical and numeric variables
-        def preprocess_input(input_data, required_columns):
-            input_data = input_data.copy()
-            for col in required_columns:
-                if col in input_data:
-                    if isinstance(input_data[col].iloc[0], str):
-                        input_data[col] = input_data[col].astype('category').cat.codes
-                    elif input_data[col].isna().any():
-                        input_data[col] = input_data[col].fillna('Unknown').astype('category').cat.codes
-            for col in ['Patient_Age']:
-                if col in input_data:
-                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
-            input_data = input_data.fillna({'Barangay': 'Unknown', 'Weather': 'Unknown', 'Year': 0})
-            return input_data
-
-        input_data = pd.DataFrame([{
+        # Default values for expected model features
+        default_values = {
             'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Weather': data.get('weather', 'Unknown'),
-            'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
-            'Severity': data.get('severity', 'Unknown'),
+            'Barangay': data.get('barangay', ''),
+            'Weather': data.get('weather', ''),
+            'Health_Type': data.get('health_type', ''),
+            'Health_Cause': data.get('health_cause', ''),
+            'Severity': data.get('severity', ''),
             'Patient_Age': data.get('patient_age', '0'),
-            'Patient_Gender': data.get('patient_gender', 'Unknown')
-        }])
+            'Patient_Gender': data.get('patient_gender', '')
+        }
+        
+        # Map input values to dataset categories
+        type_mapping = {
+            'heart attack': 'Heart Attack',
+            'stroke': 'Stroke',
+            'fall': 'Fall',
+            'breathing difficulty': 'Breathing Difficulty',
+            'giving birth': 'Giving Birth',
+            'seizure': 'Seizure',
+            'burn': 'Burn',
+            'poisoning': 'Poisoning',
+            'allergic reaction': 'Allergic Reaction'
+        }
+        cause_mapping = {
+            'chronic illness': 'Chronic Illness',
+            'accident': 'Accident',
+            'allergy': 'Allergy',
+            'infection': 'Infection',
+            'pregnant': 'Pregnant',
+            'overdose': 'Overdose',
+            'heatstroke': 'Heatstroke'
+        }
+        
+        # Validate and clean input data
+        cleaned_data = {}
+        for key in default_values:
+            if key == 'Year':
+                cleaned_data[key] = default_values[key]
+            elif key == 'Barangay':
+                cleaned_data[key] = data.get('barangay', default_values[key])
+            elif key == 'Health_Type':
+                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
+            elif key == 'Health_Cause':
+                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+            else:
+                cleaned_data[key] = default_values[key]
+        
+        # Prepare DataFrame for prediction
+        input_df = pd.DataFrame([cleaned_data])
+        # Preprocess input data
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
-        input_data = preprocess_input(input_data, required_columns)
+        input_df = preprocess_input(input_df, required_columns)
+        # Ensure all expected columns are present
+        expected_columns = health_predictor._get_param_names() if data.get('emergency_type') == 'Health Emergency' else birth_predictor._get_param_names()
+        for col in expected_columns:
+            if col not in input_df:
+                input_df[col] = 0
+        # Reorder columns to match training data
+        input_df = input_df[expected_columns]
+        # Make prediction
         predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
-        raw_prediction = predictor.predict_proba(input_data)[0][1] * 100
-        prediction = f"{raw_prediction:.1f}% chance in year {datetime.now().year}"
-        data['prediction'] = prediction
-        logger.info(f"Prediction for Health response: {data['prediction']}")
+        prediction = predictor.predict_proba(input_df)[0][1] * 100
+        chart_data = {
+            'alert_id': data.get('alert_id'),
+            'prediction': f"{prediction:.2f}% chance in year {datetime.now().year}"
+        }
+        logger.info(f"Prediction for health response: {chart_data['prediction']}")
     except Exception as e:
-        data['prediction'] = 'prediction_error'
+        chart_data = {
+            'alert_id': data.get('alert_id'),
+            'prediction': 'prediction_error'
+        }
         logger.error(f"Error predicting health response: {e}")
-
+    
     # Get municipality from database
     barangay = data.get('barangay')
     conn = get_db_connection()
@@ -1562,12 +1661,11 @@ def handle_health_response(data):
         conn.close()
     
     # Prepare response data
-    assigned_hospital = data.get('assigned_hospital', 'Unknown')
+    assigned_hospital = data.get('assigned_hospital', '')
     health_room = f"health_{municipality.lower()}" if municipality else "health"
     
     # Prepare chart data
-    chart_data = {
-        'alert_id': data.get('alert_id'),
+    chart_data.update({
         'health_type': {
             'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
             'datasets': [{
@@ -1619,9 +1717,8 @@ def handle_health_response(data):
             }]
         },
         'barangay': barangay,
-        'assigned_hospital': assigned_hospital,
-        'prediction': str(data['prediction'])
-    }
+        'assigned_hospital': assigned_hospital
+    })
     logger.info(f"Emitting health_response_update with chart_data: {chart_data}")
     socketio.emit('health_response_update', chart_data, room=health_room)
     logger.info(f"Chart update emitted to room {health_room}")
