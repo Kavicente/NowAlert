@@ -727,13 +727,13 @@ def handle_submit_response(data):
                 INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-            #prediction = handle_cdrrmo_response_submitted(data)
+            prediction = handle_cdrrmo_response_submitted(data)
         elif role == 'pnp':
             conn.execute('''
                 INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-            #prediction = handle_pnp_response_submitted(data)
+            prediction = handle_pnp_response_submitted(data)
         elif role == 'bfp':
             # Existing BFP logic remains unchanged
             pass
@@ -1078,52 +1078,25 @@ def handle_barangay_response_submitted(data):
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     conn = get_db_connection()
-    if data.get('emergency_type') == 'Road Accident':
-        if data.get('role') == 'barangay':
-            conn.execute('''
-                INSERT INTO barangay_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, 
-                    road_condition, vehicle_type, driver_age, driver_gender, 
-                    lat, lon, barangay, emergency_type, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
-                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
-                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
-                data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-            ))
-            conn.commit()
-            logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
-        elif data.get('role') == 'cdrrmo':
-            conn.execute('''
-                INSERT INTO cdrrmo_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, 
-                    road_condition, vehicle_type, driver_age, driver_gender, 
-                    lat, lon, barangay, emergency_type, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
-                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
-                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
-                data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-            ))
-            conn.commit()
-            logger.info(f"Stored cdrrmo response for alert_id: {data.get('alert_id')}")
-        elif data.get('role') == 'pnp':
-            conn.execute('''
-                INSERT INTO pnp_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, 
-                    road_condition, vehicle_type, driver_age, driver_gender, 
-                    lat, lon, barangay, emergency_type, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
-                data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
-                data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
-                data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-            ))
-            conn.commit()
-            logger.info(f"Stored pnp response for alert_id: {data.get('alert_id')}")
+    try:
+        conn.execute('''
+            INSERT INTO barangay_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        conn.commit()
+        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing barangay response: {e}")
+    finally:
+        conn.close()
     
     
     # Check if response is today for analytics
@@ -1204,15 +1177,213 @@ def handle_barangay_response_submitted(data):
     
     # Emit response to barangay room
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-    cdrrmo_room = f"cdrrmo_{data.get('municipality').lower() if data.get('municipality') else ''}"
-    pnp_room = f"pnp_{data.get('municipality').lower() if data.get('municipality') else ''}"
     emit('barangay_response', data, room=barangay_room)
-    emit('cdrrmo_response', data, room=cdrrmo_room)
-    emit('pnp_response', data, room=pnp_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
     
     
+@socketio.on('cdrrmo_response')
+def handle_cdrrmo_response_submitted(data):
+    logger.info(f"Barangay response received: {data}")
+    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO cdrrmo_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        conn.commit()
+        logger.info(f"Stored cdrrmo response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing cdrrmo response: {e}")
+    finally:
+        conn.close()
+    
+    
+    # Check if response is today for analytics
+    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+    today = datetime.now(pytz.timezone('Asia/Manila')).date()
+    if response_time.date() == today:
+        today_responses.append(data)
+    
+    # Compute prediction using ML model on form data
+    try:
+        # Default values for expected model features
+        default_values = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Road_Accident_Type': 'Overspeeding',
+            'Accident_Cause': 'Head-on collision'
+        }
+        
+        # Map input values to dataset categories
+        type_mapping = {
+            'collision': 'Head-on collision',
+            'head-on collision': 'Head-on collision',
+            'rear-end collision': 'Rear-end collision',
+            'side-impact collision': 'Side-impact collision',
+            'single vehicle accident': 'Single vehicle accident',
+            'pedestrian accident': 'Pedestrian accident'
+        }
+        cause_mapping = {
+            'speeding': 'Overspeeding',
+            'overspeeding': 'Overspeeding',
+            'drunk driving': 'Drunk Driving',
+            'reckless driving': 'Reckless Driving',
+            'overloading': 'Overloading',
+            'fatigue': 'Fatigue',
+            'distracted driving': 'Distracted Driving',
+            'poor maintenance': 'Poor Maintenance',
+            'mechanical failure': 'Mechanical Failure',
+            'inexperience': 'Inexperience'
+        }
+        
+        # Validate and clean input data
+        cleaned_data = {}
+        for key in default_values:
+            if key == 'Year':
+                cleaned_data[key] = default_values[key]
+            elif key == 'Barangay':
+                cleaned_data[key] = data.get('barangay', default_values[key])
+            elif key == 'Road_Accident_Type':
+                cleaned_data[key] = cause_mapping.get(data.get('road_accident_type', '').lower(), default_values[key])
+            elif key == 'Accident_Cause':
+                cleaned_data[key] = type_mapping.get(data.get('cause', '').lower(), default_values[key])
+        
+        # Prepare DataFrame for prediction
+        input_df = pd.DataFrame([cleaned_data])
+        
+        # Ensure all expected columns are present
+        expected_columns = road_accident_df.columns
+        for col in expected_columns:
+            if col not in input_df.columns:
+                input_df[col] = 0
+        
+        # Reorder columns to match training data
+        input_df = input_df[expected_columns]
+        
+        # Make prediction
+        if road_accident_predictor:
+            prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            logger.info(f"Prediction for barangay response: {data['prediction']}")
+        else:
+            data['prediction'] = 'prediction_error'
+            logger.error("Road accident predictor not loaded")
+    except Exception as e:
+        data['prediction'] = 'prediction_error'
+        logger.error(f"Error in prediction for barangay response: {e}")
 
+@socketio.on('pnp_response')
+def handle_pnp_response_submitted(data):
+    logger.info(f"Barangay response received: {data}")
+    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO pnp_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        ))
+        conn.commit()
+        logger.info(f"Stored pnp response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing pnp response: {e}")
+    finally:
+        conn.close()
+    
+    
+    # Check if response is today for analytics
+    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
+    today = datetime.now(pytz.timezone('Asia/Manila')).date()
+    if response_time.date() == today:
+        today_responses.append(data)
+    
+    # Compute prediction using ML model on form data
+    try:
+        # Default values for expected model features
+        default_values = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Road_Accident_Type': 'Overspeeding',
+            'Accident_Cause': 'Head-on collision'
+        }
+        
+        # Map input values to dataset categories
+        type_mapping = {
+            'collision': 'Head-on collision',
+            'head-on collision': 'Head-on collision',
+            'rear-end collision': 'Rear-end collision',
+            'side-impact collision': 'Side-impact collision',
+            'single vehicle accident': 'Single vehicle accident',
+            'pedestrian accident': 'Pedestrian accident'
+        }
+        cause_mapping = {
+            'speeding': 'Overspeeding',
+            'overspeeding': 'Overspeeding',
+            'drunk driving': 'Drunk Driving',
+            'reckless driving': 'Reckless Driving',
+            'overloading': 'Overloading',
+            'fatigue': 'Fatigue',
+            'distracted driving': 'Distracted Driving',
+            'poor maintenance': 'Poor Maintenance',
+            'mechanical failure': 'Mechanical Failure',
+            'inexperience': 'Inexperience'
+        }
+        
+        # Validate and clean input data
+        cleaned_data = {}
+        for key in default_values:
+            if key == 'Year':
+                cleaned_data[key] = default_values[key]
+            elif key == 'Barangay':
+                cleaned_data[key] = data.get('barangay', default_values[key])
+            elif key == 'Road_Accident_Type':
+                cleaned_data[key] = cause_mapping.get(data.get('road_accident_type', '').lower(), default_values[key])
+            elif key == 'Accident_Cause':
+                cleaned_data[key] = type_mapping.get(data.get('cause', '').lower(), default_values[key])
+        
+        # Prepare DataFrame for prediction
+        input_df = pd.DataFrame([cleaned_data])
+        
+        # Ensure all expected columns are present
+        expected_columns = road_accident_df.columns
+        for col in expected_columns:
+            if col not in input_df.columns:
+                input_df[col] = 0
+        
+        # Reorder columns to match training data
+        input_df = input_df[expected_columns]
+        
+        # Make prediction
+        if road_accident_predictor:
+            prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            logger.info(f"Prediction for barangay response: {data['prediction']}")
+        else:
+            data['prediction'] = 'prediction_error'
+            logger.error("Road accident predictor not loaded")
+    except Exception as e:
+        data['prediction'] = 'prediction_error'
+        logger.error(f"Error in prediction for barangay response: {e}")
+
+        
         
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
