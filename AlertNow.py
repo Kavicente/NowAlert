@@ -12,6 +12,9 @@ from collections import Counter
 from datetime import datetime, timedelta
 import pytz
 import pandas as pd
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 import uuid
 from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
 from BarangayDashboard import get_barangay_stats, get_latest_alert
@@ -319,6 +322,66 @@ def handle_forward_alert(data):
             logger.info(f"Alert {alert_id} forwarded to {target_role}_{municipality.lower()}")
     except Exception as e:
         logger.error(f"Error forwarding alert: {e}")
+
+
+def predict_road_accident(data):
+    try:
+        # Create DataFrame from input data
+        df = pd.DataFrame([data])
+        
+        # Define features for road accident prediction
+        categorical_features = ['Weather', 'Road_Condition', 'Vehicle_Type', 'Driver_Gender', 'Accident_Cause', 'Road_Accident_Type']
+        numeric_features = ['Driver_Age', 'Latitude', 'Longitude']
+        
+        # Handle missing values
+        for col in categorical_features:
+            df[col] = df[col].fillna('Unknown')
+        for col in numeric_features:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Load the preprocessor from the trained pipeline
+        pipe = joblib.load('road_predictor_lr.pkl')
+        preprocessor = pipe.named_steps['preprocessor']
+        
+        # Transform the data
+        X = preprocessor.transform(df)
+        
+        # Predict probability
+        probability = pipe.predict_proba(X)[0][1] * 100
+        return f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+    except Exception as e:
+        logger.error(f"Error predicting road accident: {e}")
+        return "prediction_error"
+
+# Modified prediction logic for health_predictor
+def predict_health_emergency(data):
+    try:
+        # Create DataFrame from input data
+        df = pd.DataFrame([data])
+        
+        # Define features for health emergency prediction
+        categorical_features = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Day_of_Week']
+        numeric_features = ['Latitude', 'Longitude', 'Patient_Count', 'Response_Time', 'Treatment_Time']
+        
+        # Handle missing values
+        for col in categorical_features:
+            df[col] = df[col].fillna('Unknown')
+        for col in numeric_features:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+        
+        # Load the preprocessor from the trained pipeline
+        pipe = joblib.load('health_predictor_lr.pkl')
+        preprocessor = pipe.named_steps['preprocessor']
+        
+        # Transform the data
+        X = preprocessor.transform(df)
+        
+        # Predict probability
+        probability = pipe.predict_proba(X)[0][1] * 100
+        return f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+    except Exception as e:
+        logger.error(f"Error predicting health emergency: {e}")
+        return "prediction_error"
 
 
 @socketio.on('response')
