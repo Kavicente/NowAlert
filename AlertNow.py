@@ -332,15 +332,22 @@ def handle_submit(data):
 
         prediction = 'N/A'
 
-        # Preprocess categorical variables and handle numeric conversions
+        # Preprocess categorical and numeric variables
         def preprocess_input(input_data, required_columns):
+            # Convert categorical columns to codes
             for col in required_columns:
-                if col in input_data and isinstance(input_data[col].iloc[0], str):
-                    input_data[col] = input_data[col].astype('category').cat.codes
+                if col in input_data:
+                    if input_data[col].dtype == 'object' or isinstance(input_data[col].iloc[0], str):
+                        input_data[col] = input_data[col].astype('category').cat.codes
             # Convert age columns to numeric, handling missing/invalid values
             for col in ['Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
                 if col in input_data:
-                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0)
+                    input_data[col] = pd.to_numeric(input_data[col], errors='coerce').fillna(0).astype(int)
+            # Ensure all other columns are numeric where expected
+            for col in input_data.columns:
+                if col not in ['Year', 'Driver_Age', 'Suspect_Age', 'Victim_Age', 'Patient_Age']:
+                    if input_data[col].dtype == 'object':
+                        input_data[col] = input_data[col].astype('category').cat.codes
             return input_data
 
         if data.get('emergency_type') == 'Road Accident':
@@ -387,7 +394,7 @@ def handle_submit(data):
                     'Weather': data.get('weather', 'Unknown'),
                     'Road_Condition': data.get('road_condition', 'Unknown'),
                     'Vehicle_Type': data.get('vehicle_type', 'Unknown'),
-                    'Driver_Age': data.get('driver_age', 0),
+                    'Driver_Age': data.get('driver_age', '0'),
                     'Driver_Gender': data.get('driver_gender', 'Unknown'),
                     'Accident_Cause': data.get('road_accident_cause', 'Unknown'),
                     'Road_Accident_Type': data.get('road_accident_type', 'Unknown')
@@ -475,8 +482,8 @@ def handle_submit(data):
                     'Level': data.get('level', 'Unknown'),
                     'Suspect_Gender': data.get('suspect_gender', 'Unknown'),
                     'Victim_Gender': data.get('victim_gender', 'Unknown'),
-                    'Suspect_Age': data.get('suspect_age', 0),
-                    'Victim_Age': data.get('victim_age', 0)
+                    'Suspect_Age': data.get('suspect_age', '0'),
+                    'Victim_Age': data.get('victim_age', '0')
                 }])
                 required_columns = ['Crime_Type', 'Crime_Cause', 'Level', 'Suspect_Gender', 'Victim_Gender']
                 input_data = preprocess_input(input_data, required_columns)
@@ -496,7 +503,7 @@ def handle_submit(data):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
-                data.get('weather'), data.get('patient_age', 'Unknown'), data.get('patient_gender', 'Unknown'),
+                data.get('weather'), data.get('patient_age', '0'), data.get('patient_gender', 'Unknown'),
                 data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
                 timestamp, True
             ))
@@ -507,7 +514,7 @@ def handle_submit(data):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('alert_id'), data.get('health_type'), data.get('health_cause'),
-                data.get('weather'), data.get('patient_age', 'Unknown'), data.get('patient_gender', 'Unknown'),
+                data.get('weather'), data.get('patient_age', '0'), data.get('patient_gender', 'Unknown'),
                 data.get('lat'), data.get('lon'), data.get('barangay'), data.get('emergency_type'),
                 timestamp, True, data.get('assigned_hospital', 'Unknown')
             ))
@@ -519,7 +526,7 @@ def handle_submit(data):
                     'Health_Type': data.get('health_type', 'Unknown'),
                     'Health_Cause': data.get('health_cause', 'Unknown'),
                     'Severity': data.get('severity', 'Unknown'),
-                    'Patient_Age': data.get('patient_age', 'Unknown'),
+                    'Patient_Age': data.get('patient_age', '0'),
                     'Patient_Gender': data.get('patient_gender', 'Unknown')
                 }])
                 required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
