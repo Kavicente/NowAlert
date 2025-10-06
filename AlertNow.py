@@ -1521,6 +1521,9 @@ def handle_health_response(data):
     # Compute prediction using ML model on form data
     try:
         # Default values for expected model features
+        patient_age = pd.to_numeric(data.get('patient_age', '0'), errors='coerce')
+        if pd.isna(patient_age):
+            patient_age = 0
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
@@ -1528,7 +1531,7 @@ def handle_health_response(data):
             'Health_Type': data.get('health_type', 'Unknown'),
             'Health_Cause': data.get('health_cause', 'Unknown'),
             'Severity': data.get('severity', 'Unknown'),
-            'Patient_Age': pd.to_numeric(data.get('patient_age', '0'), errors='coerce').fillna(0),
+            'Patient_Age': patient_age,
             'Patient_Gender': data.get('patient_gender', 'Unknown')
         }
         # Map input values to dataset categories
@@ -1598,8 +1601,8 @@ def handle_health_response(data):
     barangay = data.get('barangay')
     conn = get_db_connection()
     try:
-        municipality = conn.execute('SELECT municipality FROM health_response WHERE barangay = ?', (barangay,)).fetchone()
-        municipality = municipality['municipality'] if municipality else None
+        municipality = conn.execute('SELECT assigned_municipality FROM users WHERE barangay = ?', (barangay,)).fetchone()
+        municipality = municipality['assigned_municipality'] if municipality else None
     except Exception as e:
         logger.error(f"Error fetching municipality: {e}")
         municipality = None
