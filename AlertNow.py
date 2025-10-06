@@ -1573,14 +1573,13 @@ def handle_health_response(data):
         # Preprocess input data
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
         input_df = preprocess_input(input_df, required_columns)
-        # Ensure all expected columns are present and handle numeric conversion
+        # Ensure all expected columns are present
         expected_columns = health_emergencies_df.columns.drop('Severity', errors='ignore')
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        # Convert all numeric columns to ensure compatibility
-        for col in input_df.select_dtypes(include=['object']).columns:
-            input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
+        # Convert all columns to numeric where applicable and handle NaN
+        input_df = input_df.astype(float, errors='ignore').fillna(0)
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
         # Make prediction
@@ -1597,18 +1596,6 @@ def handle_health_response(data):
             'prediction': 'prediction_error'
         }
         logger.error(f"Error predicting health response: {e}")
-    
-    # Get municipality from database
-    barangay = data.get('barangay')
-    conn = get_db_connection()
-    try:
-        municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
-        municipality = municipality['municipality'] if municipality else None
-    except Exception as e:
-        logger.error(f"Error fetching municipality: {e}")
-        municipality = None
-    finally:
-        conn.close()
     
     # Get municipality from database
     barangay = data.get('barangay')
