@@ -116,7 +116,6 @@
             const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
-            // Fetch menu.txt for dropdown options
             fetch('/static/menu.txt')
                 .then(response => response.text())
                 .then(text => {
@@ -145,6 +144,47 @@
                 if (data.target_role === 'barangay') {
                     updateUIWithAlert(data);
                     notifyAlert(data);
+                }
+            });
+
+            socket.on('update_dashboard_emergency_type', (data) => {
+                console.log('Emergency type update received:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const typeDiv = alertItem.querySelector('div:nth-child(3)');
+                    typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
+                    typeDiv.style.display = 'block';
+                    const responseForm = alertItem.querySelector('.response-form');
+                    let emergencyType = data.emergency_type || 'Unknown';
+                    let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
+                    responseForm.innerHTML = '';
+                    Object.keys(dropdownData).forEach(key => {
+                        const select = document.createElement('select');
+                        select.name = key.toLowerCase().replace(/\s+/g, '_');
+                        dropdownData[key].forEach(option => {
+                            const opt = document.createElement('option');
+                            opt.value = option;
+                            opt.textContent = option;
+                            select.appendChild(opt);
+                        });
+                        responseForm.appendChild(select);
+                    });
+                    const submitButton = document.createElement('button');
+                    submitButton.textContent = 'Respond';
+                    submitButton.addEventListener('click', () => {
+                        const formData = {};
+                        responseForm.querySelectorAll('select').forEach(select => {
+                            formData[select.name] = select.value;
+                        });
+                        formData.alert_id = data.alert_id;
+                        formData.emergency_type = data.emergency_type;
+                        formData.barangay = '{{ barangay }}';
+                        const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' : 'barangay_response';
+                        socket.emit(socketEvent, formData);
+                        responseForm.style.display = 'none';
+                        alertItem.querySelector('div:nth-child(1)').textContent = 'RESPONDED';
+                    });
+                    responseForm.appendChild(submitButton);
                 }
             });
 
@@ -178,7 +218,53 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    predictionDiv.style.display = 'block'; // Make prediction visible
+                    predictionDiv.style.display = 'block';
+                }
+            });
+
+            socket.on('barangay_fire_submitted', (data) => {
+                console.log('Fire response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Fire Incident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
+                        }
+                    }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    predictionDiv.style.display = 'block';
+                }
+            });
+
+            socket.on('barangay_crime_submitted', (data) => {
+                console.log('Crime response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Crime Incident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
+                        }
+                    }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    predictionDiv.style.display = 'block';
                 }
             });
 
@@ -203,6 +289,7 @@
                 const alertItem = document.createElement('div');
                 alertItem.className = 'alert-item';
                 alertItem.dataset.alertId = data.alert_id;
+                alertElements.set(data.alert_id, alertItem);
 
                 const statusDiv = document.createElement('div');
                 statusDiv.textContent = 'PENDING ALERT';
@@ -216,12 +303,11 @@
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
+                typeDiv.style.display = data.emergency_type ? 'block' : 'none';
 
                 const timeDiv = document.createElement('div');
-                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' });
                 timeDiv.textContent = `Time: ${timestamp}`;
-
-                
 
                 const imageDiv = document.createElement('img');
                 imageDiv.className = 'clickable-img';
@@ -241,87 +327,71 @@
                 responseForm.className = 'response-form';
                 responseForm.style.display = 'none';
 
-                let emergencyType, dropdownData;
-                if (!data || !data.emergency_type) {
-                    console.error('Error: data or data.emergency_type is undefined');
-                    emergencyType = 'Unknown';
-                    dropdownData = menuData['Unknown'] || [];
-                } else if (data.emergency_type === 'Road Accident') {
-                    emergencyType = 'Road Accident';
-                    dropdownData = menuData['Road Accident'] || [];
-                } else {
-                    console.warn(`Unknown emergency type: ${data.emergency_type}`);
-                    emergencyType = 'Unknown';
-                    dropdownData = menuData['Unknown'] || [];
-                }
+                let emergencyType = data.emergency_type || 'Unknown';
+                let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
 
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
-                    select.name = key.toLowerCase().replace(' ', '_');
-                    const placeholder = document.createElement('option');
-                    placeholder.text = `Select ${key}`;
-                    placeholder.value = '';
-                    placeholder.disabled = true;
-                    placeholder.selected = true;
-                    select.appendChild(placeholder);
+                    select.name = key.toLowerCase().replace(/\s+/g, '_');
                     dropdownData[key].forEach(option => {
                         const opt = document.createElement('option');
                         opt.value = option;
-                        opt.text = option;
+                        opt.textContent = option;
                         select.appendChild(opt);
                     });
                     responseForm.appendChild(select);
                 });
 
                 const submitButton = document.createElement('button');
-                submitButton.textContent = 'Submit';
+                submitButton.textContent = 'Respond';
                 submitButton.addEventListener('click', () => {
-                    const responseData = {
-                        alert_id: data.alert_id,
-                        role: 'barangay',
-                        lat: data.lat,
-                        lon: data.lon,
-                        barangay: data.barangay,
-                        emergency_type: emergencyType,
-                        municipality: '{{ municipality }}'.toLowerCase()
-                    };
+                    const formData = {};
                     responseForm.querySelectorAll('select').forEach(select => {
-                        responseData[select.name] = select.value;
+                        formData[select.name] = select.value;
                     });
-                    socket.emit('response', responseData);
+                    formData.alert_id = data.alert_id;
+                    formData.emergency_type = data.emergency_type;
+                    formData.barangay = '{{ barangay }}';
+                    const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' : 'barangay_response';
+                    socket.emit(socketEvent, formData);
+                    responseForm.style.display = 'none';
                     statusDiv.textContent = 'RESPONDED';
                 });
                 responseForm.appendChild(submitButton);
 
-                const respondButton = document.createElement('button');
-                respondButton.textContent = 'Respond';
-                respondButton.addEventListener('click', () => {
-                    socket.emit('role_accepted', { alert_id: data.alert_id, role: 'barangay' });
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = 'Prediction: N/A';
+                predictionDiv.style.display = 'none';
+
+                const acceptButton = document.createElement('button');
+                acceptButton.textContent = 'Accept';
+                acceptButton.addEventListener('click', () => {
                     responseForm.style.display = 'block';
-                    respondButton.style.display = 'none';
+                    acceptButton.style.display = 'none';
+                    declineButton.style.display = 'none';
                 });
 
                 const declineButton = document.createElement('button');
                 declineButton.textContent = 'Decline';
                 declineButton.addEventListener('click', () => {
-                    socket.emit('role_declined', { alert_id: data.alert_id, role: 'barangay' });
-                    alertItem.remove();
+                    responseForm.style.display = 'none';
+                    acceptButton.style.display = 'none';
+                    declineButton.style.display = 'none';
+                    statusDiv.textContent = 'DECLINED';
                 });
 
-                const predictionDiv = document.createElement('div');
-                predictionDiv.className = 'prediction';
-                predictionDiv.textContent = 'PREDICTION: N/A';
-                predictionDiv.style.fontWeight = 'bold';
-                predictionDiv.style.fontSize = '16px';
-                predictionDiv.style.color = 'black';
-                
+                alertItem.appendChild(statusDiv);
+                alertItem.appendChild(alertText);
+                alertItem.appendChild(typeDiv);
+                alertItem.appendChild(timeDiv);
+                alertItem.appendChild(imageDiv);
+                alertItem.appendChild(acceptButton);
+                alertItem.appendChild(declineButton);
+                alertItem.appendChild(responseForm);
+                alertItem.appendChild(predictionDiv);
 
-                
-
-
-                alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv);
-                alertContainer.prepend(alertItem);
-                alertElements.set(data.alert_id, alertItem);
+                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
 
                 document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
                     document.getElementById('image-modal').style.display = 'none';
