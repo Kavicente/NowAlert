@@ -343,8 +343,7 @@
                 alertItem.appendChild(responseForm);
                 alertItem.appendChild(predictionDiv);
 
-                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
-
+                alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv);
                 document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
                     document.getElementById('image-modal').style.display = 'none';
                 });
