@@ -132,10 +132,12 @@
                 console.error('Connection error:', error);
             });
 
-            socket.on('pnp_redirect_alert', (data) => {
-                console.log('PNP redirect alert received:', data);
-                updateUIWithAlert(data);
-                notifyAlert(data);
+            socket.on('pnp_redirected_alert', (data) => {
+                console.log('Redirected alert received:', data);
+                if (data.target_role === 'barangay') {
+                    updateUIWithAlert(data);
+                    notifyAlert(data);
+                }
             });
 
             socket.on('update_dashboard_emergency_type', (data) => {
@@ -171,7 +173,7 @@
                         formData.emergency_type = data.emergency_type;
                         formData.municipality = '{{ municipality }}';
                         const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' :
-                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' :
+                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_submitted' :
                                             'pnp_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
@@ -180,12 +182,11 @@
                     });
                     responseForm.appendChild(submitButton);
                     responseForm.style.display = 'block';
-                    
                 }
             });
 
             socket.on('pnp_response', (data) => {
-                console.log('PNP response submitted:', data);
+                console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -210,7 +211,7 @@
             });
 
             socket.on('pnp_fire_submitted', (data) => {
-                console.log('PNP fire response submitted:', data);
+                console.log('Fire response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -234,8 +235,8 @@
                 }
             });
 
-            socket.on('pnp_crime_response', (data) => {
-                console.log('PNP crime response submitted:', data);
+            socket.on('pnp_crime_submitted', (data) => {
+                console.log('Crime response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
