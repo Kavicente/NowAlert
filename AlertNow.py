@@ -3323,7 +3323,7 @@ if __name__ == '__main__':
         ''')
         c.execute('''
             CREATE TABLE IF NOT EXISTS pnp_alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 lat REAL,
                 lon REAL,
                 municipality TEXT,
