@@ -182,7 +182,7 @@
                         const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' : 'barangay_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
-                        alertItem.querySelector('div:nth-child(1)').textContent = 'RESPONDED';
+                        statusDiv.textContent = 'RESPONDED';
                     });
                     responseForm.appendChild(submitButton);
                 }
@@ -342,22 +342,7 @@
                     responseForm.appendChild(select);
                 });
 
-                const submitButton = document.createElement('button');
-                submitButton.textContent = 'Respond';
-                submitButton.addEventListener('click', () => {
-                    const formData = {};
-                    responseForm.querySelectorAll('select').forEach(select => {
-                        formData[select.name] = select.value;
-                    });
-                    formData.alert_id = data.alert_id;
-                    formData.emergency_type = data.emergency_type;
-                    formData.barangay = '{{ barangay }}';
-                    const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' : 'barangay_response';
-                    socket.emit(socketEvent, formData);
-                    responseForm.style.display = 'none';
-                    statusDiv.textContent = 'RESPONDED';
-                });
-                responseForm.appendChild(submitButton);
+                
 
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
