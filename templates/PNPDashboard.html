@@ -203,8 +203,6 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '16px';
-                    predictionDiv.style.color = 'black';
                 }
             });
 
@@ -228,8 +226,6 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '16px';
-                    predictionDiv.style.color = 'black';
                 }
             });
 
@@ -253,8 +249,6 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '16px';
-                    predictionDiv.style.color = 'black';
                 }
             });
 
@@ -276,11 +270,11 @@
                 alertItem.innerHTML = `
                     <div>PENDING ALERT</div>
                     <div>Emergency at ${data.barangay || 'Unknown'}</div>
-                    <div>Type: ${data.emergency_type || 'N/A'}</div>
+                    <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
                     <img class="clickable-img" style="display: none;" src="${data.image || ''}">
                     <div class="response-form"></div>
-                    <div class="prediction" style="display: none; font-weight: bold;, font-size: 20px; color: black;">Prediction: ${data.prediction || 'N/A'}</div>
+                    <div class="prediction" style="display: none;">Prediction: N/A</div>
                 `;
                 if (data.image) {
                     const img = alertItem.querySelector('img');
