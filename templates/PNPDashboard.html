@@ -343,7 +343,7 @@
                 alertItem.appendChild(responseForm);
                 alertItem.appendChild(predictionDiv);
 
-                alertContainer.insertBefore(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv, alertContainer.firstChild);
+                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
 
                 document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
                     document.getElementById('image-modal').style.display = 'none';
