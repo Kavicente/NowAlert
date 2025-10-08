@@ -158,7 +158,6 @@
                     let emergencyType = data.emergency_type || 'Unknown';
                     let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
                     responseForm.innerHTML = '';
-                    responseForm.style.display = 'block';
                     Object.keys(dropdownData).forEach(key => {
                         const select = document.createElement('select');
                         select.name = key.toLowerCase().replace(/\s+/g, '_');
@@ -180,15 +179,16 @@
                         formData.alert_id = data.alert_id;
                         formData.emergency_type = data.emergency_type;
                         formData.barangay = '{{ barangay }}';
-                        formData.lat = data.lat || {{ lat_coord|default(14.0549) }};
-                        formData.lon = data.lon || {{ lon_coord|default(121.3013) }};
                         const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' :
-                                           data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' : 'barangay_response';
+                                            data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' :
+                                            'barangay_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
-                        alertItem.querySelector('div:nth-child(1)').textContent = 'RESPONDED';
+                        const statusDiv = alertItem.querySelector('div:nth-child(1)');
+                        statusDiv.textContent = 'RESPONDED';
                     });
                     responseForm.appendChild(submitButton);
+                    responseForm.style.display = 'block';
                 }
             });
 
@@ -278,24 +278,23 @@
                 alertItem.className = 'alert-item';
                 alertItem.innerHTML = `
                     <div>PENDING ALERT</div>
-                    <div>Emergency at ${data.barangay || 'Unknown'} Resident from ${data.resident_barangay || data.barangay}</div>
+                    <div>Emergency at ${data.barangay || 'Unknown'}</div>
                     <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
+                    <img class="clickable-img" style="display: none;" src="${data.image || ''}">
                     <div class="response-form"></div>
                     <div class="prediction" style="display: none; font-weight: bold;, font-size: 20px; color: black;">Prediction: ${data.prediction || 'N/A'}</div>
                 `;
                 if (data.image) {
-                    const img = document.createElement('img');
-                    img.src = data.image;
-                    img.className = 'clickable-img';
+                    const img = alertItem.querySelector('img');
+                    img.style.display = 'block';
                     img.addEventListener('click', () => {
                         document.getElementById('modal-image').src = data.image;
                         document.getElementById('image-modal').style.display = 'flex';
                     });
-                    alertItem.appendChild(img);
                 }
-                alertContainer.prepend(alertItem);
                 alertElements.set(data.alert_id, alertItem);
+                alertContainer.prepend(alertItem);
             }
 
             document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
@@ -308,6 +307,22 @@
                 setTimeout(() => notification.textContent = '', 5000);
             }
         });
+
+        function parseMenuText(text) {
+            const sections = text.split('#').filter(section => section.trim());
+            const menuData = {};
+            sections.forEach(section => {
+                const lines = section.trim().split('\n');
+                const sectionName = lines[0].trim();
+                const sectionData = {};
+                lines.slice(1).forEach(line => {
+                    const [key, values] = line.split(':');
+                    sectionData[key.trim()] = values.split(',').map(v => v.trim());
+                });
+                menuData[sectionName] = sectionData;
+            });
+            return menuData;
+        }
     </script>
 </body>
 </html>
