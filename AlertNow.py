@@ -903,6 +903,14 @@ def handle_update_dashboard_emergency_type(data):
     }, room=pnp_room)
     
     logger.info(f"Emergency type update emitted to rooms {barangay_room} and {pnp_room}")
+    
+    pnp_room = f"pnp_{data.get('barangay').lower()}"
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        'barangay': data.get('barangay')
+    }, room=pnp_room)
+    logger.info(f"Emergency type update emitted to room {pnp_room}")
 
 # After @socketio.on('response_update')
 @socketio.on('hospital_response')
