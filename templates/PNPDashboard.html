@@ -196,7 +196,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -219,7 +219,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Fire Incident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -242,7 +242,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Crime Incident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -250,6 +250,17 @@
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
                 }
+            });
+
+            socket.on('update_map', (data) => {
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                pnpMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(pnpMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             function updateUIWithAlert(data) {

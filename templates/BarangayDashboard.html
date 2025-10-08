@@ -192,17 +192,6 @@
                 }
             });
 
-            socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                barangayMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(barangayMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-            });
-
             socket.on('barangay_response', (data) => {
                 console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
@@ -216,7 +205,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -239,7 +228,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Fire Incident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -262,7 +251,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Crime Incident Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -270,6 +259,17 @@
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
                 }
+            });
+
+            socket.on('update_map', (data) => {
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                barangayMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(barangayMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             function updateUIWithAlert(data) {
@@ -283,7 +283,7 @@
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
                     <img class="clickable-img" style="display: none;" src="${data.image || ''}">
                     <div class="response-form"></div>
-                    <div class="prediction" style="display: none; font-weight: bold;, font-size: 20px; color: black;">Prediction: ${data.prediction || 'N/A'}</div>
+                    <div class="prediction" style="display: none;">Prediction: N/A</div>
                 `;
                 if (data.image) {
                     const img = alertItem.querySelector('img');
@@ -306,23 +306,23 @@
                 notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}`;
                 setTimeout(() => notification.textContent = '', 5000);
             }
-        });
 
-        function parseMenuText(text) {
-            const sections = text.split('#').filter(section => section.trim());
-            const menuData = {};
-            sections.forEach(section => {
-                const lines = section.trim().split('\n');
-                const sectionName = lines[0].trim();
-                const sectionData = {};
-                lines.slice(1).forEach(line => {
-                    const [key, values] = line.split(':');
-                    sectionData[key.trim()] = values.split(',').map(v => v.trim());
+            function parseMenuText(text) {
+                const sections = text.split('#').filter(section => section.trim());
+                const menuData = {};
+                sections.forEach(section => {
+                    const lines = section.trim().split('\n');
+                    const sectionName = lines[0].trim();
+                    const sectionData = {};
+                    lines.slice(1).forEach(line => {
+                        const [key, values] = line.split(':');
+                        sectionData[key.trim()] = values.split(',').map(v => v.trim());
+                    });
+                    menuData[sectionName] = sectionData;
                 });
-                menuData[sectionName] = sectionData;
-            });
-            return menuData;
-        }
+                return menuData;
+            }
+        });
     </script>
 </body>
 </html>
