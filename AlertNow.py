@@ -834,47 +834,58 @@ def handle_redirect_alert(data):
 
 @socketio.on('pnp_redirect_alert')
 def handle_pnp_redirect_alert(data):
-    logger.debug(f"PNP redirect alert received: {data}")
+    logger.info(f"Received PNP redirect alert: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    
+    conn = get_db_connection()
     try:
-        target_role = 'pnp'
-        municipality = data.get('municipality', '').lower() or data.get('barangay', '').lower()
-        barangay = data.get('barangay').lower()
-        emergency_type = data.get('emergency_type')
-        if emergency_type not in ['Road Accident', 'Fire Incident', 'Crime Incident']:
-            logger.error(f"Invalid emergency type for PNP: {emergency_type}")
-            return
-        emit('pnp_redirect_alert', data, room=f"pnp_{municipality}")
-        # Emit update_map to pin alert on PNP dashboard
-        map_data = {
-            'lat': data.get('lat'),
-            'lon': data.get('lon'),
-            'barangay': data.get('barangay'),
-            'emergency_type': emergency_type
-        }
-        emit('update_map', map_data, room=f"pnp_{municipality}")
-        # Update Barangay dashboard with emergency type
-        emit('update_dashboard_emergency_type', {
-            'alert_id': data.get('alert_id'),
-            'emergency_type': emergency_type,
-            'barangay': barangay
-        }, room=f"barangay_{barangay}")
-        logger.info(f"Alert redirected to pnp_{municipality} with map update and emergency type {emergency_type}")
+        conn.execute('''
+            INSERT INTO pnp_alerts (
+                alert_id, lat, lon, municipality, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('lat'), data.get('lon'),
+            data.get('municipality'), data.get('barangay'),
+            data.get('emergency_type'), data['timestamp']
+        ))
+        conn.commit()
+        logger.info(f"Stored PNP redirect alert for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error in handle_pnp_redirect_alert: {e}")
+        logger.error(f"Error storing PNP redirect alert: {e}")
+    finally:
+        conn.close()
+    
+    pnp_room = f"pnp_{data.get('municipality').lower()}"
+    emit('pnp_redirect_alert', data, room=pnp_room)
+    logger.info(f"PNP redirect alert emitted to room {pnp_room}")
+    
+    emit('update_map', {
+        'lat': data.get('lat'),
+        'lon': data.get('lon'),
+        'barangay': data.get('barangay'),
+        'emergency_type': data.get('emergency_type')
+    }, room=pnp_room)
 
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
-    logger.info(f"Update dashboard emergency type: {data}")
-    try:
-        alert_id = data.get('alert_id')
-        emergency_type = data.get('emergency_type')
-        barangay = data.get('barangay').lower()
-        emit('update_dashboard_emergency_type', {
-            'alert_id': alert_id,
-            'emergency_type': emergency_type
-        }, room=f"barangay_{barangay}")
-    except Exception as e:
-        logger.error(f"Error updating dashboard emergency type: {e}")
+    logger.info(f"Received update dashboard emergency type: {data}")
+    
+    barangay_room = f"barangay_{data.get('barangay').lower()}"
+    pnp_room = f"pnp_{data.get('barangay').lower()}"
+    
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        'barangay': data.get('barangay')
+    }, room=barangay_room)
+    
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        'barangay': data.get('barangay')
+    }, room=pnp_room)
+    
+    logger.info(f"Emergency type update emitted to rooms {barangay_room} and {pnp_room}")
 
 # After @socketio.on('response_update')
 @socketio.on('hospital_response')
@@ -1235,517 +1246,7 @@ def handle_barangay_response_submitted(data):
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
  
-@socketio.on('barangay_fire_submitted')
-def handle_barangay_fire_response_submitted(data):
-    logger.info(f"Barangay fire response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
-    
-    conn = get_db_connection()
-    try:
-        conn.execute('''
-            INSERT INTO barangay_fire_response (
-                alert_id, fire_type, fire_cause, weather, fire_severity, 
-                resident_age, resident_gender, lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
-            data.get('weather'), data.get('fire_severity'), data.get('resident_age'),
-            data.get('resident_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), 
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        ))
-        conn.commit()
-        logger.info(f"Stored barangay fire response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing barangay fire response: {e}")
-    finally:
-        conn.close()
-    
-    # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
-    if response_time.date() == today:
-        today_responses.append(data)
-    
-    # Compute prediction using ML model on form data
-    try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': 'Residential Fire',
-            'Fire_Cause': 'Electrical Short Circuit'
-        }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'residential fire': 'Residential Fire',
-            'structural fire': 'Structural Fire',
-            'commercial/industrial fire': 'Commercial/Industrial Fire',
-            'electrical fire': 'Electrical Fire',
-            'vehicular fire': 'Vehicular Fire',
-            'grass fire': 'Grass Fire',
-            'forest/wildfire': 'Forest/Wildfire',
-            'rubbish/garbage fire': 'Rubbish/Garbage Fire',
-            'kitchen/grease fire': 'Kitchen/Grease Fire',
-            'gas/lpg fire': 'Gas/LPG Fire',
-            'explosion/blast-related fire': 'Explosion/Blast-related Fire',
-            'post fire': 'Post Fire'
-        }
-        cause_mapping = {
-            'unattended cooking': 'Unattended Cooking',
-            'electrical short circuit': 'Electrical Short Circuit',
-            'candles left burning': 'Candles Left Burning',
-            'overloaded extension cords': 'Overloaded Extension Cords',
-            'smoking materials': 'Smoking Materials',
-            'lpg/gas leak': 'LPG/Gas Leak',
-            'faulty wiring': 'Faulty Wiring',
-            'flammable materials': 'Flammable Materials Stored Improperly',
-            'welding sparks': 'Welding or Construction Sparks',
-            'arson': 'Arson',
-            'machinery overheating': 'Machinery/Equipment Overheating',
-            'chemical reactions': 'Chemical Reactions or Spills',
-            'boiler failure': 'Boiler or Furnace Failure',
-            'improper disposal': 'Improper Disposal of Flammable Waste',
-            'exposed wiring': 'Exposed or Damaged Wiring',
-            'lightning strike': 'Lightning Strike',
-            'engine overheating': 'Engine Overheating',
-            'fuel leak': 'Fuel Leak'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Fire_Type':
-                cleaned_data[key] = type_mapping.get(data.get('fire_type', '').lower(), default_values[key])
-            elif key == 'Fire_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('fire_cause', '').lower(), default_values[key])
-        
-        # Prepare features for prediction
-        features = [
-            cleaned_data['Year'],
-            cleaned_data['Barangay'],
-            cleaned_data['Fire_Type'],
-            cleaned_data['Fire_Cause']
-        ]
-        
-        # Call ML model
-        prediction = fire_accident_predictor.predict([features])[0]
-        
-        # Get municipality from database
-        barangay = data.get('barangay')
-        conn = get_db_connection()
-        try:
-            municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
-            municipality = municipality['municipality'] if municipality else None
-        except Exception as e:
-            logger.error(f"Error fetching municipality: {e}")
-            municipality = None
-        finally:
-            conn.close()
-        
-        # Prepare response data
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'fire_type': {
-                'labels': [data.get('fire_type', 'Unknown')] if data.get('fire_type') else ['No Data'],
-                'datasets': [{
-                    'label': 'Fire Type',
-                    'data': [1] if data.get('fire_type') else [0],
-                    'backgroundColor': ['#FF6F61'] if data.get('fire_type') else ['#999999'],
-                    'borderColor': ['#FF6F61'] if data.get('fire_type') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'fire_cause': {
-                'labels': [data.get('fire_cause', 'Unknown')] if data.get('fire_cause') else ['No Data'],
-                'datasets': [{
-                    'label': 'Fire Cause',
-                    'data': [1] if data.get('fire_cause') else [0],
-                    'backgroundColor': ['#FF9F40'] if data.get('fire_cause') else ['#999999'],
-                    'borderColor': ['#FF9F40'] if data.get('fire_cause') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'weather': {
-                'labels': [data.get('weather', 'Unknown')] if data.get('weather') else ['No Data'],
-                'datasets': [{
-                    'label': 'Weather Conditions',
-                    'data': [1] if data.get('weather') else [0],
-                    'backgroundColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                    'borderColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'fire_severity': {
-                'labels': [data.get('fire_severity', 'Unknown')] if data.get('fire_severity') else ['No Data'],
-                'datasets': [{
-                    'label': 'Fire Severity',
-                    'data': [1] if data.get('fire_severity') else [0],
-                    'backgroundColor': ['#D4A5A5'] if data.get('fire_severity') else ['#999999'],
-                    'borderColor': ['#D4A5A5'] if data.get('fire_severity') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'barangay': barangay,
-            'prediction': str(prediction)
-        }
-        emit('barangay_fire_submitted', chart_data, room=f"barangay_{barangay.lower()}")
-        logger.info(f"Chart update emitted to room barangay_{barangay.lower()}")
-    except Exception as e:
-        logger.error(f"Error in handle_barangay_fire_response: {e}")
 
-
-@socketio.on('barangay_health_response')
-def handle_barangay_health_response(data):
-    logger.info(f"Barangay Health response received: {data}")
-    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-    
-    conn = get_db_connection()
-    try:
-        if data.get('role') == 'health':
-            conn.execute('''
-                INSERT INTO barangay_health_response (
-                    alert_id, health_cause, health_type, patient_age, patient_gender, 
-                    lat, lon, barangay, emergency_type, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
-                data.get('patient_age', '0'), data.get('patient_gender', ''), data.get('lat'), data.get('lon'),
-                data.get('barangay'), data.get('emergency_type'), data['timestamp']
-            ))
-            conn.commit()
-            logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing health response: {e}")
-    finally:
-        conn.close()
-    
-    # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
-    if response_time.date() == today:
-        today_responses.append(data)
-    
-    # Compute prediction using ML model on form data
-    try:
-        # Default values for expected model features
-        patient_age = pd.to_numeric(data.get('patient_age', '0'), errors='coerce')
-        if pd.isna(patient_age):
-            patient_age = 0
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Weather': data.get('weather', 'Unknown'),
-            'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
-            'Severity': data.get('severity', 'Unknown'),
-            'Patient_Age': patient_age,
-            'Patient_Gender': data.get('patient_gender', 'Unknown')
-        }
-        # Map input values to dataset categories
-        type_mapping = {
-            'heart attack': 'Heart Attack',
-            'stroke': 'Stroke',
-            'fall': 'Fall',
-            'breathing difficulty': 'Breathing Difficulty',
-            'giving birth': 'Giving Birth',
-            'seizure': 'Seizure',
-            'burn': 'Burn',
-            'poisoning': 'Poisoning',
-            'allergic reaction': 'Allergic Reaction'
-        }
-        cause_mapping = {
-            'chronic illness': 'Chronic Illness',
-            'accident': 'Accident',
-            'allergy': 'Allergy',
-            'infection': 'Infection',
-            'pregnant': 'Pregnant',
-            'overdose': 'Overdose',
-            'heatstroke': 'Heatstroke'
-        }
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Health_Type':
-                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
-            elif key == 'Health_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
-            else:
-                cleaned_data[key] = default_values[key]
-        # Prepare DataFrame for prediction
-        input_df = pd.DataFrame([cleaned_data])
-        
-        # Ensure all expected columns are present
-        expected_columns = health_emergencies_df.columns
-        for col in expected_columns:
-            if col not in input_df.columns:
-                input_df[col] = 0
-        
-        # Reorder columns to match training data
-        input_df = input_df[expected_columns]
-        # Make prediction
-        predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
-        prediction = predictor.predict_proba(input_df)[0][1] * 100
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'prediction': f"{prediction:.2f}% chance in year {datetime.now().year}"
-        }
-        logger.info(f"Prediction for barangay health response: {chart_data['prediction']}")
-    except Exception as e:
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'prediction': 'prediction_error'
-        }
-        logger.error(f"Error predicting health response: {e}")
-    
-    # Get municipality from database
-    barangay = data.get('barangay')
-    conn = get_db_connection()
-    try:
-        municipality = conn.execute('SELECT assigned_municipality FROM users WHERE barangay = ?', (barangay,)).fetchone()
-        municipality = municipality['assigned_municipality'] if municipality else None
-    except Exception as e:
-        logger.error(f"Error fetching municipality: {e}")
-        municipality = None
-    finally:
-        conn.close()
-    
-    # Prepare response data
-    assigned_hospital = data.get('assigned_hospital', '')
-    barangay_room = f"barangay_{municipality.lower()}" if municipality else "barangay"
-    
-    # Prepare chart data
-    chart_data.update({
-        'health_type': {
-            'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
-            'datasets': [{
-                'label': 'Health Emergency Type',
-                'data': [1] if data.get('health_type') else [0],
-                'backgroundColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                'borderColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                'borderWidth': 1
-            }]
-        },
-        'health_cause': {
-            'labels': [data.get('health_cause', 'Unknown')] if data.get('health_cause') else ['No Data'],
-            'datasets': [{
-                'label': 'Health Emergency Cause',
-                'data': [1] if data.get('health_cause') else [0],
-                'backgroundColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                'borderColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                'borderWidth': 1
-            }]
-        },
-        'weather': {
-            'labels': [data.get('weather', 'Unknown')] if data.get('weather') else ['No Data'],
-            'datasets': [{
-                'label': 'Weather Conditions',
-                'data': [1] if data.get('weather') else [0],
-                'backgroundColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                'borderColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                'borderWidth': 1
-            }]
-        },
-        'patient_age': {
-            'labels': [data.get('patient_age', 'Unknown')] if data.get('patient_age') else ['No Data'],
-            'datasets': [{
-                'label': 'Patient Age',
-                'data': [1] if data.get('patient_age') else [0],
-                'backgroundColor': ['#FFEEAD'] if data.get('patient_age') else ['#999999'],
-                'borderColor': ['#FFEEAD'] if data.get('patient_age') else ['#999999'],
-                'borderWidth': 1
-            }]
-        },
-        'patient_gender': {
-            'labels': [data.get('patient_gender', 'Unknown')] if data.get('patient_gender') else ['No Data'],
-            'datasets': [{
-                'label': 'Patient Gender',
-                'data': [1] if data.get('patient_gender') else [0],
-                'backgroundColor': ['#D4A5A5'] if data.get('patient_gender') else ['#999999'],
-                'borderColor': ['#D4A5A5'] if data.get('patient_gender') else ['#999999'],
-                'borderWidth': 1
-            }]
-        },
-        'barangay': barangay,
-        'assigned_hospital': assigned_hospital
-    })
-    logger.info(f"Emitting health_response with chart_data: {chart_data}")
-    # Combine data and chart_data into a single dictionary for emission
-    emission_data = {**data, **chart_data}
-    socketio.emit('barangay_health_response', emission_data, room=barangay_room)
-    logger.info(f"Chart update emitted to room {barangay_room}")
-
-
-@socketio.on('barangay_crime_response')
-def handle_barangay_crime_response_submitted(data):
-    logger.info(f"Barangay crime response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
-    
-    conn = get_db_connection()
-    try:
-        conn.execute('''
-            INSERT INTO barangay_crime_response (
-                alert_id, crime_type, crime_cause, level, suspect_age, 
-                suspect_gender, victim_age, victim_gender, lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'),
-            data.get('level'), data.get('suspect_age'), data.get('suspect_gender'),
-            data.get('victim_age'), data.get('victim_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), 
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        ))
-        conn.commit()
-        logger.info(f"Stored barangay crime response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing barangay crime response: {e}")
-    finally:
-        conn.close()
-    
-    # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
-    if response_time.date() == today:
-        today_responses.append(data)
-    
-    # Compute prediction using ML model on form data
-    try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Crime_Type': 'Theft',
-            'Crime_Cause': 'Poverty'
-        }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'theft': 'Theft',
-            'assault': 'Assault',
-            'burglary': 'Burglary',
-            'robbery': 'Robbery',
-            'vandalism': 'Vandalism',
-            'harassment': 'Harassment',
-            'domestic violence': 'Domestic Violence',
-            'drug-related': 'Drug-Related',
-            'fraud': 'Fraud'
-        }
-        cause_mapping = {
-            'poverty': 'Poverty',
-            'unemployment': 'Unemployment',
-            'alcohol': 'Alcohol',
-            'drugs': 'Drugs',
-            'personal dispute': 'Personal Dispute',
-            'gang activity': 'Gang Activity',
-            'opportunistic': 'Opportunistic',
-            'domestic issue': 'Domestic Issue',
-            'mental health': 'Mental Health'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Crime_Type':
-                cleaned_data[key] = type_mapping.get(data.get('crime_type', '').lower(), default_values[key])
-            elif key == 'Crime_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('crime_cause', '').lower(), default_values[key])
-        
-        # Prepare features for prediction
-        features = [
-            cleaned_data['Year'],
-            cleaned_data['Barangay'],
-            cleaned_data['Crime_Type'],
-            cleaned_data['Crime_Cause']
-        ]
-        
-        # Call ML model
-        prediction = crime_predictor.predict([features])[0]
-        
-        # Get municipality from database
-        barangay = data.get('barangay')
-        conn = get_db_connection()
-        try:
-            municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
-            municipality = municipality['municipality'] if municipality else None
-        except Exception as e:
-            logger.error(f"Error fetching municipality: {e}")
-            municipality = None
-        finally:
-            conn.close()
-        
-        # Prepare response data
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'crime_type': {
-                'labels': [data.get('crime_type', 'Unknown')] if data.get('crime_type') else ['No Data'],
-                'datasets': [{
-                    'label': 'Crime Type',
-                    'data': [1] if data.get('crime_type') else [0],
-                    'backgroundColor': ['#FF6F61'] if data.get('crime_type') else ['#999999'],
-                    'borderColor': ['#FF6F61'] if data.get('crime_type') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'crime_cause': {
-                'labels': [data.get('crime_cause', 'Unknown')] if data.get('crime_cause') else ['No Data'],
-                'datasets': [{
-                    'label': 'Crime Cause',
-                    'data': [1] if data.get('crime_cause') else [0],
-                    'backgroundColor': ['#FF9F40'] if data.get('crime_cause') else ['#999999'],
-                    'borderColor': ['#FF9F40'] if data.get('crime_cause') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'level': {
-                'labels': [data.get('level', 'Unknown')] if data.get('level') else ['No Data'],
-                'datasets': [{
-                    'label': 'Crime Level',
-                    'data': [1] if data.get('level') else [0],
-                    'backgroundColor': ['#96CEB4'] if data.get('level') else ['#999999'],
-                    'borderColor': ['#96CEB4'] if data.get('level') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'suspect_age': {
-                'labels': [data.get('suspect_age', 'Unknown')] if data.get('suspect_age') else ['No Data'],
-                'datasets': [{
-                    'label': 'Suspect Age',
-                    'data': [1] if data.get('suspect_age') else [0],
-                    'backgroundColor': ['#FFEEAD'] if data.get('suspect_age') else ['#999999'],
-                    'borderColor': ['#FFEEAD'] if data.get('suspect_age') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'suspect_gender': {
-                'labels': [data.get('suspect_gender', 'Unknown')] if data.get('suspect_gender') else ['No Data'],
-                'datasets': [{
-                    'label': 'Suspect Gender',
-                    'data': [1] if data.get('suspect_gender') else [0],
-                    'backgroundColor': ['#D4A5A5'] if data.get('suspect_gender') else ['#999999'],
-                    'borderColor': ['#D4A5A5'] if data.get('suspect_gender') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'barangay': barangay,
-            'prediction': str(prediction)
-        }
-        emit('barangay_crime_submitted', chart_data, room=f"barangay_{barangay.lower()}")
-        logger.info(f"Chart update emitted to room barangay_{barangay.lower()}")
-    except Exception as e:
-        logger.error(f"Error in handle_barangay_crime_response: {e}")
     
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
@@ -1963,332 +1464,7 @@ def handle_pnp_response_submitted(data):
     emit('pnp_response', data, room=pnp_room)
     logger.info(f"PNP response emitted to room {pnp_room}")
 
-@socketio.on('pnp_fire_submitted')
-def handle_pnp_fire_response_submitted(data):
-    logger.info(f"PNP fire response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
-    
-    conn = get_db_connection()
-    try:
-        conn.execute('''
-            INSERT INTO pnp_fire_response (
-                alert_id, fire_type, fire_cause, weather, fire_severity, 
-                resident_age, resident_gender, lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
-            data.get('weather'), data.get('fire_severity'), data.get('resident_age'),
-            data.get('resident_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), 
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        ))
-        conn.commit()
-        logger.info(f"Stored PNP fire response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing PNP fire response: {e}")
-    finally:
-        conn.close()
-    
-    # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
-    if response_time.date() == today:
-        today_responses.append(data)
-    
-    # Compute prediction using ML model on form data
-    try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': 'Residential Fire',
-            'Fire_Cause': 'Electrical Short Circuit'
-        }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'residential fire': 'Residential Fire',
-            'structural fire': 'Structural Fire',
-            'commercial/industrial fire': 'Commercial/Industrial Fire',
-            'electrical fire': 'Electrical Fire',
-            'vehicular fire': 'Vehicular Fire',
-            'grass fire': 'Grass Fire',
-            'forest/wildfire': 'Forest/Wildfire',
-            'rubbish/garbage fire': 'Rubbish/Garbage Fire',
-            'kitchen/grease fire': 'Kitchen/Grease Fire',
-            'gas/lpg fire': 'Gas/LPG Fire',
-            'explosion/blast-related fire': 'Explosion/Blast-related Fire',
-            'post fire': 'Post Fire'
-        }
-        cause_mapping = {
-            'unattended cooking': 'Unattended Cooking',
-            'electrical short circuit': 'Electrical Short Circuit',
-            'candles left burning': 'Candles Left Burning',
-            'overloaded extension cords': 'Overloaded Extension Cords',
-            'smoking materials': 'Smoking Materials',
-            'lpg/gas leak': 'LPG/Gas Leak',
-            'faulty wiring': 'Faulty Wiring',
-            'flammable materials': 'Flammable Materials Stored Improperly',
-            'welding sparks': 'Welding or Construction Sparks',
-            'arson': 'Arson',
-            'machinery overheating': 'Machinery/Equipment Overheating',
-            'chemical reactions': 'Chemical Reactions or Spills',
-            'boiler failure': 'Boiler or Furnace Failure',
-            'improper disposal': 'Improper Disposal of Flammable Waste',
-            'exposed wiring': 'Exposed or Damaged Wiring',
-            'lightning strike': 'Lightning Strike',
-            'engine overheating': 'Engine Overheating',
-            'fuel leak': 'Fuel Leak'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Fire_Type':
-                cleaned_data[key] = type_mapping.get(data.get('fire_type', '').lower(), default_values[key])
-            elif key == 'Fire_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('fire_cause', '').lower(), default_values[key])
-        
-        # Prepare features for prediction
-        features = [
-            cleaned_data['Year'],
-            cleaned_data['Barangay'],
-            cleaned_data['Fire_Type'],
-            cleaned_data['Fire_Cause']
-        ]
-        
-        # Call ML model
-        prediction = fire_accident_predictor.predict([features])[0]
-        
-        # Get municipality from database
-        barangay = data.get('barangay')
-        conn = get_db_connection()
-        try:
-            municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
-            municipality = municipality['municipality'] if municipality else None
-        except Exception as e:
-            logger.error(f"Error fetching municipality: {e}")
-            municipality = None
-        finally:
-            conn.close()
-        
-        # Prepare response data
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'fire_type': {
-                'labels': [data.get('fire_type', 'Unknown')] if data.get('fire_type') else ['No Data'],
-                'datasets': [{
-                    'label': 'Fire Type',
-                    'data': [1] if data.get('fire_type') else [0],
-                    'backgroundColor': ['#FF6F61'] if data.get('fire_type') else ['#999999'],
-                    'borderColor': ['#FF6F61'] if data.get('fire_type') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'fire_cause': {
-                'labels': [data.get('fire_cause', 'Unknown')] if data.get('fire_cause') else ['No Data'],
-                'datasets': [{
-                    'label': 'Fire Cause',
-                    'data': [1] if data.get('fire_cause') else [0],
-                    'backgroundColor': ['#FF9F40'] if data.get('fire_cause') else ['#999999'],
-                    'borderColor': ['#FF9F40'] if data.get('fire_cause') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'weather': {
-                'labels': [data.get('weather', 'Unknown')] if data.get('weather') else ['No Data'],
-                'datasets': [{
-                    'label': 'Weather Conditions',
-                    'data': [1] if data.get('weather') else [0],
-                    'backgroundColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                    'borderColor': ['#96CEB4'] if data.get('weather') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'fire_severity': {
-                'labels': [data.get('fire_severity', 'Unknown')] if data.get('fire_severity') else ['No Data'],
-                'datasets': [{
-                    'label': 'Fire Severity',
-                    'data': [1] if data.get('fire_severity') else [0],
-                    'backgroundColor': ['#D4A5A5'] if data.get('fire_severity') else ['#999999'],
-                    'borderColor': ['#D4A5A5'] if data.get('fire_severity') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'barangay': barangay,
-            'prediction': str(prediction)
-        }
-        emit('pnp_fire_submitted', chart_data, room=f"pnp_{municipality.lower()}" if municipality else "pnp")
-        logger.info(f"Chart update emitted to room pnp_{municipality.lower()}")
-    except Exception as e:
-        logger.error(f"Error in handle_pnp_fire_response: {e}")
 
-
-@socketio.on('pnp_crime_response')
-def handle_pnp_crime_response_submitted(data):
-    logger.info(f"PNP crime response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
-    
-    conn = get_db_connection()
-    try:
-        conn.execute('''
-            INSERT INTO pnp_crime_response (
-                alert_id, crime_type, crime_cause, level, suspect_age, 
-                suspect_gender, victim_age, victim_gender, lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'),
-            data.get('level'), data.get('suspect_age'), data.get('suspect_gender'),
-            data.get('victim_age'), data.get('victim_gender'), data.get('lat'), data.get('lon'),
-            data.get('barangay'), data.get('emergency_type'), 
-            datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        ))
-        conn.commit()
-        logger.info(f"Stored PNP crime response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing PNP crime response: {e}")
-    finally:
-        conn.close()
-    
-    # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
-    if response_time.date() == today:
-        today_responses.append(data)
-    
-    # Compute prediction using ML model on form data
-    try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Crime_Type': 'Theft',
-            'Crime_Cause': 'Poverty'
-        }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'theft': 'Theft',
-            'assault': 'Assault',
-            'burglary': 'Burglary',
-            'robbery': 'Robbery',
-            'vandalism': 'Vandalism',
-            'harassment': 'Harassment',
-            'domestic violence': 'Domestic Violence',
-            'drug-related': 'Drug-Related',
-            'fraud': 'Fraud'
-        }
-        cause_mapping = {
-            'poverty': 'Poverty',
-            'unemployment': 'Unemployment',
-            'alcohol': 'Alcohol',
-            'drugs': 'Drugs',
-            'personal dispute': 'Personal Dispute',
-            'gang activity': 'Gang Activity',
-            'opportunistic': 'Opportunistic',
-            'domestic issue': 'Domestic Issue',
-            'mental health': 'Mental Health'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Crime_Type':
-                cleaned_data[key] = type_mapping.get(data.get('crime_type', '').lower(), default_values[key])
-            elif key == 'Crime_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('crime_cause', '').lower(), default_values[key])
-        
-        # Prepare features for prediction
-        features = [
-            cleaned_data['Year'],
-            cleaned_data['Barangay'],
-            cleaned_data['Crime_Type'],
-            cleaned_data['Crime_Cause']
-        ]
-        
-        # Call ML model
-        prediction = crime_predictor.predict([features])[0]
-        
-        # Get municipality from database
-        barangay = data.get('barangay')
-        conn = get_db_connection()
-        try:
-            municipality = conn.execute('SELECT municipality FROM barangays WHERE barangay = ?', (barangay,)).fetchone()
-            municipality = municipality['municipality'] if municipality else None
-        except Exception as e:
-            logger.error(f"Error fetching municipality: {e}")
-            municipality = None
-        finally:
-            conn.close()
-        
-        # Prepare response data
-        chart_data = {
-            'alert_id': data.get('alert_id'),
-            'crime_type': {
-                'labels': [data.get('crime_type', 'Unknown')] if data.get('crime_type') else ['No Data'],
-                'datasets': [{
-                    'label': 'Crime Type',
-                    'data': [1] if data.get('crime_type') else [0],
-                    'backgroundColor': ['#FF6F61'] if data.get('crime_type') else ['#999999'],
-                    'borderColor': ['#FF6F61'] if data.get('crime_type') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'crime_cause': {
-                'labels': [data.get('crime_cause', 'Unknown')] if data.get('crime_cause') else ['No Data'],
-                'datasets': [{
-                    'label': 'Crime Cause',
-                    'data': [1] if data.get('crime_cause') else [0],
-                    'backgroundColor': ['#FF9F40'] if data.get('crime_cause') else ['#999999'],
-                    'borderColor': ['#FF9F40'] if data.get('crime_cause') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'level': {
-                'labels': [data.get('level', 'Unknown')] if data.get('level') else ['No Data'],
-                'datasets': [{
-                    'label': 'Crime Level',
-                    'data': [1] if data.get('level') else [0],
-                    'backgroundColor': ['#96CEB4'] if data.get('level') else ['#999999'],
-                    'borderColor': ['#96CEB4'] if data.get('level') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'suspect_age': {
-                'labels': [data.get('suspect_age', 'Unknown')] if data.get('suspect_age') else ['No Data'],
-                'datasets': [{
-                    'label': 'Suspect Age',
-                    'data': [1] if data.get('suspect_age') else [0],
-                    'backgroundColor': ['#FFEEAD'] if data.get('suspect_age') else ['#999999'],
-                    'borderColor': ['#FFEEAD'] if data.get('suspect_age') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'suspect_gender': {
-                'labels': [data.get('suspect_gender', 'Unknown')] if data.get('suspect_gender') else ['No Data'],
-                'datasets': [{
-                    'label': 'Suspect Gender',
-                    'data': [1] if data.get('suspect_gender') else [0],
-                    'backgroundColor': ['#D4A5A5'] if data.get('suspect_gender') else ['#999999'],
-                    'borderColor': ['#D4A5A5'] if data.get('suspect_gender') else ['#999999'],
-                    'borderWidth': 1
-                }]
-            },
-            'barangay': barangay,
-            'prediction': str(prediction)
-        }
-        emit('pnp_crime_response', chart_data, room=f"pnp_{municipality.lower()}" if municipality else "pnp")
-        logger.info(f"Chart update emitted to room pnp_{municipality.lower()}")
-    except Exception as e:
-        logger.error(f"Error in handle_pnp_crime_response: {e}")    
         
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submitted(data):
@@ -2731,7 +1907,303 @@ def handle_hospital_response(data):
 
 
 
+@socketio.on('barangay_fire_submitted')
+def handle_barangay_fire_submitted(data):
+    logger.info(f"Received Barangay fire response: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
     
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO barangay_fire_response (
+                alert_id, fire_type, fire_cause, weather, fire_severity, 
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
+            data.get('weather'), data.get('fire_severity'), data.get('lat'), 
+            data.get('lon'), data.get('barangay'), data.get('emergency_type'), 
+            data['timestamp']
+        ))
+        conn.commit()
+        logger.info(f"Stored barangay fire response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing barangay fire response: {e}")
+    finally:
+        conn.close()
+    
+    try:
+        default_values = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Fire_Type': 'Residential Fire',
+            'Fire_Cause': 'Unattended Cooking'
+        }
+        ftype_mapping = {
+            'residential fire': 'Residential Fire', 'structural fire': 'Structural Fire',
+            'commercial/industrial fire': 'Commercial/Industrial Fire', 'electrical fire': 'Electrical Fire',
+            'vehicular fire': 'Vehicular Fire', 'grass fire': 'Grass Fire', 'forest/wildfire': 'Forest/Wildfire',
+            'rubbish/garbage fire': 'Rubbish/Garbage Fire', 'kitchen/grease fire': 'Kitchen/Grease Fire',
+            'gas/lpg fire': 'Gas/LPG Fire', 'explosion/blast-related fire': 'Explosion/Blast-related Fire',
+            'post fire': 'Post Fire'
+        }
+        fcause_mapping = {
+            'unattended cooking': 'Unattended Cooking', 'electrical short circuit': 'Electrical Short Circuit',
+            'candles left burning': 'Candles Left Burning', 'overloaded extension cords': 'Overloaded Extension Cords',
+            'smoking materials': 'Smoking Materials', 'lpg/gas leak': 'LPG/Gas Leak',
+            'faulty wiring or electrical systems': 'Faulty Wiring or Electrical Systems',
+            'flammable materials stored improperly': 'Flammable Materials Stored Improperly',
+            'welding or construction sparks': 'Welding or Construction Sparks', 'arson': 'Arson',
+            'machinery/equipment overheating': 'Machinery/Equipment Overheating',
+            'chemical reactions or spills': 'Chemical Reactions or Spills', 'boiler or furnace failure': 'Boiler or Furnace Failure',
+            'improper disposal of flammable waste': 'Improper Disposal of Flammable Waste',
+            'exposed or damaged wiring': 'Exposed or Damaged Wiring', 'lightning strike': 'Lightning Strike',
+            'engine overheating': 'Engine Overheating', 'fuel leak': 'Fuel Leak'
+        }
+        cleaned_data = {
+            'Year': default_values['Year'],
+            'Barangay': data.get('barangay', default_values['Barangay']),
+            'Fire_Type': ftype_mapping.get(data.get('fire_type', '').lower(), default_values['Fire_Type']),
+            'Fire_Cause': fcause_mapping.get(data.get('fire_cause', '').lower(), default_values['Fire_Cause'])
+        }
+        features = pd.DataFrame([[
+            cleaned_data['Fire_Type'], cleaned_data['Fire_Cause'], 
+            cleaned_data['Barangay'], cleaned_data['Year']
+        ]], columns=['Fire_Type', 'Fire_Cause', 'Barangay', 'Year'])
+        if fire_accident_predictor:
+            probability = fire_accident_predictor.predict_proba(features)[0][1] * 100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Prediction error for barangay fire response: {e}")
+        data['prediction'] = 'prediction_error'
+    
+    responses.append(data)
+    today_responses.append(data)
+    barangay_room = f"barangay_{data.get('barangay').lower()}"
+    emit('barangay_fire_submitted', data, room=barangay_room)
+    logger.info(f"Barangay fire response emitted to room {barangay_room}")
+
+@socketio.on('pnp_fire_submitted')
+def handle_pnp_fire_submitted(data):
+    logger.info(f"Received PNP fire response: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO pnp_fire_response (
+                alert_id, fire_type, fire_cause, weather, fire_severity, 
+                lat, lon, municipality, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
+            data.get('weather'), data.get('fire_severity'), data.get('lat'), 
+            data.get('lon'), data.get('municipality'), data.get('emergency_type'), 
+            data['timestamp']
+        ))
+        conn.commit()
+        logger.info(f"Stored PNP fire response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing PNP fire response: {e}")
+    finally:
+        conn.close()
+    
+    try:
+        default_values = {
+            'Year': datetime.now().year,
+            'Municipality': data.get('municipality', 'Unknown'),
+            'Fire_Type': 'Residential Fire',
+            'Fire_Cause': 'Unattended Cooking'
+        }
+        ftype_mapping = {
+            'residential fire': 'Residential Fire', 'structural fire': 'Structural Fire',
+            'commercial/industrial fire': 'Commercial/Industrial Fire', 'electrical fire': 'Electrical Fire',
+            'vehicular fire': 'Vehicular Fire', 'grass fire': 'Grass Fire', 'forest/wildfire': 'Forest/Wildfire',
+            'rubbish/garbage fire': 'Rubbish/Garbage Fire', 'kitchen/grease fire': 'Kitchen/Grease Fire',
+            'gas/lpg fire': 'Gas/LPG Fire', 'explosion/blast-related fire': 'Explosion/Blast-related Fire',
+            'post fire': 'Post Fire'
+        }
+        fcause_mapping = {
+            'unattended cooking': 'Unattended Cooking', 'electrical short circuit': 'Electrical Short Circuit',
+            'candles left burning': 'Candles Left Burning', 'overloaded extension cords': 'Overloaded Extension Cords',
+            'smoking materials': 'Smoking Materials', 'lpg/gas leak': 'LPG/Gas Leak',
+            'faulty wiring or electrical systems': 'Faulty Wiring or Electrical Systems',
+            'flammable materials stored improperly': 'Flammable Materials Stored Improperly',
+            'welding or construction sparks': 'Welding or Construction Sparks', 'arson': 'Arson',
+            'machinery/equipment overheating': 'Machinery/Equipment Overheating',
+            'chemical reactions or spills': 'Chemical Reactions or Spills', 'boiler or furnace failure': 'Boiler or Furnace Failure',
+            'improper disposal of flammable waste': 'Improper Disposal of Flammable Waste',
+            'exposed or damaged wiring': 'Exposed or Damaged Wiring', 'lightning strike': 'Lightning Strike',
+            'engine overheating': 'Engine Overheating', 'fuel leak': 'Fuel Leak'
+        }
+        cleaned_data = {
+            'Year': default_values['Year'],
+            'Municipality': data.get('municipality', default_values['Municipality']),
+            'Fire_Type': ftype_mapping.get(data.get('fire_type', '').lower(), default_values['Fire_Type']),
+            'Fire_Cause': fcause_mapping.get(data.get('fire_cause', '').lower(), default_values['Fire_Cause'])
+        }
+        features = pd.DataFrame([[
+            cleaned_data['Fire_Type'], cleaned_data['Fire_Cause'], 
+            cleaned_data['Municipality'], cleaned_data['Year']
+        ]], columns=['Fire_Type', 'Fire_Cause', 'Municipality', 'Year'])
+        if fire_accident_predictor:
+            probability = fire_accident_predictor.predict_proba(features)[0][1] * 100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Prediction error for PNP fire response: {e}")
+        data['prediction'] = 'prediction_error'
+    
+    responses.append(data)
+    today_responses.append(data)
+    pnp_room = f"pnp_{data.get('municipality').lower()}"
+    emit('pnp_fire_submitted', data, room=pnp_room)
+    logger.info(f"PNP fire response emitted to room {pnp_room}")
+
+@socketio.on('barangay_crime_submitted')
+def handle_barangay_crime_submitted(data):
+    logger.info(f"Received Barangay crime response: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO barangay_crime_response (
+                alert_id, crime_type, crime_cause, level, suspect_gender, 
+                victim_gender, suspect_age, victim_age, lat, lon, barangay, 
+                emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'),
+            data.get('level'), data.get('suspect_gender'), data.get('victim_gender'),
+            data.get('suspect_age'), data.get('victim_age'), data.get('lat'), 
+            data.get('lon'), data.get('barangay'), data.get('emergency_type'), 
+            data['timestamp']
+        ))
+        conn.commit()
+        logger.info(f"Stored barangay crime response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing barangay crime response: {e}")
+    finally:
+        conn.close()
+    
+    try:
+        default_values = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Crime_Type': 'Theft',
+            'Crime_Cause': 'Poverty'
+        }
+        ctype_mapping = {
+            'theft': 'Theft', 'assault': 'Assault', 'burglary': 'Burglary',
+            'robbery': 'Robbery', 'vandalism': 'Vandalism', 'harassment': 'Harassment',
+            'domestic violence': 'Domestic Violence', 'drug-related': 'Drug-Related',
+            'fraud': 'Fraud'
+        }
+        ccause_mapping = {
+            'poverty': 'Poverty', 'unemployment': 'Unemployment', 'alcohol': 'Alcohol',
+            'drugs': 'Drugs', 'personal dispute': 'Personal Dispute', 'gang activity': 'Gang Activity',
+            'opportunistic': 'Opportunistic', 'domestic issue': 'Domestic Issue',
+            'mental health': 'Mental Health'
+        }
+        cleaned_data = {
+            'Year': default_values['Year'],
+            'Barangay': data.get('barangay', default_values['Barangay']),
+            'Crime_Type': ctype_mapping.get(data.get('crime_type', '').lower(), default_values['Crime_Type']),
+            'Crime_Cause': ccause_mapping.get(data.get('crime_cause', '').lower(), default_values['Crime_Cause'])
+        }
+        features = pd.DataFrame([[
+            cleaned_data['Crime_Type'], cleaned_data['Crime_Cause'], 
+            cleaned_data['Barangay'], cleaned_data['Year']
+        ]], columns=['Crime_Type', 'Crime_Cause', 'Barangay', 'Year'])
+        if crime_predictor:
+            probability = crime_predictor.predict_proba(features)[0][1] * 100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Prediction error for barangay crime response: {e}")
+        data['prediction'] = 'prediction_error'
+    
+    responses.append(data)
+    today_responses.append(data)
+    barangay_room = f"barangay_{data.get('barangay').lower()}"
+    emit('barangay_crime_submitted', data, room=barangay_room)
+    logger.info(f"Barangay crime response emitted to room {barangay_room}")
+
+@socketio.on('pnp_crime_response')
+def handle_pnp_crime_response(data):
+    logger.info(f"Received PNP crime response: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    
+    conn = get_db_connection()
+    try:
+        conn.execute('''
+            INSERT INTO pnp_crime_response (
+                alert_id, crime_type, crime_cause, level, suspect_gender, 
+                victim_gender, suspect_age, victim_age, lat, lon, municipality, 
+                emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'),
+            data.get('level'), data.get('suspect_gender'), data.get('victim_gender'),
+            data.get('suspect_age'), data.get('victim_age'), data.get('lat'), 
+            data.get('lon'), data.get('municipality'), data.get('emergency_type'), 
+            data['timestamp']
+        ))
+        conn.commit()
+        logger.info(f"Stored PNP crime response for alert_id: {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error storing PNP crime response: {e}")
+    finally:
+        conn.close()
+    
+    try:
+        default_values = {
+            'Year': datetime.now().year,
+            'Municipality': data.get('municipality', 'Unknown'),
+            'Crime_Type': 'Theft',
+            'Crime_Cause': 'Poverty'
+        }
+        ctype_mapping = {
+            'theft': 'Theft', 'assault': 'Assault', 'burglary': 'Burglary',
+            'robbery': 'Robbery', 'vandalism': 'Vandalism', 'harassment': 'Harassment',
+            'domestic violence': 'Domestic Violence', 'drug-related': 'Drug-Related',
+            'fraud': 'Fraud'
+        }
+        ccause_mapping = {
+            'poverty': 'Poverty', 'unemployment': 'Unemployment', 'alcohol': 'Alcohol',
+            'drugs': 'Drugs', 'personal dispute': 'Personal Dispute', 'gang activity': 'Gang Activity',
+            'opportunistic': 'Opportunistic', 'domestic issue': 'Domestic Issue',
+            'mental health': 'Mental Health'
+        }
+        cleaned_data = {
+            'Year': default_values['Year'],
+            'Municipality': data.get('municipality', default_values['Municipality']),
+            'Crime_Type': ctype_mapping.get(data.get('crime_type', '').lower(), default_values['Crime_Type']),
+            'Crime_Cause': ccause_mapping.get(data.get('crime_cause', '').lower(), default_values['Crime_Cause'])
+        }
+        features = pd.DataFrame([[
+            cleaned_data['Crime_Type'], cleaned_data['Crime_Cause'], 
+            cleaned_data['Municipality'], cleaned_data['Year']
+        ]], columns=['Crime_Type', 'Crime_Cause', 'Municipality', 'Year'])
+        if crime_predictor:
+            probability = crime_predictor.predict_proba(features)[0][1] * 100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Prediction error for PNP crime response: {e}")
+        data['prediction'] = 'prediction_error'
+    
+    responses.append(data)
+    today_responses.append(data)
+    pnp_room = f"pnp_{data.get('municipality').lower()}"
+    emit('pnp_crime_response', data, room=pnp_room)
+    logger.info(f"PNP crime response emitted to room {pnp_room}")
 
 
 
