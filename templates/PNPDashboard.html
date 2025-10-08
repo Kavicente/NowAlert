@@ -309,69 +309,6 @@
                 });
                 responseForm.appendChild(submitButton);
 
-
-
-                const submitButton = document.createElement('button');
-                submitButton.textContent = 'Submit';
-                submitButton.addEventListener('click', () => {
-                    const responseData = {
-                        alert_id: data.alert_id,
-                        role: 'pnp',
-                        lat: data.lat,
-                        lon: data.lon,
-                        barangay: data.barangay,
-                        emergency_type: 'Road Accident',
-                        municipality: '{{ municipality }}'.toLowerCase()
-                    };
-                    formData.querySelectorAll('select').forEach(select => {
-                        responseData[select.name] = select.value;
-                    });
-                    socket.emit('pnp_response', responseData);
-                    statusDiv.textContent = 'RESPONDED';
-                });
-                responseForm.appendChild(submitButton);
-
-                const submitButton = document.createElement('button');
-                submitButton.textContent = 'Submit';
-                submitButton.addEventListener('click', () => {
-                    const responseData = {
-                        alert_id: data.alert_id,
-                        role: 'pnp',
-                        lat: data.lat,
-                        lon: data.lon,
-                        barangay: data.barangay,
-                        emergency_type: 'Fire Incident',
-                        municipality: '{{ municipality }}'.toLowerCase()
-                    };
-                    formData.querySelectorAll('select').forEach(select => {
-                        responseData[select.name] = select.value;
-                    });
-                    socket.emit('pnp_fire_submitted', responseData);
-                    statusDiv.textContent = 'RESPONDED';
-                });
-                responseForm.appendChild(submitButton);
-
-
-                const submitButton = document.createElement('button');
-                submitButton.textContent = 'Submit';
-                submitButton.addEventListener('click', () => {
-                    const responseData = {
-                        alert_id: data.alert_id,
-                        role: 'pnp',
-                        lat: data.lat,
-                        lon: data.lon,
-                        barangay: data.barangay,
-                        emergency_type: 'Crime Incident',
-                        municipality: '{{ municipality }}'.toLowerCase()
-                    };
-                    formData.querySelectorAll('select').forEach(select => {
-                        responseData[select.name] = select.value;
-                    });
-                    socket.emit('pnp_crime_response', responseData);
-                    statusDiv.textContent = 'RESPONDED';
-                });
-                responseForm.appendChild(submitButton);
-
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.textContent = 'Prediction: N/A';
