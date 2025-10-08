@@ -302,7 +302,7 @@
                     formData.alert_id = data.alert_id;
                     formData.emergency_type = data.emergency_type;
                     formData.barangay = data.barangay;
-                    const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' : 'pnp_response';
+                    const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' : data.emergency_type === 'Road Accident' ? 'pnp_response';
                     socket.emit(socketEvent, formData);
                     responseForm.style.display = 'none';
                     statusDiv.textContent = 'RESPONDED';
