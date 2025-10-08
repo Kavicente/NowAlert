@@ -84,278 +84,278 @@
     </main>
 
     <script>
-            let menuData = {};
-            document.addEventListener('DOMContentLoaded', () => {
-                const lat = {{ lat_coord|default(14.0549) }};
-                const lon = {{ lon_coord|default(121.3013) }};
-                const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
-                const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
+        let menuData = {};
+        document.addEventListener('DOMContentLoaded', () => {
+            const lat = {{ lat_coord|default(14.0549) }};
+            const lon = {{ lon_coord|default(121.3013) }};
+            const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
+            const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-                const pnpMap = L.map('map').setView([lat, lon], 16);
+            const pnpMap = L.map('map').setView([lat, lon], 16);
 
-                var satellite = L.tileLayer(tileLayerUrl, {
-                    attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-                    maxZoom: 18,
-                    tileSize: 512,
-                    zoomOffset: -1
-                });
+            var satellite = L.tileLayer(tileLayerUrl, {
+                attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+                maxZoom: 18,
+                tileSize: 512,
+                zoomOffset: -1
+            });
 
-                var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
-                });
+            var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            });
 
-                satellite.addTo(pnpMap);
+            satellite.addTo(pnpMap);
 
-                var baseLayers = {
-                    "Satellite with Labels": satellite,
-                    "OpenStreetMap": osm
-                };
-                L.control.layers(baseLayers).addTo(pnpMap);
+            var baseLayers = {
+                "Satellite with Labels": satellite,
+                "OpenStreetMap": osm
+            };
+            L.control.layers(baseLayers).addTo(pnpMap);
 
-                const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
-                const alertElements = new Map();
+            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+            const alertElements = new Map();
 
-                fetch('/static/menu.txt')
-                    .then(response => response.text())
-                    .then(text => {
-                        menuData = parseMenuText(text);
-                        console.log('Menu data loaded:', menuData);
-                    })
-                    .catch(error => console.error('Error loading menu.txt:', error));
+            fetch('/static/menu.txt')
+                .then(response => response.text())
+                .then(text => {
+                    menuData = parseMenuText(text);
+                    console.log('Menu data loaded:', menuData);
+                })
+                .catch(error => console.error('Error loading menu.txt:', error));
 
-                socket.on('connect', () => {
-                    console.log('Connected to server');
-                    socket.emit('register_role', { role: 'pnp', municipality: '{{ municipality }}'.toLowerCase() });
-                });
+            socket.on('connect', () => {
+                console.log('Connected to server');
+                socket.emit('register_role', { role: 'pnp', municipality: '{{ municipality }}'.toLowerCase() });
+            });
 
-                socket.on('connect_error', (error) => {
-                    console.error('Connection error:', error);
-                });
+            socket.on('connect_error', (error) => {
+                console.error('Connection error:', error);
+            });
 
-                socket.on('pnp_redirect_alert', (data) => {
-                    console.log('PNP redirected alert received:', data);
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                });
+            socket.on('pnp_redirect_alert', (data) => {
+                console.log('PNP redirected alert received:', data);
+                updateUIWithAlert(data);
+                notifyAlert(data);
+            });
 
-                socket.on('update_map', (data) => {
-                    console.log('Update map received:', data);
-                    const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                    const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                    pnpMap.setView([lat, lon], 16);
-                    L.marker([lat, lon]).addTo(pnpMap).bindPopup(
-                        `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                    ).openPopup();
-                    document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-                });
+            socket.on('update_map', (data) => {
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                pnpMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(pnpMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+            });
 
-                socket.on('pnp_response', (data) => {
-                    console.log('Response submitted:', data);
-                    const alertItem = alertElements.get(data.alert_id);
-                    if (alertItem) {
-                        const predictionDiv = alertItem.querySelector('.prediction');
-                        const predictionText = data.prediction || 'N/A';
-                        let formattedPrediction = 'N/A';
-                        if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                            if (match) {
-                                const percentage = match[1];
-                                const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
-                                const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                                formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
-                            } else {
-                                formattedPrediction = predictionText;
-                            }
+            socket.on('pnp_response', (data) => {
+                console.log('Response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
                         }
-                        predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                        predictionDiv.style.display = 'block';
                     }
-                });
-
-                socket.on('pnp_fire_submitted', (data) => {
-                    console.log('Fire response submitted:', data);
-                    const alertItem = alertElements.get(data.alert_id);
-                    if (alertItem) {
-                        const predictionDiv = alertItem.querySelector('.prediction');
-                        const predictionText = data.prediction || 'N/A';
-                        let formattedPrediction = 'N/A';
-                        if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                            if (match) {
-                                const percentage = match[1];
-                                const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
-                                const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                                formattedPrediction = `There will be a ${percentage}% chance of Fire Incident Again in next ${randomRange}`;
-                            } else {
-                                formattedPrediction = predictionText;
-                            }
-                        }
-                        predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                        predictionDiv.style.display = 'block';
-                    }
-                });
-
-                socket.on('pnp_crime_response', (data) => {
-                    console.log('Crime response submitted:', data);
-                    const alertItem = alertElements.get(data.alert_id);
-                    if (alertItem) {
-                        const predictionDiv = alertItem.querySelector('.prediction');
-                        const predictionText = data.prediction || 'N/A';
-                        let formattedPrediction = 'N/A';
-                        if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                            if (match) {
-                                const percentage = match[1];
-                                const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
-                                const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                                formattedPrediction = `There will be a ${percentage}% chance of Crime Incident Again in next ${randomRange}`;
-                            } else {
-                                formattedPrediction = predictionText;
-                            }
-                        }
-                        predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                        predictionDiv.style.display = 'block';
-                    }
-                });
-
-                function parseMenuText(text) {
-                    const sections = text.split('#').filter(s => s.trim());
-                    const menu = {};
-                    sections.forEach(section => {
-                        const lines = section.trim().split('\n');
-                        const sectionName = lines[0].trim();
-                        const options = {};
-                        lines.slice(1).forEach(line => {
-                            const [key, values] = line.split(':');
-                            options[key.trim()] = values.split(',').map(v => v.trim());
-                        });
-                        menu[sectionName] = options;
-                    });
-                    return menu;
-                }
-
-                function updateUIWithAlert(data) {
-                    const alertContainer = document.getElementById('alert-container');
-                    const alertItem = document.createElement('div');
-                    alertItem.className = 'alert-item';
-                    alertItem.dataset.alertId = data.alert_id;
-                    alertElements.set(data.alert_id, alertItem);
-
-                    const statusDiv = document.createElement('div');
-                    statusDiv.textContent = 'PENDING ALERT';
-                    statusDiv.style.fontWeight = 'bold';
-                    statusDiv.style.fontSize = '16px';
-
-                    const alertText = document.createElement('div');
-                    alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
-
-                    const typeDiv = document.createElement('div');
-                    typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
-                    typeDiv.style.fontWeight = 'bold';
-                    typeDiv.style.fontSize = '16px';
-                    typeDiv.style.display = 'block';
-
-                    const timeDiv = document.createElement('div');
-                    const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' });
-                    timeDiv.textContent = `Time: ${timestamp}`;
-
-                    const imageDiv = document.createElement('img');
-                    imageDiv.className = 'clickable-img';
-                    imageDiv.style.display = 'none';
-                    if (data.image) {
-                        imageDiv.src = data.image;
-                        imageDiv.style.display = 'block';
-                        imageDiv.addEventListener('click', () => {
-                            const modal = document.getElementById('image-modal');
-                            const modalImg = document.getElementById('modal-image');
-                            modalImg.src = data.image;
-                            modal.style.display = 'flex';
-                        });
-                    }
-
-                    const responseForm = document.createElement('div');
-                    responseForm.className = 'response-form';
-                    responseForm.style.display = 'none';
-
-                    let emergencyType = data.emergency_type || 'Unknown';
-                    let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
-
-                    Object.keys(dropdownData).forEach(key => {
-                        const select = document.createElement('select');
-                        select.name = key.toLowerCase().replace(/\s+/g, '_');
-                        dropdownData[key].forEach(option => {
-                            const opt = document.createElement('option');
-                            opt.value = option;
-                            opt.textContent = option;
-                            select.appendChild(opt);
-                        });
-                        responseForm.appendChild(select);
-                    });
-
-                    const submitButton = document.createElement('button');
-                    submitButton.textContent = 'Respond';
-                    submitButton.addEventListener('click', () => {
-                        const formData = {};
-                        responseForm.querySelectorAll('select').forEach(select => {
-                            formData[select.name] = select.value;
-                        });
-                        formData.alert_id = data.alert_id;
-                        formData.emergency_type = data.emergency_type;
-                        formData.barangay = data.barangay;
-                        const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' : data.emergency_type === 'Road Accident' ? 'pnp_response';
-                        socket.emit(socketEvent, formData);
-                        responseForm.style.display = 'none';
-                        statusDiv.textContent = 'RESPONDED';
-                    });
-                    responseForm.appendChild(submitButton);
-
-                    const predictionDiv = document.createElement('div');
-                    predictionDiv.className = 'prediction';
-                    predictionDiv.textContent = 'Prediction: N/A';
-                    predictionDiv.style.display = 'none';
-                    predictionDiv.style.fontSize = '16px';
-                    predictionDiv.style.color = 'black';
-
-                    const acceptButton = document.createElement('button');
-                    acceptButton.textContent = 'Accept';
-                    acceptButton.addEventListener('click', () => {
-                        responseForm.style.display = 'block';
-                        acceptButton.style.display = 'none';
-                        declineButton.style.display = 'none';
-                    });
-
-                    const declineButton = document.createElement('button');
-                    declineButton.textContent = 'Decline';
-                    declineButton.addEventListener('click', () => {
-                        responseForm.style.display = 'none';
-                        acceptButton.style.display = 'none';
-                        declineButton.style.display = 'none';
-                        statusDiv.textContent = 'DECLINED';
-                    });
-
-                    alertItem.appendChild(statusDiv);
-                    alertItem.appendChild(alertText);
-                    alertItem.appendChild(typeDiv);
-                    alertItem.appendChild(timeDiv);
-                    alertItem.appendChild(imageDiv);
-                    alertItem.appendChild(acceptButton);
-                    alertItem.appendChild(declineButton);
-                    alertItem.appendChild(responseForm);
-                    alertItem.appendChild(predictionDiv);
-
-                    alertContainer.insertBefore(alertItem, alertContainer.firstChild);
-
-                    document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
-                        document.getElementById('image-modal').style.display = 'none';
-                    });
-                }
-
-                function notifyAlert(data) {
-                    const notification = document.getElementById('notification');
-                    notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}`;
-                    setTimeout(() => notification.textContent = '', 5000);
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    predictionDiv.style.display = 'block';
                 }
             });
+
+            socket.on('pnp_fire_submitted', (data) => {
+                console.log('Fire response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Fire Incident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
+                        }
+                    }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    predictionDiv.style.display = 'block';
+                }
+            });
+
+            socket.on('pnp_crime_response', (data) => {
+                console.log('Crime response submitted:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
+                    const predictionText = data.prediction || 'N/A';
+                    let formattedPrediction = 'N/A';
+                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                        if (match) {
+                            const percentage = match[1];
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% chance of Crime Incident Again in next ${randomRange}`;
+                        } else {
+                            formattedPrediction = predictionText;
+                        }
+                    }
+                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                    predictionDiv.style.display = 'block';
+                }
+            });
+
+            function parseMenuText(text) {
+                const sections = text.split('#').filter(s => s.trim());
+                const menu = {};
+                sections.forEach(section => {
+                    const lines = section.trim().split('\n');
+                    const sectionName = lines[0].trim();
+                    const options = {};
+                    lines.slice(1).forEach(line => {
+                        const [key, values] = line.split(':');
+                        options[key.trim()] = values.split(',').map(v => v.trim());
+                    });
+                    menu[sectionName] = options;
+                });
+                return menu;
+            }
+
+            function updateUIWithAlert(data) {
+                const alertContainer = document.getElementById('alert-container');
+                const alertItem = document.createElement('div');
+                alertItem.className = 'alert-item';
+                alertItem.dataset.alertId = data.alert_id;
+                alertElements.set(data.alert_id, alertItem);
+
+                const statusDiv = document.createElement('div');
+                statusDiv.textContent = 'PENDING ALERT';
+                statusDiv.style.fontWeight = 'bold';
+                statusDiv.style.fontSize = '16px';
+
+                const alertText = document.createElement('div');
+                alertText.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
+
+                const typeDiv = document.createElement('div');
+                typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
+                typeDiv.style.fontWeight = 'bold';
+                typeDiv.style.fontSize = '16px';
+                typeDiv.style.display = 'block';
+
+                const timeDiv = document.createElement('div');
+                const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Manila' });
+                timeDiv.textContent = `Time: ${timestamp}`;
+
+                const imageDiv = document.createElement('img');
+                imageDiv.className = 'clickable-img';
+                imageDiv.style.display = 'none';
+                if (data.image) {
+                    imageDiv.src = data.image;
+                    imageDiv.style.display = 'block';
+                    imageDiv.addEventListener('click', () => {
+                        const modal = document.getElementById('image-modal');
+                        const modalImg = document.getElementById('modal-image');
+                        modalImg.src = data.image;
+                        modal.style.display = 'flex';
+                    });
+                }
+
+                const responseForm = document.createElement('div');
+                responseForm.className = 'response-form';
+                responseForm.style.display = 'none';
+
+                let emergencyType = data.emergency_type || 'Unknown';
+                let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
+
+                Object.keys(dropdownData).forEach(key => {
+                    const select = document.createElement('select');
+                    select.name = key.toLowerCase().replace(/\s+/g, '_');
+                    dropdownData[key].forEach(option => {
+                        const opt = document.createElement('option');
+                        opt.value = option;
+                        opt.textContent = option;
+                        select.appendChild(opt);
+                    });
+                    responseForm.appendChild(select);
+                });
+
+                const submitButton = document.createElement('button');
+                submitButton.textContent = 'Respond';
+                submitButton.addEventListener('click', () => {
+                    const formData = {};
+                    responseForm.querySelectorAll('select').forEach(select => {
+                        formData[select.name] = select.value;
+                    });
+                    formData.alert_id = data.alert_id;
+                    formData.emergency_type = data.emergency_type;
+                    formData.barangay = data.barangay;
+                    const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' : data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' : 'pnp_response';
+                    socket.emit(socketEvent, formData);
+                    responseForm.style.display = 'none';
+                    statusDiv.textContent = 'RESPONDED';
+                });
+                responseForm.appendChild(submitButton);
+
+                const predictionDiv = document.createElement('div');
+                predictionDiv.className = 'prediction';
+                predictionDiv.textContent = 'Prediction: N/A';
+                predictionDiv.style.display = 'none';
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.color = 'black';
+
+                const acceptButton = document.createElement('button');
+                acceptButton.textContent = 'Accept';
+                acceptButton.addEventListener('click', () => {
+                    responseForm.style.display = 'block';
+                    acceptButton.style.display = 'none';
+                    declineButton.style.display = 'none';
+                });
+
+                const declineButton = document.createElement('button');
+                declineButton.textContent = 'Decline';
+                declineButton.addEventListener('click', () => {
+                    responseForm.style.display = 'none';
+                    acceptButton.style.display = 'none';
+                    declineButton.style.display = 'none';
+                    statusDiv.textContent = 'DECLINED';
+                });
+
+                alertItem.appendChild(statusDiv);
+                alertItem.appendChild(alertText);
+                alertItem.appendChild(typeDiv);
+                alertItem.appendChild(timeDiv);
+                alertItem.appendChild(imageDiv);
+                alertItem.appendChild(acceptButton);
+                alertItem.appendChild(declineButton);
+                alertItem.appendChild(responseForm);
+                alertItem.appendChild(predictionDiv);
+
+                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
+
+                document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
+                    document.getElementById('image-modal').style.display = 'none';
+                });
+            }
+
+            function notifyAlert(data) {
+                const notification = document.getElementById('notification');
+                notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}`;
+                setTimeout(() => notification.textContent = '', 5000);
+            }
+        });
     </script>
 </body>
 </html>
