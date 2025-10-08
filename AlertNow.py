@@ -835,36 +835,53 @@ def handle_redirect_alert(data):
 @socketio.on('pnp_redirect_alert')
 def handle_pnp_redirect_alert(data):
     logger.info(f"Received PNP redirect alert: {data}")
-    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    # Use Asia/Manila timezone and format timestamp consistently
+    timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    data['timestamp'] = timestamp
     
     conn = get_db_connection()
     try:
+        # Ensure all values are provided or default to None with proper type handling
+        alert_id = data.get('alert_id')
+        lat = float(data.get('lat')) if data.get('lat') is not None else None
+        lon = float(data.get('lon')) if data.get('lon') is not None else None
+        municipality = data.get('municipality')
+        barangay = data.get('barangay')
+        emergency_type = data.get('emergency_type')
+
+        if None in (alert_id, lat, lon, municipality, barangay, emergency_type):
+            logger.warning(f"Missing required fields in PNP redirect alert: {data}")
+            return
+
         conn.execute('''
             INSERT INTO pnp_alerts (
                 alert_id, lat, lon, municipality, barangay, emergency_type, timestamp
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('alert_id'), data.get('lat'), data.get('lon'),
-            data.get('municipality'), data.get('barangay'),
-            data.get('emergency_type'), data['timestamp']
-        ))
+        ''', (alert_id, lat, lon, municipality, barangay, emergency_type, timestamp))
         conn.commit()
-        logger.info(f"Stored PNP redirect alert for alert_id: {data.get('alert_id')}")
+        logger.info(f"Stored PNP redirect alert for alert_id: {alert_id}")
+    except sqlite3.IntegrityError as e:
+        logger.error(f"Database integrity error storing PNP redirect alert: {e}")
+    except ValueError as e:
+        logger.error(f"Type conversion error storing PNP redirect alert: {e}")
     except Exception as e:
         logger.error(f"Error storing PNP redirect alert: {e}")
     finally:
         conn.close()
     
-    pnp_room = f"pnp_{data.get('municipality').lower()}"
+    # Emit to the correct PNP room based on municipality
+    pnp_room = f"pnp_{data.get('municipality', '').lower()}"
     emit('pnp_redirect_alert', data, room=pnp_room)
     logger.info(f"PNP redirect alert emitted to room {pnp_room}")
     
+    # Emit map update to the same room
     emit('update_map', {
         'lat': data.get('lat'),
         'lon': data.get('lon'),
         'barangay': data.get('barangay'),
         'emergency_type': data.get('emergency_type')
     }, room=pnp_room)
+    logger.info(f"Map update emitted to room {pnp_room} for alert {data.get('alert_id')}")
 
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
@@ -3323,7 +3340,7 @@ if __name__ == '__main__':
         ''')
         c.execute('''
             CREATE TABLE IF NOT EXISTS pnp_alerts (
-                alert_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT PRIMARY KEY,
                 lat REAL,
                 lon REAL,
                 municipality TEXT,
