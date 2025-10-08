@@ -169,9 +169,9 @@
                         });
                         formData.alert_id = data.alert_id;
                         formData.emergency_type = data.emergency_type;
-                        formData.municipality = '{{ municipality }}';
+                        formData.barangay = '{{ barangay }}';
                         const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' :
-                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' :
+                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_submitted' :
                                             'pnp_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
@@ -184,7 +184,7 @@
             });
 
             socket.on('pnp_response', (data) => {
-                console.log('PNP response submitted:', data);
+                console.log('Response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -203,11 +203,13 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
+                    predictionDiv.style.fontSize = '16px';
+                    predictionDiv.style.color = 'black';
                 }
             });
 
             socket.on('pnp_fire_submitted', (data) => {
-                console.log('PNP fire response submitted:', data);
+                console.log('Fire response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -226,11 +228,13 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
+                    predictionDiv.style.fontSize = '16px';
+                    predictionDiv.style.color = 'black';
                 }
             });
 
-            socket.on('pnp_crime_response', (data) => {
-                console.log('PNP crime response submitted:', data);
+            socket.on('pnp_crime_submitted', (data) => {
+                console.log('Crime response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -249,6 +253,8 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
+                    predictionDiv.style.fontSize = '16px';
+                    predictionDiv.style.color = 'black';
                 }
             });
 
@@ -256,8 +262,8 @@
                 console.log('Update map received:', data);
                 const lat = data.lat || {{ lat_coord|default(14.0549) }};
                 const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                pnpMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(pnpMap).bindPopup(
+                barangayMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(barangayMap).bindPopup(
                     `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                 ).openPopup();
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
@@ -270,11 +276,11 @@
                 alertItem.innerHTML = `
                     <div>PENDING ALERT</div>
                     <div>Emergency at ${data.barangay || 'Unknown'}</div>
-                    <div>Type: ${data.emergency_type || 'N/A'}</div>
+                    <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
                     <img class="clickable-img" style="display: none;" src="${data.image || ''}">
                     <div class="response-form"></div>
-                    <div class="prediction" style="display: none; font-weight: bold;, font-size: 20px; color: black;">Prediction: ${data.prediction || 'N/A'}</div>
+                    <div class="prediction" style="display: none;">Prediction: N/A</div>
                 `;
                 if (data.image) {
                     const img = alertItem.querySelector('img');

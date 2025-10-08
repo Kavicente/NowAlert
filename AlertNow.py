@@ -3321,7 +3321,17 @@ if __name__ == '__main__':
                 responded BOOLEAN DEFAULT TRUE
             )
         ''')
-        
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS pnp_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lat REAL,
+                lon REAL,
+                municipality TEXT,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT
+            )
+        ''')
         conn.commit()
         conn.close()
         logger.info("barangay_response initialized successfully in users_web.db")
