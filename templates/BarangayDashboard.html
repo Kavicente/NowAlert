@@ -181,6 +181,7 @@
                         formData.barangay = '{{ barangay }}';
                         const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' :
                                             data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' :
+                                            data.emergency_type === 'Health Emergency' ? 'barangay_health_response' :
                                             'barangay_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
@@ -189,6 +190,23 @@
                     });
                     responseForm.appendChild(submitButton);
                     responseForm.style.display = 'block';
+                }
+            });
+
+            socket.on('hospital_admission_notification', (data) => {
+                console.log('Hospital admission notification received:', data);
+                const alertItem = alertElements.get(data.alert_id);
+                if (alertItem) {
+                    const statusDiv = alertItem.querySelector('div:nth-child(1)');
+                    statusDiv.textContent = 'RESPONDED';
+                    const typeDiv = alertItem.querySelector('div:nth-child(3)');
+                    typeDiv.textContent = `Type: Health Emergency`;
+                    typeDiv.style.display = 'block';
+                    const admissionDiv = document.createElement('div');
+                    admissionDiv.textContent = `Admit to ${data.assigned_hospital}`;
+                    admissionDiv.style.color = '#000000';
+                    admissionDiv.style.fontSize = '16px';
+                    alertItem.appendChild(admissionDiv);
                 }
             });
 
