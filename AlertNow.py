@@ -892,6 +892,59 @@ def handle_pnp_redirect_alert(data):
     }, room=pnp_room)
     logger.info(f"Emergency type update emitted to room {pnp_room} for alert {data.get('alert_id')}")
 
+
+@socketio.on('hospital_redirect_alert')
+def handle_hospital_redirect_alert(data):
+    print(f"Hospital redirect alert received: {data}")
+    alert_id = data.get('alert_id')
+    assigned_hospital = data.get('assigned_hospital')
+    barangay = data.get('barangay')
+    emergency_type = data.get('emergency_type', 'Health Emergency')
+    health_type = data.get('health_type', 'N/A')
+    health_cause = data.get('health_cause', 'N/A')
+    patient_age = data.get('patient_age', 'N/A')
+    patient_gender = data.get('patient_gender', 'N/A')
+    timestamp = data.get('timestamp')
+    
+    if alert_id and assigned_hospital and barangay:
+        # Update alert with hospital assignment in the database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE alerts 
+            SET status = ?, assigned_hospital = ?
+            WHERE alert_id = ? AND barangay = ?
+        ''', ('RESPONDED', assigned_hospital, alert_id, barangay))
+        conn.commit()
+        conn.close()
+        
+        # Notify the specific hospital
+        emit('hospital_redirect_alert', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'emergency_type': emergency_type,
+            'assigned_hospital': assigned_hospital,
+            'health_type': health_type,
+            'health_cause': health_cause,
+            'patient_age': patient_age,
+            'patient_gender': patient_gender,
+            'timestamp': timestamp,
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'image': data.get('image')
+        }, room=f'hospital_{assigned_hospital.lower().replace(" ", "_")}')
+        
+        # Notify the barangay of hospital admission
+        emit('hospital_admission_notification', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'assigned_hospital': assigned_hospital,
+            'health_type': health_type,
+            'health_cause': health_cause,
+            'patient_age': patient_age,
+            'patient_gender': patient_gender
+        }, room=f'barangay_{barangay.lower()}')
+
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
     logger.info(f"Received update dashboard emergency type: {data}")
@@ -3385,6 +3438,24 @@ if __name__ == '__main__':
                 emergency_type TEXT,
                 timestamp TEXT,
                 responded BOOLEAN DEFAULT TRUE
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS hospital_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT NOT NULL,
+                barangay TEXT NOT NULL,
+                assigned_hospital TEXT NOT NULL,
+                health_type TEXT DEFAULT 'N/A',
+                health_cause TEXT DEFAULT 'N/A',
+                patient_age TEXT DEFAULT 'N/A',
+                patient_gender TEXT DEFAULT 'N/A',
+                timestamp TEXT NOT NULL,
+                status TEXT NOT NULL,
+                lat REAL,
+                lon REAL,
+                image TEXT,
+                FOREIGN KEY (alert_id, barangay) REFERENCES alerts (alert_id, barangay)
             )
         ''')
         conn.commit()
