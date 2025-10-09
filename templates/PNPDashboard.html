@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PNP Dashboard</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -112,7 +113,7 @@
             };
             L.control.layers(baseLayers).addTo(pnpMap);
 
-            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+            const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             fetch('/static/menu.txt')

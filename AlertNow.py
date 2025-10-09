@@ -892,58 +892,117 @@ def handle_pnp_redirect_alert(data):
     }, room=pnp_room)
     logger.info(f"Emergency type update emitted to room {pnp_room} for alert {data.get('alert_id')}")
 
+@socketio.on('city_health_response')
+def handle_city_health_response(data):
+    logger.info(f"Received city_health_response: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        resident_barangay = data.get('resident_barangay', barangay)
+        image = data.get('image')
 
-@socketio.on('hospital_redirect_alert')
-def handle_hospital_redirect_alert(data):
-    print(f"Hospital redirect alert received: {data}")
-    alert_id = data.get('alert_id')
-    assigned_hospital = data.get('assigned_hospital')
-    barangay = data.get('barangay')
-    emergency_type = data.get('emergency_type', 'Health Emergency')
-    health_type = data.get('health_type', 'N/A')
-    health_cause = data.get('health_cause', 'N/A')
-    patient_age = data.get('patient_age', 'N/A')
-    patient_gender = data.get('patient_gender', 'N/A')
-    timestamp = data.get('timestamp')
-    
-    if alert_id and assigned_hospital and barangay:
-        # Update alert with hospital assignment in the database
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            UPDATE alerts 
-            SET status = ?, assigned_hospital = ?
-            WHERE alert_id = ? AND barangay = ?
-        ''', ('RESPONDED', assigned_hospital, alert_id, barangay))
+        if not alert_id or not barangay:
+            logger.error("Missing required fields in city_health_response")
+            return
+
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO health_responses (alert_id, barangay, emergency_type, lat, lon, timestamp, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (alert_id, barangay, emergency_type, lat, lon, timestamp, 'PENDING', image))
         conn.commit()
         conn.close()
-        
-        # Notify the specific hospital
-        emit('hospital_redirect_alert', {
+        logger.info(f"Stored health_response for alert_id: {alert_id}")
+
+        emit('city_health_response', {
             'alert_id': alert_id,
             'barangay': barangay,
             'emergency_type': emergency_type,
-            'assigned_hospital': assigned_hospital,
+            'lat': lat,
+            'lon': lon,
+            'resident_barangay': resident_barangay,
+            'image': image
+        }, broadcast=True, include_self=False)
+    except Exception as e:
+        logger.error(f"Error in city_health_response: {e}")
+
+@socketio.on('hospital_redirect_alert')
+def handle_hospital_redirect_alert(data):
+    logger.info(f"Received hospital_redirect_alert: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        health_type = data.get('health_type', 'N/A')
+        health_cause = data.get('health_cause', 'N/A')
+        patient_gender = data.get('patient_gender', 'N/A')
+        patient_age = data.get('patient_age', 'N/A')
+        assigned_hospital = data.get('assigned_hospital')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+
+        if not alert_id or not barangay or not assigned_hospital:
+            logger.error("Missing required fields in hospital_redirect_alert")
+            return
+
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT contact_no FROM users WHERE role = 'hospital' AND assigned_hospital = ?", (assigned_hospital,))
+        hospital = c.fetchone()
+        if not hospital:
+            logger.error(f"No hospital found with assigned_hospital: {assigned_hospital}")
+            conn.close()
+            return
+
+        c.execute("INSERT OR REPLACE INTO hospital_alerts (alert_id, barangay, assigned_hospital, health_type, health_cause, patient_age, patient_gender, timestamp, status, lat, lon, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (alert_id, barangay, assigned_hospital, health_type, health_cause, patient_age, patient_gender, timestamp, 'PENDING', lat, lon, data.get('image')))
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored hospital_alert for alert_id: {alert_id}")
+
+        emit('hospital_redirect_alert', {
+            'alert_id': alert_id,
+            'barangay': barangay,
             'health_type': health_type,
             'health_cause': health_cause,
-            'patient_age': patient_age,
             'patient_gender': patient_gender,
-            'timestamp': timestamp,
-            'lat': data.get('lat'),
-            'lon': data.get('lon'),
+            'patient_age': patient_age,
+            'assigned_hospital': assigned_hospital,
+            'emergency_type': emergency_type,
+            'lat': lat,
+            'lon': lon,
             'image': data.get('image')
-        }, room=f'hospital_{assigned_hospital.lower().replace(" ", "_")}')
-        
-        # Notify the barangay of hospital admission
+        }, broadcast=True, include_self=False)
+    except Exception as e:
+        logger.error(f"Error in hospital_redirect_alert: {e}")
+
+@socketio.on('hospital_admission_notification')
+def handle_hospital_admission_notification(data):
+    logger.info(f"Received hospital_admission_notification: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        assigned_hospital = data.get('assigned_hospital')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+
+        if not alert_id or not barangay or not assigned_hospital:
+            logger.error("Missing required fields in hospital_admission_notification")
+            return
+
         emit('hospital_admission_notification', {
             'alert_id': alert_id,
             'barangay': barangay,
             'assigned_hospital': assigned_hospital,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'patient_age': patient_age,
-            'patient_gender': patient_gender
-        }, room=f'barangay_{barangay.lower()}')
+            'emergency_type': emergency_type
+        }, broadcast=True, include_self=False)
+    except Exception as e:
+        logger.error(f"Error in hospital_admission_notification: {e}")
 
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
@@ -3397,6 +3456,19 @@ if __name__ == '__main__':
                 lon REAL,
                 image TEXT,
                 FOREIGN KEY (alert_id, barangay) REFERENCES alerts (alert_id, barangay)
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS health_responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT NOT NULL,
+                barangay TEXT NOT NULL,
+                emergency_type TEXT NOT NULL,
+                lat REAL,
+                lon REAL,
+                timestamp TEXT NOT NULL,
+                status TEXT NOT NULL,
+                image TEXT
             )
         ''')
         conn.commit()

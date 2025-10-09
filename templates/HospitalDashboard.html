@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hospital Dashboard</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -111,7 +112,7 @@
             };
             L.control.layers(baseLayers).addTo(hospitalMap);
 
-            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+            const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             socket.on('connect', () => {
@@ -128,6 +129,11 @@
                 if (data.assigned_hospital.toLowerCase() === '{{ assigned_hospital }}'.toLowerCase()) {
                     updateUIWithAlert(data);
                     notifyAlert(data);
+                    hospitalMap.setView([data.lat || {{ lat_coord|default(14.0549) }}, data.lon || {{ lon_coord|default(121.3013) }}], 16);
+                    L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
+                        `Health Emergency at ${data.barangay} (To ${data.assigned_hospital})`
+                    ).openPopup();
+                    document.getElementById('map-coordinates').textContent = `${data.lat}, ${data.lon}`;
                 }
             });
 
@@ -135,44 +141,74 @@
                 const alertContainer = document.getElementById('alert-container');
                 const alertItem = document.createElement('div');
                 alertItem.className = 'alert-item';
-                alertItem.innerHTML = `
-                    <div>RESPONDED HEALTH EMERGENCY AND ON THE WAY TO ${data.assigned_hospital.toUpperCase()}</div>
-                    <div>Resident From ${data.barangay}</div>
-                    <div>Time: ${data.timestamp}</div>
-                    <div>Health Type: ${data.health_type || 'N/A'}</div>
-                    <div>Health Cause: ${data.health_cause || 'N/A'}</div>
-                    <div>Patient Age: ${data.patient_age || 'N/A'}</div>
-                    <div>Patient Gender: ${data.patient_gender || 'N/A'}</div>
-                `;
+                alertItem.dataset.alertId = data.alert_id;
+                alertElements.set(data.alert_id, alertItem);
+
+                const alertText = document.createElement('div');
+                alertText.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
+
+                const timeDiv = document.createElement('div');
+                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                timeDiv.textContent = `Time: ${timestamp}`;
+
+                const healthTypeDiv = document.createElement('div');
+                healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
+                healthTypeDiv.style.fontWeight = 'bold';
+                healthTypeDiv.style.fontSize = '16px';
+
+                const healthCauseDiv = document.createElement('div');
+                healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
+                healthCauseDiv.style.fontSize = '16px';
+
+                const patientAgeDiv = document.createElement('div');
+                patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
+                patientAgeDiv.style.fontSize = '16px';
+
+                const patientGenderDiv = document.createElement('div');
+                patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
+                patientGenderDiv.style.fontSize = '16px';
+
+                const imageDiv = document.createElement('img');
+                imageDiv.className = 'clickable-img';
+                imageDiv.style.display = 'none';
                 if (data.image) {
-                    const img = document.createElement('img');
-                    img.src = data.image;
-                    img.className = 'clickable-img';
-                    img.addEventListener('click', () => {
+                    imageDiv.src = data.image;
+                    imageDiv.style.display = 'block';
+                    imageDiv.addEventListener('click', () => {
                         const modal = document.getElementById('image-modal');
                         const modalImg = document.getElementById('modal-image');
                         modalImg.src = data.image;
                         modal.style.display = 'flex';
                     });
-                    alertItem.appendChild(img);
                 }
-                alertContainer.prepend(alertItem);
-                alertElements.set(data.alert_id, alertItem);
-                L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(`Health Emergency at ${data.barangay}`);
+
+                alertItem.appendChild(alertText);
+                alertItem.appendChild(timeDiv);
+                alertItem.appendChild(healthTypeDiv);
+                alertItem.appendChild(healthCauseDiv);
+                alertItem.appendChild(patientAgeDiv);
+                alertItem.appendChild(patientGenderDiv);
+                alertItem.appendChild(imageDiv);
+                alertContainer.appendChild(alertItem);
+
+                const modal = document.getElementById('image-modal');
+                const closeBtn = modal.querySelector('.close-btn');
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
             }
 
             function notifyAlert(data) {
                 const notificationDiv = document.getElementById('notification');
-                notificationDiv.innerHTML = `<p>New Health Emergency alert at ${data.barangay}</p>`;
-                setTimeout(() => { notificationDiv.innerHTML = ''; }, 5000);
+                const notification = document.createElement('div');
+                notification.className = 'notification';
+                notification.textContent = `New Alert: Health Emergency at ${data.barangay} (To ${data.assigned_hospital})`;
+                notificationDiv.appendChild(notification);
+                setTimeout(() => {
+                    notification.remove();
+                }, 5000);
             }
-
-            document.getElementById('image-modal').addEventListener('click', (e) => {
-                if (e.target.className === 'close-btn' || e.target.id === 'image-modal') {
-                    document.getElementById('image-modal').style.display = 'none';
-                }
-            });
         });
-    </script>
+</script>
 </body>
 </html>

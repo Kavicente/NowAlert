@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Barangay Dashboard</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -113,7 +114,7 @@
             };
             L.control.layers(baseLayers).addTo(barangayMap);
 
-            const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+            const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
             fetch('/static/menu.txt')
@@ -197,14 +198,8 @@
                 console.log('Hospital admission notification received:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
-                    const statusDiv = alertItem.querySelector('div:nth-child(1)');
-                    statusDiv.textContent = 'RESPONDED';
-                    const typeDiv = alertItem.querySelector('div:nth-child(3)');
-                    typeDiv.textContent = `Type: Health Emergency`;
-                    typeDiv.style.display = 'block';
                     const admissionDiv = document.createElement('div');
-                    admissionDiv.textContent = `Admit to ${data.assigned_hospital}`;
-                    admissionDiv.style.color = '#000000';
+                    admissionDiv.textContent = `RESPONDED\nEmergency at ${data.barangay}\nType: Health Emergency\nTime: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\nPrediction: ${alertItem.querySelector('.prediction').textContent.replace('Prediction: ', '')}\nAdmit to ${data.assigned_hospital}`;
                     admissionDiv.style.fontSize = '16px';
                     alertItem.appendChild(admissionDiv);
                 }
