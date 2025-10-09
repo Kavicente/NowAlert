@@ -2115,6 +2115,8 @@ def handle_pnp_crime_response(data):
     logger.info(f"PNP crime response emitted to room {pnp_room}")
 
 
+
+
 @socketio.on('health_response')
 def handle_health_response(data):
     logger.info(f"Health response received: {data}")
@@ -2194,11 +2196,15 @@ def handle_health_response(data):
                 cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
             elif key == 'Health_Cause':
                 cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+            elif key == 'Weather':
+                cleaned_data[key] = data.get('weather', default_values[key]) if data.get('weather') in ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'] else default_values[key]
+            elif key == 'Severity':
+                cleaned_data[key] = data.get('severity', default_values[key]) if data.get('severity') in ['Low', 'Medium', 'High'] else default_values[key]
             else:
                 cleaned_data[key] = default_values[key]
-        # Prepare DataFrame for prediction
+        # Prepare DataFrame for prediction with exact columns from health_emergencies.csv
         input_df = pd.DataFrame([cleaned_data])
-        # Preprocess input data
+        # Preprocess input data to match model expectations
         def preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
@@ -2209,12 +2215,12 @@ def handle_health_response(data):
             return df
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
         input_df = preprocess_input(input_df, required_columns)
-        # Ensure all expected columns are present
+        # Ensure all expected columns are present and match health_emergencies.csv
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0 if col in ['Year'] else 'Unknown'
-        # Convert object columns to numeric where possible
+                input_df[col] = 0 if col == 'Year' else 'Unknown'
+        # Convert object columns to numeric where applicable
         for col in input_df.select_dtypes(include=['object']).columns:
             input_df[col] = input_df[col].astype('category').cat.codes
         # Reorder columns to match expected_columns
@@ -2388,11 +2394,15 @@ def handle_barangay_health_response(data):
                 cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
             elif key == 'Health_Cause':
                 cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+            elif key == 'Weather':
+                cleaned_data[key] = data.get('weather', default_values[key]) if data.get('weather') in ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'] else default_values[key]
+            elif key == 'Severity':
+                cleaned_data[key] = data.get('severity', default_values[key]) if data.get('severity') in ['Low', 'Medium', 'High'] else default_values[key]
             else:
                 cleaned_data[key] = default_values[key]
-        # Prepare DataFrame for prediction
+        # Prepare DataFrame for prediction with exact columns from health_emergencies.csv
         input_df = pd.DataFrame([cleaned_data])
-        # Preprocess input data
+        # Preprocess input data to match model expectations
         def preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
@@ -2403,12 +2413,12 @@ def handle_barangay_health_response(data):
             return df
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
         input_df = preprocess_input(input_df, required_columns)
-        # Ensure all expected columns are present
+        # Ensure all expected columns are present and match health_emergencies.csv
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0 if col in ['Year'] else 'Unknown'
-        # Convert object columns to numeric where possible
+                input_df[col] = 0 if col == 'Year' else 'Unknown'
+        # Convert object columns to numeric where applicable
         for col in input_df.select_dtypes(include=['object']).columns:
             input_df[col] = input_df[col].astype('category').cat.codes
         # Reorder columns to match expected_columns
