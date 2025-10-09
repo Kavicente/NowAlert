@@ -2116,7 +2116,6 @@ def handle_pnp_crime_response(data):
 
 
 
-
 @socketio.on('health_response')
 def handle_health_response(data):
     logger.info(f"Health response received: {data}")
@@ -2164,6 +2163,7 @@ def handle_health_response(data):
             'Patient_Age': patient_age,
             'Patient_Gender': data.get('patient_gender', 'Unknown')
         }
+
         # Map input values to dataset categories
         type_mapping = {
             'heart attack': 'Heart Attack',
@@ -2185,6 +2185,7 @@ def handle_health_response(data):
             'overdose': 'Overdose',
             'heatstroke': 'Heatstroke'
         }
+
         # Validate and clean input data
         cleaned_data = {}
         for key in default_values:
@@ -2202,44 +2203,58 @@ def handle_health_response(data):
                 cleaned_data[key] = data.get('severity', default_values[key]) if data.get('severity') in ['Low', 'Medium', 'High'] else default_values[key]
             else:
                 cleaned_data[key] = default_values[key]
-        # Prepare DataFrame for prediction with exact columns from health_emergencies.csv
+
+        # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
+
         # Preprocess input data to match model expectations
         def preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
-                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Handle unseen categories
+                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Encode strings to numeric
             for col in ['Patient_Age']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             return df
-        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
+
+        # ✅ FIXED: Include 'Barangay' in required_columns for encoding
+        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender', 'Barangay']
         input_df = preprocess_input(input_df, required_columns)
-        # Ensure all expected columns are present and match health_emergencies.csv
+
+        # Ensure all expected columns exist
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0 if col == 'Year' else 0  # Default to 0 for categorical columns
-        # Convert all columns to numeric, ensuring compatibility
+                input_df[col] = 0
+
+        # Convert all to numeric
         for col in input_df.columns:
             input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
-        # Reorder columns to match expected_columns
+
+        # Reorder columns to match model expectations
         input_df = input_df[expected_columns]
+
+        # Optional debug logs
+        logger.debug(f"Preprocessed input_df dtypes:\n{input_df.dtypes}")
+        logger.debug(f"Preprocessed input_df values:\n{input_df}")
+
         # Make prediction
         predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
         prediction = predictor.predict_proba(input_df)[0][1] * 100
+
         chart_data = {
             'alert_id': data.get('alert_id'),
             'prediction': f"{prediction:.2f}% chance in year {datetime.now().year}"
         }
         logger.info(f"Prediction for health response: {chart_data['prediction']}")
+
     except Exception as e:
         chart_data = {
             'alert_id': data.get('alert_id'),
             'prediction': 'prediction_error'
         }
         logger.error(f"Error predicting health response: {e}")
-    
+
     # Get municipality from database
     barangay = data.get('barangay')
     conn = get_db_connection()
@@ -2311,9 +2326,11 @@ def handle_health_response(data):
         'barangay': barangay,
         'assigned_hospital': assigned_hospital
     })
+
     logger.info(f"Emitting health_response with chart_data: {chart_data}")
     socketio.emit('health_response', {'data': data, 'chart_data': chart_data}, room=health_room)
     logger.info(f"Chart update emitted to room {health_room}")
+
 
 @socketio.on('barangay_health_response')
 def handle_barangay_health_response(data):
@@ -2362,6 +2379,7 @@ def handle_barangay_health_response(data):
             'Patient_Age': patient_age,
             'Patient_Gender': data.get('patient_gender', 'Unknown')
         }
+
         # Map input values to dataset categories
         type_mapping = {
             'heart attack': 'Heart Attack',
@@ -2383,6 +2401,7 @@ def handle_barangay_health_response(data):
             'overdose': 'Overdose',
             'heatstroke': 'Heatstroke'
         }
+
         # Validate and clean input data
         cleaned_data = {}
         for key in default_values:
@@ -2400,44 +2419,58 @@ def handle_barangay_health_response(data):
                 cleaned_data[key] = data.get('severity', default_values[key]) if data.get('severity') in ['Low', 'Medium', 'High'] else default_values[key]
             else:
                 cleaned_data[key] = default_values[key]
-        # Prepare DataFrame for prediction with exact columns from health_emergencies.csv
+
+        # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
+
         # Preprocess input data to match model expectations
         def preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
-                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Handle unseen categories
+                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Encode strings to numeric
             for col in ['Patient_Age']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             return df
-        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender']
+
+        # ✅ FIXED: Include 'Barangay' in required_columns for encoding
+        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender', 'Barangay']
         input_df = preprocess_input(input_df, required_columns)
-        # Ensure all expected columns are present and match health_emergencies.csv
+
+        # Ensure all expected columns exist
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0 if col == 'Year' else 0  # Default to 0 for categorical columns
-        # Convert all columns to numeric, ensuring compatibility
+                input_df[col] = 0
+
+        # Convert all to numeric
         for col in input_df.columns:
             input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
-        # Reorder columns to match expected_columns
+
+        # Reorder columns to match model expectations
         input_df = input_df[expected_columns]
+
+        # Optional debug logs
+        logger.debug(f"Preprocessed input_df dtypes:\n{input_df.dtypes}")
+        logger.debug(f"Preprocessed input_df values:\n{input_df}")
+
         # Make prediction
         predictor = health_predictor if data.get('emergency_type') == 'Health Emergency' else birth_predictor
         prediction = predictor.predict_proba(input_df)[0][1] * 100
+
         chart_data = {
             'alert_id': data.get('alert_id'),
             'prediction': f"{prediction:.2f}% chance in year {datetime.now().year}"
         }
         logger.info(f"Prediction for barangay health response: {chart_data['prediction']}")
+
     except Exception as e:
         chart_data = {
             'alert_id': data.get('alert_id'),
             'prediction': 'prediction_error'
         }
         logger.error(f"Error predicting barangay health response: {e}")
-    
+
     # Get municipality from database
     barangay = data.get('barangay')
     conn = get_db_connection()
@@ -2509,9 +2542,11 @@ def handle_barangay_health_response(data):
         'barangay': barangay,
         'assigned_hospital': assigned_hospital
     })
+
     logger.info(f"Emitting barangay_response with chart_data: {chart_data}")
     socketio.emit('barangay_health_response', {'data': data, 'chart_data': chart_data}, room=barangay_room)
     logger.info(f"Chart update emitted to room {barangay_room}")
+
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
