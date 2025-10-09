@@ -2238,7 +2238,7 @@ def handle_health_response(data):
         
     responses.append(data)
     today_responses.append(data)
-    health_room = f"health_{data.get('municipality').lower()}"
+    health_room = f"health_{(data.get('municipality') or 'unknown').lower()}"
     emit('health_response', data, room=health_room)
     logger.info(f"City Health response emitted to room {health_room}")
 
