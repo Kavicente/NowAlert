@@ -2153,12 +2153,8 @@ def handle_health_response(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Weather': data.get('weather', 'Unknown'),
             'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
-            'Severity': data.get('severity', 'Unknown'),
-            'Patient_Age': pd.to_numeric(data.get('patient_age', '0'), errors='coerce').fillna(0).astype(int),
-            'Patient_Gender': data.get('patient_gender', 'Unknown')
+            'Health_Cause': data.get('health_cause', 'Unknown')
         }
 
         # Map input values to dataset categories
@@ -2194,29 +2190,18 @@ def handle_health_response(data):
                 cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
             elif key == 'Health_Cause':
                 cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
-            elif key == 'Weather':
-                cleaned_data[key] = data.get('weather', default_values[key]) if data.get('weather') in ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'] else default_values[key]
-            elif key == 'Severity':
-                cleaned_data[key] = data.get('severity', default_values[key]) if data.get('severity') in ['Low', 'Medium', 'High'] else default_values[key]
-            elif key == 'Patient_Age':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Patient_Gender':
-                cleaned_data[key] = default_values[key]
+        
 
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
-
-        # Preprocess input data
-        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender', 'Barangay']
-        input_df = preprocess_input(input_df, required_columns)
-
-        # Ensure all expected columns exist
-        expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Age', 'Patient_Gender']
+        
+        # Ensure all expected columns are present
+        expected_columns = health_emergencies_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-
-        # Reorder columns to match model expectations
+        
+        # Reorder columns to match training data
         input_df = input_df[expected_columns]
 
         # Make prediction
@@ -2347,12 +2332,8 @@ def handle_barangay_health_response(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Weather': data.get('weather', 'Unknown'),
             'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
-            'Severity': data.get('severity', 'Unknown'),
-            'Patient_Age': pd.to_numeric(data.get('patient_age', '0'), errors='coerce').fillna(0).astype(int),
-            'Patient_Gender': data.get('patient_gender', 'Unknown')
+            'Health_Cause': data.get('health_cause', 'Unknown')
         }
 
         # Map input values to dataset categories
@@ -2388,29 +2369,18 @@ def handle_barangay_health_response(data):
                 cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
             elif key == 'Health_Cause':
                 cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
-            elif key == 'Weather':
-                cleaned_data[key] = data.get('weather', default_values[key]) if data.get('weather') in ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'] else default_values[key]
-            elif key == 'Severity':
-                cleaned_data[key] = data.get('severity', default_values[key]) if data.get('severity') in ['Low', 'Medium', 'High'] else default_values[key]
-            elif key == 'Patient_Age':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Patient_Gender':
-                cleaned_data[key] = default_values[key]
+        
 
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
-
-        # Preprocess input data
-        required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender', 'Barangay']
-        input_df = preprocess_input(input_df, required_columns)
-
-        # Ensure all expected columns exist
-        expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Age', 'Patient_Gender']
+        
+        # Ensure all expected columns are present
+        expected_columns = health_emergencies_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-
-        # Reorder columns to match model expectations
+        
+        # Reorder columns to match training data
         input_df = input_df[expected_columns]
 
         # Make prediction
