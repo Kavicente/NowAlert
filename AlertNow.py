@@ -1675,7 +1675,7 @@ def handle_health_response(data):
     if response_time.date() == today:
         today_responses.append(data)
     
-        # Compute prediction using ML model on form data
+    # Compute prediction using ML model on form data
     try:
         # Default values for expected model features
         patient_age = pd.to_numeric(data.get('patient_age', '0'), errors='coerce')
@@ -2304,28 +2304,28 @@ def handle_pnp_crime_response(data):
     emit('pnp_crime_response', data, room=pnp_room)
     logger.info(f"PNP crime response emitted to room {pnp_room}")
 
-@socketio.on('health_response')
-def handle_health_response(data):
-    logger.info(f"Health response received: {data}")
+@socketio.on('barangay_health_response')
+def handle_barangay_health_response(data):
+    logger.info(f"Barangay Health response received: {data}")
     data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
     
     conn = get_db_connection()
     try:
-        if data.get('role') == 'health':
+        if data.get('role') == 'barangay':
             conn.execute('''
-                INSERT INTO health_response (
+                INSERT INTO barangay_health_response (
                     alert_id, health_cause, health_type, patient_age, patient_gender, 
                     lat, lon, barangay, emergency_type, timestamp
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
+                data.get('alert_id'), data.get('health_causes'), data.get('health_emergency_types'),
                 data.get('patient_age', '0'), data.get('patient_gender', ''), data.get('lat'), data.get('lon'),
                 data.get('barangay'), data.get('emergency_type'), data['timestamp']
             ))
             conn.commit()
-            logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
+            logger.info(f"Stored barangay health response for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error storing health response: {e}")
+        logger.error(f"Error storing barangay health response: {e}")
     finally:
         conn.close()
     
@@ -2350,8 +2350,8 @@ def handle_health_response(data):
             'Latitude': data.get('lat', 0.0),
             'Longitude': data.get('lon', 0.0),
             'Weather': data.get('weather', 'Unknown'),
-            'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Health_Type': data.get('health_emergency_types', 'Unknown'),
+            'Health_Cause': data.get('health_causes', 'Unknown'),
             'Severity': data.get('severity', 'Unknown'),
             'Patient_Count': 1,
             'Response_Time': 0,
@@ -2388,9 +2388,9 @@ def handle_health_response(data):
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
             elif key == 'Health_Type':
-                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
+                cleaned_data[key] = type_mapping.get(data.get('health_emergency_types', '').lower(), default_values[key])
             elif key == 'Health_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+                cleaned_data[key] = cause_mapping.get(data.get('health_causes', '').lower(), default_values[key])
             else:
                 cleaned_data[key] = default_values[key]
         # Prepare DataFrame for prediction
@@ -2411,13 +2411,13 @@ def handle_health_response(data):
             'alert_id': data.get('alert_id'),
             'prediction': f"{prediction:.2f}% chance in year {datetime.now().year}"
         }
-        logger.info(f"Prediction for health response: {chart_data['prediction']}")
+        logger.info(f"Prediction for barangay health response: {chart_data['prediction']}")
     except Exception as e:
         chart_data = {
             'alert_id': data.get('alert_id'),
             'prediction': 'prediction_error'
         }
-        logger.error(f"Error predicting health response: {e}")
+        logger.error(f"Error predicting barangay health response: {e}")
     
     # Get municipality from database
     barangay = data.get('barangay')
@@ -2433,27 +2433,27 @@ def handle_health_response(data):
     
     # Prepare response data
     assigned_hospital = data.get('assigned_hospital', '')
-    health_room = f"health_{municipality.lower()}" if municipality else "health"
+    barangay_room = f"barangay_{barangay.lower()}" if barangay else "barangay"
     
     # Prepare chart data
     chart_data.update({
         'health_type': {
-            'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
+            'labels': [data.get('health_emergency_types', 'Unknown')] if data.get('health_emergency_types') else ['No Data'],
             'datasets': [{
                 'label': 'Health Emergency Type',
-                'data': [1] if data.get('health_type') else [0],
-                'backgroundColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                'borderColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
+                'data': [1] if data.get('health_emergency_types') else [0],
+                'backgroundColor': ['#4ECDC4'] if data.get('health_emergency_types') else ['#999999'],
+                'borderColor': ['#4ECDC4'] if data.get('health_emergency_types') else ['#999999'],
                 'borderWidth': 1
             }]
         },
         'health_cause': {
-            'labels': [data.get('health_cause', 'Unknown')] if data.get('health_cause') else ['No Data'],
+            'labels': [data.get('health_causes', 'Unknown')] if data.get('health_causes') else ['No Data'],
             'datasets': [{
                 'label': 'Health Emergency Cause',
-                'data': [1] if data.get('health_cause') else [0],
-                'backgroundColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                'borderColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
+                'data': [1] if data.get('health_causes') else [0],
+                'backgroundColor': ['#45B7D1'] if data.get('health_causes') else ['#999999'],
+                'borderColor': ['#45B7D1'] if data.get('health_causes') else ['#999999'],
                 'borderWidth': 1
             }]
         },
@@ -2490,11 +2490,11 @@ def handle_health_response(data):
         'barangay': barangay,
         'assigned_hospital': assigned_hospital
     })
-    logger.info(f"Emitting health_response with chart_data: {chart_data}")
+    logger.info(f"Emitting barangay_health_response with chart_data: {chart_data}")
     # Combine data and chart_data into a single dictionary for emission
     emission_data = {**data, **chart_data}
-    socketio.emit('health_response', emission_data, room=health_room)
-    logger.info(f"Chart update emitted to room {health_room}")
+    socketio.emit('barangay_health_response', emission_data, room=barangay_room)
+    logger.info(f"Chart update emitted to room {barangay_room}")
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
