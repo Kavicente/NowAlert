@@ -132,12 +132,10 @@
                 console.error('Connection error:', error);
             });
 
-            socket.on('pnp_redirected_alert', (data) => {
-                console.log('Redirected alert received:', data);
-                if (data.target_role === 'barangay') {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                }
+            socket.on('pnp_redirect_alert', (data) => {
+                console.log('PNP redirect alert received:', data);
+                updateUIWithAlert(data);
+                notifyAlert(data);
             });
 
             socket.on('update_dashboard_emergency_type', (data) => {
@@ -172,8 +170,9 @@
                         formData.alert_id = data.alert_id;
                         formData.emergency_type = data.emergency_type;
                         formData.municipality = '{{ municipality }}';
-                        const socketEvent = data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' :
-                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_submitted' :
+                        const socketEvent = data.emergency_type === 'Road Accident' ? 'pnp_response' :
+                                            data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' :
+                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' :
                                             'pnp_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
@@ -186,7 +185,7 @@
             });
 
             socket.on('pnp_response', (data) => {
-                console.log('Response submitted:', data);
+                console.log('PNP response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -211,7 +210,7 @@
             });
 
             socket.on('pnp_fire_submitted', (data) => {
-                console.log('Fire response submitted:', data);
+                console.log('PNP fire response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -235,8 +234,8 @@
                 }
             });
 
-            socket.on('pnp_crime_submitted', (data) => {
-                console.log('Crime response submitted:', data);
+            socket.on('pnp_crime_response', (data) => {
+                console.log('PNP crime response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
@@ -258,17 +257,6 @@
                     predictionDiv.style.fontSize = '16px';
                     predictionDiv.style.color = 'black';
                 }
-            });
-
-            socket.on('update_map', (data) => {
-                console.log('Update map received:', data);
-                const lat = data.lat || {{ lat_coord|default(14.0549) }};
-                const lon = data.lon || {{ lon_coord|default(121.3013) }};
-                pnpMap.setView([lat, lon], 16);
-                L.marker([lat, lon]).addTo(pnpMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
-                ).openPopup();
-                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
             function updateUIWithAlert(data) {
@@ -277,40 +265,43 @@
                 alertItem.className = 'alert-item';
                 alertItem.innerHTML = `
                     <div>PENDING ALERT</div>
-                    <div>Emergency at ${data.barangay || 'Unknown'}</div>
+                    <div>Emergency at ${data.municipality || 'N/A'}</div>
                     <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
-                    <img class="clickable-img" style="display: none;" src="${data.image || ''}">
                     <div class="response-form"></div>
-                    <div class="prediction" style="display: none;">Prediction: N/A</div>
+                    <div class="prediction"></div>
                 `;
                 if (data.image) {
-                    const img = alertItem.querySelector('img');
-                    img.style.display = 'block';
-                    img.addEventListener('click', () => {
+                    const img = document.createElement('img');
+                    img.src = data.image;
+                    img.className = 'clickable-img';
+                    img.onclick = () => {
                         document.getElementById('modal-image').src = data.image;
                         document.getElementById('image-modal').style.display = 'flex';
-                    });
+                    };
+                    alertItem.appendChild(img);
                 }
+                alertContainer.appendChild(alertItem);
                 alertElements.set(data.alert_id, alertItem);
-                alertContainer.prepend(alertItem);
+                L.marker([data.lat, data.lon]).addTo(pnpMap)
+                    .bindPopup(`Emergency: ${data.emergency_type || 'N/A'} at ${data.municipality || 'N/A'}`);
             }
-
-            document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
-                document.getElementById('image-modal').style.display = 'none';
-            });
 
             function notifyAlert(data) {
                 const notification = document.getElementById('notification');
-                notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}`;
-                setTimeout(() => notification.textContent = '', 5000);
+                notification.innerHTML = `<p>New alert: ${data.emergency_type || 'N/A'} at ${data.municipality || 'N/A'}</p>`;
+                setTimeout(() => notification.innerHTML = '', 5000);
             }
 
+            document.getElementById('image-modal').querySelector('.close-btn').onclick = () => {
+                document.getElementById('image-modal').style.display = 'none';
+            };
+
             function parseMenuText(text) {
-                const sections = text.split('#').filter(section => section.trim());
                 const menuData = {};
+                const sections = text.split('#').filter(s => s.trim());
                 sections.forEach(section => {
-                    const lines = section.trim().split('\n');
+                    const lines = section.trim().split('\n').filter(l => l.trim());
                     const sectionName = lines[0].trim();
                     const sectionData = {};
                     lines.slice(1).forEach(line => {
