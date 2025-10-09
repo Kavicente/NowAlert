@@ -1728,11 +1728,22 @@ def handle_health_response(data):
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
         
-        # Ensure all expected columns are present
+        # Ensure all expected columns are present, handling categorical variables
         expected_columns = health_emergencies_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0
+                if col.startswith('Health_Type_') or col.startswith('Health_Cause_'):
+                    input_df[col] = 0  # One-hot encoded columns
+                else:
+                    input_df[col] = default_values.get(col, 0)
+        
+        # Apply one-hot encoding for Health_Type and Health_Cause
+        for health_type in type_mapping.values():
+            col_name = f'Health_Type_{health_type}'
+            input_df[col_name] = 1 if cleaned_data['Health_Type'] == health_type else 0
+        for health_cause in cause_mapping.values():
+            col_name = f'Health_Cause_{health_cause}'
+            input_df[col_name] = 1 if cleaned_data['Health_Cause'] == health_cause else 0
         
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
