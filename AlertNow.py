@@ -883,6 +883,15 @@ def handle_pnp_redirect_alert(data):
     }, room=pnp_room)
     logger.info(f"Map update emitted to room {pnp_room} for alert {data.get('alert_id')}")
 
+    # Trigger update_dashboard_emergency_type for PNPDashboard dropdown
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        'barangay': data.get('barangay'),
+        'municipality': data.get('municipality')
+    }, room=pnp_room)
+    logger.info(f"Emergency type update emitted to room {pnp_room} for alert {data.get('alert_id')}")
+
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
     logger.info(f"Received update dashboard emergency type: {data}")
