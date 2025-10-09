@@ -2208,7 +2208,7 @@ def handle_health_response(data):
         def preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
-                    df[col] = df[col].astype('category').cat.codes
+                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Handle unseen categories
             for col in ['Patient_Age']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -2219,10 +2219,10 @@ def handle_health_response(data):
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0 if col == 'Year' else 'Unknown'
-        # Convert object columns to numeric where applicable
-        for col in input_df.select_dtypes(include=['object']).columns:
-            input_df[col] = input_df[col].astype('category').cat.codes
+                input_df[col] = 0 if col == 'Year' else 0  # Default to 0 for categorical columns
+        # Convert all columns to numeric, ensuring compatibility
+        for col in input_df.columns:
+            input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
         # Reorder columns to match expected_columns
         input_df = input_df[expected_columns]
         # Make prediction
@@ -2312,7 +2312,7 @@ def handle_health_response(data):
         'assigned_hospital': assigned_hospital
     })
     logger.info(f"Emitting health_response with chart_data: {chart_data}")
-    socketio.emit('health_response', data, chart_data, room=health_room)
+    socketio.emit('health_response', {'data': data, 'chart_data': chart_data}, room=health_room)
     logger.info(f"Chart update emitted to room {health_room}")
 
 @socketio.on('barangay_health_response')
@@ -2406,7 +2406,7 @@ def handle_barangay_health_response(data):
         def preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
-                    df[col] = df[col].astype('category').cat.codes
+                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Handle unseen categories
             for col in ['Patient_Age']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -2417,10 +2417,10 @@ def handle_barangay_health_response(data):
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0 if col == 'Year' else 'Unknown'
-        # Convert object columns to numeric where applicable
-        for col in input_df.select_dtypes(include=['object']).columns:
-            input_df[col] = input_df[col].astype('category').cat.codes
+                input_df[col] = 0 if col == 'Year' else 0  # Default to 0 for categorical columns
+        # Convert all columns to numeric, ensuring compatibility
+        for col in input_df.columns:
+            input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
         # Reorder columns to match expected_columns
         input_df = input_df[expected_columns]
         # Make prediction
@@ -2510,9 +2510,8 @@ def handle_barangay_health_response(data):
         'assigned_hospital': assigned_hospital
     })
     logger.info(f"Emitting barangay_response with chart_data: {chart_data}")
-    socketio.emit('barangay_health_response', data, chart_data, room=barangay_room)
+    socketio.emit('barangay_health_response', {'data': data, 'chart_data': chart_data}, room=barangay_room)
     logger.info(f"Chart update emitted to room {barangay_room}")
-
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
