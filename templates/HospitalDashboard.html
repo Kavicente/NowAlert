@@ -86,129 +86,129 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const lat = {{ lat_coord|default(14.0549) }};
-            const lon = {{ lon_coord|default(121.3013) }};
-            const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
-            const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
+        const lat = {{ lat_coord|default(14.0549) }};
+        const lon = {{ lon_coord|default(121.3013) }};
+        const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
+        const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
-            const hospitalMap = L.map('map').setView([lat, lon], 16);
+        const hospitalMap = L.map('map').setView([lat, lon], 16);
 
-            var satellite = L.tileLayer(tileLayerUrl, {
-                attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-                maxZoom: 18,
-                tileSize: 512,
-                zoomOffset: -1
-            });
+        var satellite = L.tileLayer(tileLayerUrl, {
+            attribution: 'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+            maxZoom: 18,
+            tileSize: 512,
+            zoomOffset: -1
+        });
 
-            var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            });
+        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        });
 
-            satellite.addTo(hospitalMap);
+        satellite.addTo(hospitalMap);
 
-            var baseLayers = {
-                "Satellite with Labels": satellite,
-                "OpenStreetMap": osm
-            };
-            L.control.layers(baseLayers).addTo(hospitalMap);
+        var baseLayers = {
+            "Satellite with Labels": satellite,
+            "OpenStreetMap": osm
+        };
+        L.control.layers(baseLayers).addTo(hospitalMap);
 
-            const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
-            const alertElements = new Map();
+        const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
+        const alertElements = new Map();
 
-            socket.on('connect', () => {
-                console.log('Connected to server');
-                socket.emit('register_role', { role: 'hospital', assigned_hospital: '{{ assigned_hospital }}'.toLowerCase() });
-            });
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            socket.emit('register_role', { role: 'hospital', assigned_hospital: '{{ assigned_hospital }}'.toLowerCase() });
+        });
 
-            socket.on('connect_error', (error) => {
-                console.error('Connection error:', error);
-            });
+        socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+        });
 
-            socket.on('hospital_redirect_alert', (data) => {
-                console.log('Hospital redirect alert received:', data);
-                if (data.assigned_hospital.toLowerCase() === '{{ assigned_hospital }}'.toLowerCase()) {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                    hospitalMap.setView([data.lat || {{ lat_coord|default(14.0549) }}, data.lon || {{ lon_coord|default(121.3013) }}], 16);
-                    L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
-                        `Health Emergency at ${data.barangay} (To ${data.assigned_hospital})`
-                    ).openPopup();
-                    document.getElementById('map-coordinates').textContent = `${data.lat}, ${data.lon}`;
-                }
-            });
+        socket.on('hospital_redirect_alert', (data) => {
+            console.log('Hospital redirect alert received:', data);
+            if (data.assigned_hospital.toLowerCase() === '{{ assigned_hospital }}'.toLowerCase()) {
+                updateUIWithAlert(data);
+                notifyAlert(data);
+                hospitalMap.setView([data.lat || {{ lat_coord|default(14.0549) }}, data.lon || {{ lon_coord|default(121.3013) }}], 16);
+                L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
+                    `Health Emergency at ${data.barangay} (To ${data.assigned_hospital})`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${data.lat}, ${data.lon}`;
+            }
+        });
 
-            function updateUIWithAlert(data) {
-                const alertContainer = document.getElementById('alert-container');
-                const alertItem = document.createElement('div');
-                alertItem.className = 'alert-item';
-                alertItem.dataset.alertId = data.alert_id;
-                alertElements.set(data.alert_id, alertItem);
+        function updateUIWithAlert(data) {
+            const alertContainer = document.getElementById('alert-container');
+            const alertItem = document.createElement('div');
+            alertItem.className = 'alert-item';
+            alertItem.dataset.alertId = data.alert_id;
+            alertElements.set(data.alert_id, alertItem);
 
-                const alertText = document.createElement('div');
-                alertText.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
+            const alertText = document.createElement('div');
+            alertText.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
 
-                const timeDiv = document.createElement('div');
-                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                timeDiv.textContent = `Time: ${timestamp}`;
+            const timeDiv = document.createElement('div');
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            timeDiv.textContent = `Time: ${timestamp}`;
 
-                const healthTypeDiv = document.createElement('div');
-                healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
-                healthTypeDiv.style.fontWeight = 'bold';
-                healthTypeDiv.style.fontSize = '16px';
+            const healthTypeDiv = document.createElement('div');
+            healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
+            healthTypeDiv.style.fontWeight = 'bold';
+            healthTypeDiv.style.fontSize = '16px';
 
-                const healthCauseDiv = document.createElement('div');
-                healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
-                healthCauseDiv.style.fontSize = '16px';
+            const healthCauseDiv = document.createElement('div');
+            healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
+            healthCauseDiv.style.fontSize = '16px';
 
-                const patientAgeDiv = document.createElement('div');
-                patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
-                patientAgeDiv.style.fontSize = '16px';
+            const patientAgeDiv = document.createElement('div');
+            patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
+            patientAgeDiv.style.fontSize = '16px';
 
-                const patientGenderDiv = document.createElement('div');
-                patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
-                patientGenderDiv.style.fontSize = '16px';
+            const patientGenderDiv = document.createElement('div');
+            patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
+            patientGenderDiv.style.fontSize = '16px';
 
-                const imageDiv = document.createElement('img');
-                imageDiv.className = 'clickable-img';
-                imageDiv.style.display = 'none';
-                if (data.image) {
-                    imageDiv.src = data.image;
-                    imageDiv.style.display = 'block';
-                    imageDiv.addEventListener('click', () => {
-                        const modal = document.getElementById('image-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = data.image;
-                        modal.style.display = 'flex';
-                    });
-                }
-
-                alertItem.appendChild(alertText);
-                alertItem.appendChild(timeDiv);
-                alertItem.appendChild(healthTypeDiv);
-                alertItem.appendChild(healthCauseDiv);
-                alertItem.appendChild(patientAgeDiv);
-                alertItem.appendChild(patientGenderDiv);
-                alertItem.appendChild(imageDiv);
-                alertContainer.appendChild(alertItem);
-
-                const modal = document.getElementById('image-modal');
-                const closeBtn = modal.querySelector('.close-btn');
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
+            const imageDiv = document.createElement('img');
+            imageDiv.className = 'clickable-img';
+            imageDiv.style.display = 'none';
+            if (data.image) {
+                imageDiv.src = data.image;
+                imageDiv.style.display = 'block';
+                imageDiv.addEventListener('click', () => {
+                    const modal = document.getElementById('image-modal');
+                    const modalImg = document.getElementById('modal-image');
+                    modalImg.src = data.image;
+                    modal.style.display = 'flex';
                 });
             }
 
-            function notifyAlert(data) {
-                const notificationDiv = document.getElementById('notification');
-                const notification = document.createElement('div');
-                notification.className = 'notification';
-                notification.textContent = `New Alert: Health Emergency at ${data.barangay} (To ${data.assigned_hospital})`;
-                notificationDiv.appendChild(notification);
-                setTimeout(() => {
-                    notification.remove();
-                }, 5000);
-            }
-        });
+            alertItem.appendChild(alertText);
+            alertItem.appendChild(timeDiv);
+            alertItem.appendChild(healthTypeDiv);
+            alertItem.appendChild(healthCauseDiv);
+            alertItem.appendChild(patientAgeDiv);
+            alertItem.appendChild(patientGenderDiv);
+            alertItem.appendChild(imageDiv);
+            alertContainer.appendChild(alertItem);
+
+            const modal = document.getElementById('image-modal');
+            const closeBtn = modal.querySelector('.close-btn');
+            closeBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
+        }
+
+        function notifyAlert(data) {
+            const notificationDiv = document.getElementById('notification');
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = `New Alert: Health Emergency at ${data.barangay} (To ${data.assigned_hospital})`;
+            notificationDiv.appendChild(notification);
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+    });
 </script>
 </body>
 </html>

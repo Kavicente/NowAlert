@@ -907,6 +907,7 @@ def handle_city_health_response(data):
 
         if not alert_id or not barangay:
             logger.error("Missing required fields in city_health_response")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -929,6 +930,7 @@ def handle_city_health_response(data):
         }, broadcast=True, include_self=False)
     except Exception as e:
         logger.error(f"Error in city_health_response: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('hospital_redirect_alert')
 def handle_hospital_redirect_alert(data):
@@ -945,9 +947,11 @@ def handle_hospital_redirect_alert(data):
         lat = data.get('lat')
         lon = data.get('lon')
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        image = data.get('image')
 
         if not alert_id or not barangay or not assigned_hospital:
             logger.error("Missing required fields in hospital_redirect_alert")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -957,11 +961,12 @@ def handle_hospital_redirect_alert(data):
         hospital = c.fetchone()
         if not hospital:
             logger.error(f"No hospital found with assigned_hospital: {assigned_hospital}")
+            emit('error', {'message': f"No hospital found for {assigned_hospital}"}, to=request.sid)
             conn.close()
             return
 
         c.execute("INSERT OR REPLACE INTO hospital_alerts (alert_id, barangay, assigned_hospital, health_type, health_cause, patient_age, patient_gender, timestamp, status, lat, lon, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (alert_id, barangay, assigned_hospital, health_type, health_cause, patient_age, patient_gender, timestamp, 'PENDING', lat, lon, data.get('image')))
+                  (alert_id, barangay, assigned_hospital, health_type, health_cause, patient_age, patient_gender, timestamp, 'PENDING', lat, lon, image))
         conn.commit()
         conn.close()
         logger.info(f"Stored hospital_alert for alert_id: {alert_id}")
@@ -977,10 +982,11 @@ def handle_hospital_redirect_alert(data):
             'emergency_type': emergency_type,
             'lat': lat,
             'lon': lon,
-            'image': data.get('image')
+            'image': image
         }, broadcast=True, include_self=False)
     except Exception as e:
         logger.error(f"Error in hospital_redirect_alert: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('hospital_admission_notification')
 def handle_hospital_admission_notification(data):
@@ -993,6 +999,7 @@ def handle_hospital_admission_notification(data):
 
         if not alert_id or not barangay or not assigned_hospital:
             logger.error("Missing required fields in hospital_admission_notification")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
         emit('hospital_admission_notification', {
@@ -1003,6 +1010,7 @@ def handle_hospital_admission_notification(data):
         }, broadcast=True, include_self=False)
     except Exception as e:
         logger.error(f"Error in hospital_admission_notification: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
@@ -3469,6 +3477,24 @@ if __name__ == '__main__':
                 timestamp TEXT NOT NULL,
                 status TEXT NOT NULL,
                 image TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS hospital_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT NOT NULL,
+                barangay TEXT NOT NULL,
+                assigned_hospital TEXT NOT NULL,
+                health_type TEXT DEFAULT 'N/A',
+                health_cause TEXT DEFAULT 'N/A',
+                patient_age TEXT DEFAULT 'N/A',
+                patient_gender TEXT DEFAULT 'N/A',
+                timestamp TEXT NOT NULL,
+                status TEXT NOT NULL,
+                lat REAL,
+                lon REAL,
+                image TEXT,
+                FOREIGN KEY (alert_id, barangay) REFERENCES alerts (alert_id, barangay)
             )
         ''')
         conn.commit()
