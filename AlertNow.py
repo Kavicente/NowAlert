@@ -1675,19 +1675,27 @@ def handle_health_response(data):
     if response_time.date() == today:
         today_responses.append(data)
     
-    # Compute prediction using ML model on form data
+        # Compute prediction using ML model on form data
     try:
         # Default values for expected model features
         patient_age = pd.to_numeric(data.get('patient_age', '0'), errors='coerce')
         if pd.isna(patient_age):
             patient_age = 0
         default_values = {
+            'Date': datetime.now().strftime('%d/%m/%Y'),
             'Year': datetime.now().year,
+            'Time': datetime.now().strftime('%H:%M'),
+            'Day_of_Week': datetime.now().strftime('%A'),
             'Barangay': data.get('barangay', 'Unknown'),
+            'Latitude': data.get('lat', 0.0),
+            'Longitude': data.get('lon', 0.0),
             'Weather': data.get('weather', 'Unknown'),
             'Health_Type': data.get('health_type', 'Unknown'),
             'Health_Cause': data.get('health_cause', 'Unknown'),
             'Severity': data.get('severity', 'Unknown'),
+            'Patient_Count': 1,
+            'Response_Time': 0,
+            'Treatment_Time': 0,
             'Patient_Age': patient_age,
             'Patient_Gender': data.get('patient_gender', 'Unknown')
         }
@@ -1728,22 +1736,11 @@ def handle_health_response(data):
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
         
-        # Ensure all expected columns are present, handling categorical variables
+        # Ensure all expected columns are present
         expected_columns = health_emergencies_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
-                if col.startswith('Health_Type_') or col.startswith('Health_Cause_'):
-                    input_df[col] = 0  # One-hot encoded columns
-                else:
-                    input_df[col] = default_values.get(col, 0)
-        
-        # Apply one-hot encoding for Health_Type and Health_Cause
-        for health_type in type_mapping.values():
-            col_name = f'Health_Type_{health_type}'
-            input_df[col_name] = 1 if cleaned_data['Health_Type'] == health_type else 0
-        for health_cause in cause_mapping.values():
-            col_name = f'Health_Cause_{health_cause}'
-            input_df[col_name] = 1 if cleaned_data['Health_Cause'] == health_cause else 0
+                input_df[col] = default_values.get(col, 0)
         
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
@@ -2321,7 +2318,7 @@ def handle_barangay_health_response(data):
                     lat, lon, barangay, emergency_type, timestamp
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
+                data.get('alert_id'), data.get('health_causes'), data.get('health_emergency_types'),
                 data.get('patient_age', '0'), data.get('patient_gender', ''), data.get('lat'), data.get('lon'),
                 data.get('barangay'), data.get('emergency_type'), data['timestamp']
             ))
@@ -2345,12 +2342,20 @@ def handle_barangay_health_response(data):
         if pd.isna(patient_age):
             patient_age = 0
         default_values = {
+            'Date': datetime.now().strftime('%d/%m/%Y'),
             'Year': datetime.now().year,
+            'Time': datetime.now().strftime('%H:%M'),
+            'Day_of_Week': datetime.now().strftime('%A'),
             'Barangay': data.get('barangay', 'Unknown'),
+            'Latitude': data.get('lat', 0.0),
+            'Longitude': data.get('lon', 0.0),
             'Weather': data.get('weather', 'Unknown'),
-            'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Health_Type': data.get('health_emergency_types', 'Unknown'),
+            'Health_Cause': data.get('health_causes', 'Unknown'),
             'Severity': data.get('severity', 'Unknown'),
+            'Patient_Count': 1,
+            'Response_Time': 0,
+            'Treatment_Time': 0,
             'Patient_Age': patient_age,
             'Patient_Gender': data.get('patient_gender', 'Unknown')
         }
@@ -2383,9 +2388,9 @@ def handle_barangay_health_response(data):
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
             elif key == 'Health_Type':
-                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
+                cleaned_data[key] = type_mapping.get(data.get('health_emergency_types', '').lower(), default_values[key])
             elif key == 'Health_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+                cleaned_data[key] = cause_mapping.get(data.get('health_causes', '').lower(), default_values[key])
             else:
                 cleaned_data[key] = default_values[key]
         # Prepare DataFrame for prediction
@@ -2395,7 +2400,7 @@ def handle_barangay_health_response(data):
         expected_columns = health_emergencies_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
-                input_df[col] = 0
+                input_df[col] = default_values.get(col, 0)
         
         # Reorder columns to match training data
         input_df = input_df[expected_columns]
@@ -2433,22 +2438,22 @@ def handle_barangay_health_response(data):
     # Prepare chart data
     chart_data.update({
         'health_type': {
-            'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
+            'labels': [data.get('health_emergency_types', 'Unknown')] if data.get('health_emergency_types') else ['No Data'],
             'datasets': [{
                 'label': 'Health Emergency Type',
-                'data': [1] if data.get('health_type') else [0],
-                'backgroundColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                'borderColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
+                'data': [1] if data.get('health_emergency_types') else [0],
+                'backgroundColor': ['#4ECDC4'] if data.get('health_emergency_types') else ['#999999'],
+                'borderColor': ['#4ECDC4'] if data.get('health_emergency_types') else ['#999999'],
                 'borderWidth': 1
             }]
         },
         'health_cause': {
-            'labels': [data.get('health_cause', 'Unknown')] if data.get('health_cause') else ['No Data'],
+            'labels': [data.get('health_causes', 'Unknown')] if data.get('health_causes') else ['No Data'],
             'datasets': [{
                 'label': 'Health Emergency Cause',
-                'data': [1] if data.get('health_cause') else [0],
-                'backgroundColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                'borderColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
+                'data': [1] if data.get('health_causes') else [0],
+                'backgroundColor': ['#45B7D1'] if data.get('health_causes') else ['#999999'],
+                'borderColor': ['#45B7D1'] if data.get('health_causes') else ['#999999'],
                 'borderWidth': 1
             }]
         },
@@ -2488,7 +2493,7 @@ def handle_barangay_health_response(data):
     logger.info(f"Emitting barangay_health_response with chart_data: {chart_data}")
     # Combine data and chart_data into a single dictionary for emission
     emission_data = {**data, **chart_data}
-    emit('barangay_health_response', emission_data, room=barangay_room)
+    socketio.emit('barangay_health_response', emission_data, room=barangay_room)
     logger.info(f"Chart update emitted to room {barangay_room}")
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
