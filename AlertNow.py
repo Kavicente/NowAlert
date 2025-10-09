@@ -2194,9 +2194,13 @@ def handle_health_response(data):
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
             elif key == 'Health_Type':
-                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
+                mapped_value = type_mapping.get(data.get('health_type', '').lower(), 'Unknown')
+                cleaned_data[key] = mapped_value
+                logger.debug(f"Mapping Health_Type: '{data.get('health_type', '')}' -> '{mapped_value}'")
             elif key == 'Health_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+                mapped_value = cause_mapping.get(data.get('health_cause', '').lower(), 'Unknown')
+                cleaned_data[key] = mapped_value
+                logger.debug(f"Mapping Health_Cause: '{data.get('health_cause', '')}' -> '{mapped_value}'")
             elif key == 'Weather':
                 cleaned_data[key] = data.get('weather', default_values[key]) if data.get('weather') in ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'] else default_values[key]
             elif key == 'Severity':
@@ -2208,18 +2212,17 @@ def handle_health_response(data):
         input_df = pd.DataFrame([cleaned_data])
 
         # Preprocess input data to match model expectations
-        def preprocess_input(df, required_columns):
+        def the_preprocess_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
-                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Encode strings to numeric
+                    df[col] = df[col].astype('category').cat.codes.replace({-1: 0})  # Map unseen to 0
             for col in ['Patient_Age']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             return df
 
-        # ✅ FIXED: Include 'Barangay' in required_columns for encoding
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender', 'Barangay']
-        input_df = preprocess_input(input_df, required_columns)
+        input_df = the_preprocess_input(input_df, required_columns)
 
         # Ensure all expected columns exist
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
@@ -2373,8 +2376,8 @@ def handle_barangay_health_response(data):
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
             'Weather': data.get('weather', 'Unknown'),
-            'Health_Type': data.get('health_type', 'Unknown'),
-            'Health_Cause': data.get('health_cause', 'Unknown'),
+            'Health_Type': data.get('health_emergency_types', 'Unknown'),  # Adjusted key
+            'Health_Cause': data.get('health_causes', 'Unknown'),          # Adjusted key
             'Severity': data.get('severity', 'Unknown'),
             'Patient_Age': patient_age,
             'Patient_Gender': data.get('patient_gender', 'Unknown')
@@ -2410,9 +2413,13 @@ def handle_barangay_health_response(data):
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
             elif key == 'Health_Type':
-                cleaned_data[key] = type_mapping.get(data.get('health_type', '').lower(), default_values[key])
+                mapped_value = type_mapping.get(data.get('health_emergency_types', '').lower(), 'Unknown')
+                cleaned_data[key] = mapped_value
+                logger.debug(f"Mapping Health_Type: '{data.get('health_emergency_types', '')}' -> '{mapped_value}'")
             elif key == 'Health_Cause':
-                cleaned_data[key] = cause_mapping.get(data.get('health_cause', '').lower(), default_values[key])
+                mapped_value = cause_mapping.get(data.get('health_causes', '').lower(), 'Unknown')
+                cleaned_data[key] = mapped_value
+                logger.debug(f"Mapping Health_Cause: '{data.get('health_causes', '')}' -> '{mapped_value}'")
             elif key == 'Weather':
                 cleaned_data[key] = data.get('weather', default_values[key]) if data.get('weather') in ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'] else default_values[key]
             elif key == 'Severity':
@@ -2424,18 +2431,17 @@ def handle_barangay_health_response(data):
         input_df = pd.DataFrame([cleaned_data])
 
         # Preprocess input data to match model expectations
-        def preprocess_input(df, required_columns):
+        def preprocess_the_input(df, required_columns):
             for col in required_columns:
                 if col in df.columns and df[col].dtype == 'object':
-                    df[col] = df[col].astype('category').cat.codes.replace(-1, 0)  # Encode strings to numeric
+                    df[col] = df[col].astype('category').cat.codes.replace({-1: 0})  # Map unseen to 0
             for col in ['Patient_Age']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             return df
 
-        # ✅ FIXED: Include 'Barangay' in required_columns for encoding
         required_columns = ['Weather', 'Health_Type', 'Health_Cause', 'Severity', 'Patient_Gender', 'Barangay']
-        input_df = preprocess_input(input_df, required_columns)
+        input_df = preprocess_the_input(input_df, required_columns)
 
         # Ensure all expected columns exist
         expected_columns = ['Year', 'Barangay', 'Weather', 'Health_Type', 'Health_Cause', 'Severity']
@@ -2490,22 +2496,22 @@ def handle_barangay_health_response(data):
     # Prepare chart data
     chart_data.update({
         'health_type': {
-            'labels': [data.get('health_type', 'Unknown')] if data.get('health_type') else ['No Data'],
+            'labels': [data.get('health_emergency_types', 'Unknown')] if data.get('health_emergency_types') else ['No Data'],
             'datasets': [{
                 'label': 'Health Emergency Type',
-                'data': [1] if data.get('health_type') else [0],
-                'backgroundColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
-                'borderColor': ['#4ECDC4'] if data.get('health_type') else ['#999999'],
+                'data': [1] if data.get('health_emergency_types') else [0],
+                'backgroundColor': ['#4ECDC4'] if data.get('health_emergency_types') else ['#999999'],
+                'borderColor': ['#4ECDC4'] if data.get('health_emergency_types') else ['#999999'],
                 'borderWidth': 1
             }]
         },
         'health_cause': {
-            'labels': [data.get('health_cause', 'Unknown')] if data.get('health_cause') else ['No Data'],
+            'labels': [data.get('health_causes', 'Unknown')] if data.get('health_causes') else ['No Data'],
             'datasets': [{
                 'label': 'Health Emergency Cause',
-                'data': [1] if data.get('health_cause') else [0],
-                'backgroundColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
-                'borderColor': ['#45B7D1'] if data.get('health_cause') else ['#999999'],
+                'data': [1] if data.get('health_causes') else [0],
+                'backgroundColor': ['#45B7D1'] if data.get('health_causes') else ['#999999'],
+                'borderColor': ['#45B7D1'] if data.get('health_causes') else ['#999999'],
                 'borderWidth': 1
             }]
         },
@@ -2546,7 +2552,6 @@ def handle_barangay_health_response(data):
     logger.info(f"Emitting barangay_response with chart_data: {chart_data}")
     socketio.emit('barangay_health_response', {'data': data, 'chart_data': chart_data}, room=barangay_room)
     logger.info(f"Chart update emitted to room {barangay_room}")
-
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
