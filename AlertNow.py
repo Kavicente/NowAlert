@@ -2029,12 +2029,12 @@ def handle_pnp_fire_submitted(data):
         conn.execute('''
             INSERT INTO pnp_fire_response (
                 alert_id, fire_type, fire_cause, weather, fire_severity, 
-                lat, lon, municipality, emergency_type, timestamp
+                lat, lon, barangay, emergency_type, timestamp
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'), data.get('fire_type'), data.get('fire_cause'),
             data.get('weather'), data.get('fire_severity'), data.get('lat'), 
-            data.get('lon'), data.get('municipality'), data.get('emergency_type'), 
+            data.get('lon'), data.get('barangay'), data.get('emergency_type'), 
             data['timestamp']
         ))
         conn.commit()
@@ -2178,14 +2178,14 @@ def handle_pnp_crime_response(data):
         conn.execute('''
             INSERT INTO pnp_crime_response (
                 alert_id, crime_type, crime_cause, level, suspect_gender, 
-                victim_gender, suspect_age, victim_age, lat, lon, municipality, 
+                victim_gender, suspect_age, victim_age, lat, lon, baranagya, municipality, 
                 emergency_type, timestamp
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'),
             data.get('level'), data.get('suspect_gender'), data.get('victim_gender'),
             data.get('suspect_age'), data.get('victim_age'), data.get('lat'), 
-            data.get('lon'), data.get('municipality'), data.get('emergency_type'), 
+            data.get('lon'), data.get('barangay'), data.get('municipality'), data.get('emergency_type'), 
             data['timestamp']
         ))
         conn.commit()
@@ -3350,6 +3350,7 @@ if __name__ == '__main__':
                 lat REAL,
                 lon REAL,
                 barangay TEXT,
+                municipality TEXT,
                 emergency_type TEXT,
                 timestamp TEXT,
                 responded BOOLEAN DEFAULT TRUE
@@ -3364,6 +3365,22 @@ if __name__ == '__main__':
                 barangay TEXT,
                 emergency_type TEXT,
                 timestamp TEXT
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS pnp_fire_response (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT,
+                fire_type TEXT,
+                fire_cause TEXT,
+                weather TEXT,
+                fire_severity TEXT,
+                lat REAL,
+                lon REAL,
+                barangay TEXT,
+                emergency_type TEXT,
+                timestamp TEXT,
+                responded BOOLEAN DEFAULT TRUE
             )
         ''')
         conn.commit()
