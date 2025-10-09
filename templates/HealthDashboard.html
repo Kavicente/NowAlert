@@ -140,7 +140,7 @@
                 }
             });
 
-            socket.on('city_health_response', (data) => {
+            socket.on('health_response', (data) => {
                 console.log('City health response received:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
