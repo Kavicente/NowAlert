@@ -2048,6 +2048,7 @@ def handle_pnp_fire_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Municipality': data.get('municipality', 'Unknown'),
+            'Barangay': data.get('barangay', 'Unknown'),
             'Fire_Type': 'Residential Fire',
             'Fire_Cause': 'Unattended Cooking'
         }
@@ -2075,13 +2076,14 @@ def handle_pnp_fire_submitted(data):
         cleaned_data = {
             'Year': default_values['Year'],
             'Municipality': data.get('municipality', default_values['Municipality']),
+            'Barangay': data.get('barangay', default_values['Barangay']),
             'Fire_Type': ftype_mapping.get(data.get('fire_type', '').lower(), default_values['Fire_Type']),
             'Fire_Cause': fcause_mapping.get(data.get('fire_cause', '').lower(), default_values['Fire_Cause'])
         }
         features = pd.DataFrame([[
             cleaned_data['Fire_Type'], cleaned_data['Fire_Cause'], 
-            cleaned_data['Municipality'], cleaned_data['Year']
-        ]], columns=['Fire_Type', 'Fire_Cause', 'Municipality', 'Year'])
+            cleaned_data['Municipality'], cleaned_data['Barangay'], cleaned_data['Year']
+        ]], columns=['Fire_Type', 'Fire_Cause', 'Municipality', 'Barangay', 'Year'])
         if fire_accident_predictor:
             probability = fire_accident_predictor.predict_proba(features)[0][1] * 100
             data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
@@ -2178,9 +2180,9 @@ def handle_pnp_crime_response(data):
         conn.execute('''
             INSERT INTO pnp_crime_response (
                 alert_id, crime_type, crime_cause, level, suspect_gender, 
-                victim_gender, suspect_age, victim_age, lat, lon, baranagya, municipality, 
+                victim_gender, suspect_age, victim_age, lat, lon, barangay, municipality, 
                 emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('alert_id'), data.get('crime_type'), data.get('crime_cause'),
             data.get('level'), data.get('suspect_gender'), data.get('victim_gender'),
@@ -2199,6 +2201,7 @@ def handle_pnp_crime_response(data):
         default_values = {
             'Year': datetime.now().year,
             'Municipality': data.get('municipality', 'Unknown'),
+            'Barangay': data.get('barangay', 'Unknown'),
             'Crime_Type': 'Theft',
             'Crime_Cause': 'Poverty'
         }
@@ -2217,13 +2220,14 @@ def handle_pnp_crime_response(data):
         cleaned_data = {
             'Year': default_values['Year'],
             'Municipality': data.get('municipality', default_values['Municipality']),
+            'Barangay': data.get('barangay', default_values['Barangay']),
             'Crime_Type': ctype_mapping.get(data.get('crime_type', '').lower(), default_values['Crime_Type']),
             'Crime_Cause': ccause_mapping.get(data.get('crime_cause', '').lower(), default_values['Crime_Cause'])
         }
         features = pd.DataFrame([[
             cleaned_data['Crime_Type'], cleaned_data['Crime_Cause'], 
-            cleaned_data['Municipality'], cleaned_data['Year']
-        ]], columns=['Crime_Type', 'Crime_Cause', 'Municipality', 'Year'])
+            cleaned_data['Municipality'], cleaned_data['Barangay'], cleaned_data['Year']
+        ]], columns=['Crime_Type', 'Crime_Cause', 'Municipality', 'Barangay', 'Year'])
         if crime_predictor:
             probability = crime_predictor.predict_proba(features)[0][1] * 100
             data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
