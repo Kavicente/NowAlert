@@ -2226,12 +2226,8 @@ def handle_health_response(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-
-        # Convert all to numeric
-        for col in input_df.columns:
-            input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
-
-        # Reorder columns to match model expectations
+        
+        # Reorder columns to match training data
         input_df = input_df[expected_columns]
 
         # Optional debug logs
@@ -2442,12 +2438,8 @@ def handle_barangay_health_response(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-
-        # Convert all to numeric
-        for col in input_df.columns:
-            input_df[col] = pd.to_numeric(input_df[col], errors='coerce').fillna(0)
-
-        # Reorder columns to match model expectations
+        
+        # Reorder columns to match training data
         input_df = input_df[expected_columns]
 
         # Optional debug logs
