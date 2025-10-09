@@ -2124,7 +2124,7 @@ def handle_barangay_health_response(data):
     conn = get_db_connection()
     try:
         conn.execute('''
-                INSERT INTO barangay_response (
+                INSERT INTO barangay_health_response (
                     alert_id, health_cause, health_type, patient_age, patient_gender, 
                     lat, lon, barangay, emergency_type, timestamp
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
