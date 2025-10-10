@@ -892,9 +892,9 @@ def handle_pnp_redirect_alert(data):
     }, room=pnp_room)
     logger.info(f"Emergency type update emitted to room {pnp_room} for alert {data.get('alert_id')}")
 
-@socketio.on('health_redirect_alert')
-def handle_health_redirect_alert(data):
-    logger.info(f"Received health_redirect_alert: {data}")
+@socketio.on('health_redirected_alert')
+def handle_health_redirected_alert(data):
+    logger.info(f"Received health_redirected_alert: {data}")
     try:
         alert_id = data.get('alert_id')
         barangay = data.get('barangay')
@@ -906,7 +906,7 @@ def handle_health_redirect_alert(data):
         image = data.get('image')
 
         if not alert_id or not barangay:
-            logger.error("Missing required fields in health_redirect_alert")
+            logger.error("Missing required fields in health_redirected_alert")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
@@ -914,12 +914,12 @@ def handle_health_redirect_alert(data):
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         c.execute("INSERT OR REPLACE INTO health_responses (alert_id, barangay, emergency_type, lat, lon, timestamp, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                  (alert_id, barangay, emergency_type, lat, lon, timestamp, 'PENDING', image))
+                  (alert_id, barangay, emergency_type, lat, lon, timestamp, 'RESPONDED', image))
         conn.commit()
         conn.close()
-        logger.info(f"Stored health_redirect_alert for alert_id: {alert_id}")
+        logger.info(f"Stored health_redirected_alert for alert_id: {alert_id}")
 
-        emit('health_redirect_alert', {
+        emit('health_redirected_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
             'emergency_type': emergency_type,
@@ -929,7 +929,7 @@ def handle_health_redirect_alert(data):
             'image': image
         }, broadcast=True, include_self=False)
     except Exception as e:
-        logger.error(f"Error in health_redirect_alert: {e}")
+        logger.error(f"Error in health_redirected_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('hospital_redirect_alert')
