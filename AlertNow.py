@@ -2210,91 +2210,94 @@ def handle_barangay_health_response(data):
     
 @socketio.on('health_response')
 def handle_health_response(data):
-    logger.info(f"Received health_response: {data}")
-    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-
-    conn = get_db_connection()
     try:
-        conn.execute('''
+        logger.info(f"Received health response: {data}")
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute('''
                 INSERT INTO health_response (
                     alert_id, health_cause, health_type, patient_age, patient_gender, 
                     lat, lon, barangay, emergency_type, timestamp
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                data.get('alert_id'), data.get('health_causes', None), data.get('health_emergency_types', None),
-                data.get('patient_age', None), data.get('patient_gender', None), data.get('lat'), data.get('lon'),
+                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
+                data.get('patient_age'), data.get('patient_gender'), data.get('lat'), data.get('lon'),
                 data.get('barangay'), data.get('emergency_type'), data['timestamp']
             ))
         conn.commit()
-        logger.info(f"Stored health_response for alert_id: {data.get('alert_id')}")
-    except Exception as e:
-        logger.error(f"Error storing health_response: {e}")
-    finally:
         conn.close()
-
-    try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Health_Type': 'Heart Attack',
-            'Health_Cause': 'Heatstroke',
-            'Patient_Age': '0-17',
-            'Patient_Gender': 'Male'
-        }
-        htype_mapping = {
-            'Heart Attack': 'Heart Attack', 'Stroke': 'Stroke', 'Fall': 'Fall', 
-            'Breathing Difficulty': 'Breathing Difficulty', 'Giving Birth': 'Giving Birth', 'Seizure': 'Seizure',
-            'Burn': 'Burn', 'Poisoning': 'Poisoning', 'Allergic Reaction': 'Allergic Reaction'
-        }
-        hcause_mapping = {
-            'Pregnant': 'Pregnant', 'Chronic Illness': 'Chronic Illness', 'Accident': 'Accident',
-            'Allergy': 'Allergy', 'Infection': 'Infection', 'Overdose': 'Overdose', 'Heatstroke': 'Heatstroke'
-        }
-        cleaned_data = {
-            'Year': default_values['Year'],
-            'Barangay': data.get('barangay', default_values['Barangay']),
-            'Health_Type': htype_mapping.get(data.get('health_emergency_types', default_values['Health_Type']).title(), default_values['Health_Type']),
-            'Health_Cause': hcause_mapping.get(data.get('health_causes', default_values['Health_Cause']).title(), default_values['Health_Cause']),
-            'Patient_Age': data.get('patient_age', default_values['Patient_Age']),
-            'Patient_Gender': data.get('patient_gender', default_values['Patient_Gender'])
-        }
-        features = pd.DataFrame([{
-            'Health_Type': cleaned_data['Health_Type'],
-            'Health_Cause': cleaned_data['Health_Cause'],
-            'Barangay': cleaned_data['Barangay'],
-            'Year': cleaned_data['Year'],
-            'Patient_Age': cleaned_data['Patient_Age'],
-            'Patient_Gender': cleaned_data['Patient_Gender']
-        }], columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year', 'Patient_Age', 'Patient_Gender'])
-        prediction = 'N/A'
-        if health_predictor:
-            probability = health_predictor.predict_proba(features)[0][1] * 100
-            prediction = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
-        else:
-            prediction = 'prediction_error'
-
-        emit_data = {
-            'alert_id': data.get('alert_id'),
-            'barangay': data.get('barangay'),
-            'emergency_type': data.get('emergency_type', 'Health Emergency'),
-            'lat': data.get('lat'),
-            'lon': data.get('lon'),
-            'resident_barangay': data.get('resident_barangay', data.get('barangay')),
-            'image': data.get('image'),
-            'health_emergency_types': data.get('health_emergency_types', None),
-            'health_causes': data.get('health_causes', None),
-            'patient_age': data.get('patient_age', None),
-            'patient_gender': data.get('patient_gender', None),
-            'prediction': prediction,
-            'year': datetime.now().year + 1
-        }
-        health_room = f"pnp_{data.get('municipality').lower() if data.get('municipality') else ''}"
-        emit('health_response', data, room=health_room)
-        logger.info(f"PNP response emitted to room {health_room}")
+        
+        emit('health_response', data, room=data.get('barangay', 'default_room'))
 
     except Exception as e:
-        logger.error(f"Error in health_response: {e}")
-        emit('error', {'message': str(e)}, to=request.sid)
+        logger.error(f"Error handling health response: {e}")
+        
+    logger.info(f"Receive health response: {data}")
+    logger.debug(f"Processing heealth response for alert_id: {data.get('alert_id')}")
+    default_values = {
+        'Year': datetime.now().year,
+        'Barangay': data.get('barangay', 'Unknown'),
+        'Health Cause': data.get('health_cause', 'Unknown'),
+        'Health Type': data.get('health_type', 'Unknown'),
+        
+    }
+    hcause_mapping = {
+        'Chronic Illness': 1,
+        'Allergy': 2,
+        'Infection': 3,
+        'Accident': 4,
+        'Overdose': 5,
+        'Pregnant': 6,
+        'Heatstroke': 7
+        
+    }
+    htype_mapping = {
+        'Heart Attack': 1,
+        'Stroke': 2,
+        'Fall': 3,
+        'Breathing Difficulty': 4,
+        'Seizure': 5,
+        'Giving Birth': 6,
+        'Poisoning': 7,
+        'Allergic Reaction': 8
+    }
+    
+    cleaned_data = {
+        'Year': default_values['Year'],
+        'Barangay': data.get('barangay', default_values['Barangay']),
+        'Health Cause': hcause_mapping.get(data.get('health_cause', default_values['Health Cause']), 0),
+        'Health Type': htype_mapping.get(data.get('health_type', default_values['Health Type']), 0)
+    }
+    cleaned_data.update(default_values)
+    
+    try: 
+        if health_predictor:
+            feature_names = ['Year', 'Barangay', 'Health Cause', 'Health Type']
+            features = pd.DataFrame([[
+                cleaned_data['Health Cause'],
+                cleaned_data['Health Type'],
+                cleaned_data['barangay'],
+                datetime.now().year
+            ]], columns=feature_names)
+            prediction = health_predictor.predict(features)[0]
+            probability = fire_accident_predictor.predict_proba(features)[0][1]
+            cleaned_data['prediction'] = f"{probability*100:.2f}% chance in year {datetime.now().year + 1}"
+            
+        else:
+            cleaned_data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        cleaned_data['prediction'] = 'prediction_error'
+        
+    responses.append(cleaned_data)
+    today_responses.append(cleaned_data)
+    municipality = get_municipality_from_barangay(cleaned_data['barangay'])
+    if not municipality:
+        logger.error(f"No municipality found for barangay: {cleaned_data['barangay']}")
+        municipality = 'unknown'
+    health_room = f"health_{municipality.lower()}"
+    emit('health_response', cleaned_data, room=health_room)
+    logger.info(f"Health response broadcasted to room {health_room}: {cleaned_data}") 
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
