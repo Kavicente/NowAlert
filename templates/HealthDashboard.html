@@ -168,7 +168,9 @@
                         const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
                         if (match) {
                             const percentage = match[1];
-                            formattedPrediction = `There will be a ${percentage}% Chance of ${data.emergency_type} in year ${data.year || new Date().getFullYear() + 1}`;
+                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                            formattedPrediction = `There will be a ${percentage}% Chance of ${data.emergency_type} in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -240,14 +242,14 @@
                 if (!data || !data.emergency_type) {
                     console.error('Error: data or data.emergency_type is undefined');
                     emergencyType = 'Unknown';
-                    dropdownData = menuData['Unknown'] || {};
-                } else if (data.emergency_type === 'Health Emergency' || data.emergency_type === 'Birth Emergency') {
-                    emergencyType = data.emergency_type;
-                    dropdownData = menuData['Health Emergency'] || {};
+                    dropdownData = menuData['Unknown'] || [];
+                } else if (data.emergency_type === 'Health Emergency') {
+                    emergencyType = 'Health Emergency';
+                    dropdownData = menuData['Health Emergency'] || [];
                 } else {
                     console.warn(`Unknown emergency type: ${data.emergency_type}`);
                     emergencyType = 'Unknown';
-                    dropdownData = menuData['Unknown'] || {};
+                    dropdownData = menuData['Unknown'] || [];
                 }
 
                 Object.keys(dropdownData).forEach(key => {
@@ -315,6 +317,8 @@
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.color = 'black';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
