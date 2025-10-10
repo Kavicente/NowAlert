@@ -2276,7 +2276,7 @@ def handle_health_response(data):
             features = pd.DataFrame([[
                 cleaned_data['Health Cause'],
                 cleaned_data['Health Type'],
-                cleaned_data['barangay'],
+                cleaned_data['Barangay'],
                 datetime.now().year
             ]], columns=feature_names)
             prediction = health_predictor.predict(features)[0]
