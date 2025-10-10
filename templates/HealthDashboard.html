@@ -177,6 +177,18 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
+                    predictionDiv.style.fontSize = '16px';
+                    predictionDiv.style.color = 'black';
+                    const responseForm = alertItem.querySelector('.response-form');
+                    if (responseForm) {
+                        responseForm.style.display = 'none';
+                    }
+                    const statusDiv = alertItem.querySelector('div:nth-child(1)');
+                    if (statusDiv) {
+                        statusDiv.textContent = 'RESPONDED';
+                    }
+                } else {
+                    console.error(`Alert item not found for alert_id: ${data.alert_id}`);
                 }
             });
 
@@ -238,20 +250,8 @@
                 responseForm.className = 'response-form';
                 responseForm.style.display = showResponseForm ? 'block' : 'none';
 
-                let emergencyType, dropdownData;
-                if (!data || !data.emergency_type) {
-                    console.error('Error: data or data.emergency_type is undefined');
-                    emergencyType = 'Unknown';
-                    dropdownData = menuData['Unknown'] || {};
-                } else if (data.emergency_type === 'Health Emergency' || data.emergency_type === 'Birth Emergency') {
-                    emergencyType = data.emergency_type;
-                    dropdownData = menuData['Health Emergency'] || {};
-                } else {
-                    console.warn(`Unknown emergency type: ${data.emergency_type}`);
-                    emergencyType = 'Unknown';
-                    dropdownData = menuData['Unknown'] || {};
-                }
-
+                let emergencyType = 'Health Emergency';
+                let dropdownData = menuData['Health Emergency'] || {};
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
                     select.name = key.toLowerCase().replace(/\s+/g, '_');
@@ -260,10 +260,12 @@
                     defaultOption.textContent = `Select ${key}`;
                     select.appendChild(defaultOption);
                     dropdownData[key].forEach(value => {
-                        const option = document.createElement('option');
-                        option.value = value;
-                        option.textContent = value;
-                        select.appendChild(option);
+                        if (key !== 'Health Emergency Types' || value !== 'Giving Birth') {
+                            const option = document.createElement('option');
+                            option.value = value;
+                            option.textContent = value;
+                            select.appendChild(option);
+                        }
                     });
                     responseForm.appendChild(select);
                 });
@@ -286,10 +288,11 @@
                     formData.lon = data.lon;
                     formData.barangay = data.barangay;
                     formData.emergency_type = emergencyType;
+                    formData.municipality = '{{ municipality }}';
                     formData.timestamp = new Date().toISOString();
                     socket.emit('health_response', formData);
+                    console.log('Emitted health_response:', formData);
                 });
-
                 responseForm.appendChild(submitButton);
 
                 const hospitalButtonsDiv = document.createElement('div');
@@ -310,15 +313,13 @@
                     button.style.margin = '5px';
                     button.style.padding = '5px';
                     button.style.borderRadius = '4px';
-                    button.disabled = true; // No functionality
+                    button.disabled = true;
                     hospitalButtonsDiv.appendChild(button);
                 });
 
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
-                predictionDiv.style.fontSize = '16px';
-                predictionDiv.style.color = 'black';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
