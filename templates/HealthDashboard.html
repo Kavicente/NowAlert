@@ -113,7 +113,7 @@
                 };
                 L.control.layers(baseLayers).addTo(healthMap);
 
-                const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
+                const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
                 const alertElements = new Map();
 
                 fetch('/static/menu.txt')
@@ -141,9 +141,50 @@
                     }
                 });
 
-                socket.on('city_health_response', (data) => {
-                    console.log('City health response received:', data);
+                socket.on('health_response', (data) => {
+                    console.log('Health response received:', data);
                     updateUIWithAlert(data, true);
+                    if (data.prediction) {
+                        const alertItem = alertElements.get(data.alert_id);
+                        if (alertItem) {
+                            const predictionDiv = alertItem.querySelector('.prediction');
+                            const predictionText = data.prediction || 'N/A';
+                            let formattedPrediction = 'N/A';
+                            if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                                const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                                if (match) {
+                                    const percentage = match[1];
+                                    formattedPrediction = `There will be a ${percentage}% Chance of ${data.emergency_type} in year ${data.year || new Date().getFullYear() + 1}`;
+                                } else {
+                                    formattedPrediction = predictionText;
+                                }
+                            }
+                            predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                            predictionDiv.style.display = 'block';
+
+                            const hospitalButtonsDiv = document.createElement('div');
+                            hospitalButtonsDiv.className = 'hospital-buttons';
+                            hospitalButtonsDiv.style.marginBottom = '10px';
+                            const hospitals = [
+                                'San Pablo City District Hospital',
+                                'San Pablo Colleges Medical Center',
+                                'Community General Hospital of San Pablo',
+                                'Immaculate Conception Hospital',
+                                'San Pablo City Medical Center',
+                                'San Pablo Doctors Hospital'
+                            ];
+                            hospitals.forEach(hospital => {
+                                const button = document.createElement('button');
+                                button.textContent = `Send to ${hospital}`;
+                                button.style.margin = '5px';
+                                button.style.padding = '5px';
+                                button.style.borderRadius = '4px';
+                                hospitalButtonsDiv.appendChild(button);
+                            });
+                            const alertContainer = document.getElementById('alert-container');
+                            alertContainer.insertBefore(hospitalButtonsDiv, alertContainer.firstChild);
+                        }
+                    }
                 });
 
                 socket.on('update_map', (data) => {
@@ -155,43 +196,6 @@
                         `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
                     ).openPopup();
                     document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
-                });
-
-                socket.on('health_response', (data) => {
-                    console.log('Health response received:', data);
-                    const alertItem = alertElements.get(data.alert_id);
-                    if (alertItem) {
-                        const predictionDiv = alertItem.querySelector('.prediction');
-                        const predictionText = data.prediction || 'N/A';
-                        let formattedPrediction = 'N/A';
-                        if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            formattedPrediction = predictionText;
-                        }
-                        predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                        predictionDiv.style.display = 'block';
-
-                        const hospitalButtonsDiv = document.createElement('div');
-                        hospitalButtonsDiv.className = 'hospital-buttons';
-                        hospitalButtonsDiv.style.marginBottom = '10px';
-                        const hospitals = [
-                            'San Pablo City District Hospital',
-                            'San Pablo Colleges Medical Center',
-                            'Community General Hospital of San Pablo',
-                            'Immaculate Conception Hospital',
-                            'San Pablo City Medical Center',
-                            'San Pablo Doctors Hospital'
-                        ];
-                        hospitals.forEach(hospital => {
-                            const button = document.createElement('button');
-                            button.textContent = `Send to ${hospital}`;
-                            button.style.margin = '5px';
-                            button.style.padding = '5px';
-                            button.style.borderRadius = '4px';
-                            hospitalButtonsDiv.appendChild(button);
-                        });
-                        const alertContainer = document.getElementById('alert-container');
-                        alertContainer.insertBefore(hospitalButtonsDiv, alertContainer.firstChild);
-                    }
                 });
 
                 function parseMenuText(text) {
@@ -287,7 +291,7 @@
                     submitButton.addEventListener('click', () => {
                         const formData = {};
                         responseForm.querySelectorAll('select').forEach(select => {
-                            formData[select.name] = select.value || 'N/A';
+                            formData[select.name] = select.value;
                         });
                         formData.alert_id = data.alert_id;
                         formData.lat = data.lat;
