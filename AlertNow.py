@@ -948,21 +948,21 @@ def handle_hospital_redirect_alert(data):
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
         assigned_hospital = data.get('assigned_hospital')
-        municipality = data.get('municipality', '').lower()
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        municipality = data.get('municipality', 'San Pablo').lower()
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         if not all([alert_id, barangay, assigned_hospital, municipality]):
             logger.error("Missing required fields in hospital_redirect_alert")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
-        # Validate assigned_hospital and role in users_web.db
+        # Validate assigned_hospital and role in users_web.db without selecting id
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("SELECT username FROM users WHERE role = ? AND assigned_hospital = ? AND municipality = ?",
+        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND assigned_hospital = ? AND municipality = ?)",
                   ('hospital', assigned_hospital, municipality))
-        valid_hospital = c.fetchone()
+        valid_hospital = c.fetchone()[0]  # Returns 1 if exists, 0 if not
         conn.close()
 
         if not valid_hospital:
@@ -980,7 +980,7 @@ def handle_hospital_redirect_alert(data):
         logger.info(f"Stored hospital_redirect_alert for alert_id: {alert_id}")
 
         # Emit to hospital room
-        hospital_room = f"hospital_{municipality}_{assigned_hospital.toLowerCase()}"
+        hospital_room = f"hospital_{municipality}_{assigned_hospital.lower().replace(' ', '_')}"
         emit('hospital_redirect_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
