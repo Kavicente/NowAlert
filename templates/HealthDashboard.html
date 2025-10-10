@@ -133,10 +133,12 @@
                     console.error('Connection error:', error);
                 });
 
-                socket.on('redirected_alert', (data) => {
-                    console.log('Redirected alert received:', data);
+                
+
+                socket.on('health_redirect_alert', (data) => {
+                    console.log('Health redirect alert received:', data);
                     if (data.target_role === 'health') {
-                        updateUIWithAlert(data, true);
+                        updateUIWithAlert(data, false);
                         notifyAlert(data);
                     }
                 });
@@ -160,10 +162,11 @@
                         const predictionText = data.prediction || 'N/A';
                         let formattedPrediction = 'N/A';
                         if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                            const match = predictionText.match(/(\d+\.\d+)% chance in year (\d+)/);
                             if (match) {
                                 const percentage = match[1];
-                                formattedPrediction = `There will be a ${percentage}% Chance of ${data.emergency_type} in year ${data.year || new Date().getFullYear() + 1}`;
+                                const year = match[2];
+                                formattedPrediction = `There will be a ${percentage}% Chance of ${data.emergency_type} in year ${year}`;
                             } else {
                                 formattedPrediction = predictionText;
                             }
@@ -227,28 +230,6 @@
                         });
                     }
 
-                    const hospitalButtonsDiv = document.createElement('div');
-                    hospitalButtonsDiv.className = 'hospital-buttons';
-                    hospitalButtonsDiv.style.marginBottom = '10px';
-                    const hospitals = [
-                        'San Pablo City District Hospital',
-                        'San Pablo Colleges Medical Center',
-                        'Community General Hospital of San Pablo',
-                        'Immaculate Conception Hospital',
-                        'San Pablo City Medical Center',
-                        'San Pablo Doctors Hospital'
-                    ];
-                    hospitals.forEach(hospital => {
-                        const button = document.createElement('button');
-                        button.textContent = `Send to ${hospital}`;
-                        button.style.margin = '5px';
-                        button.style.padding = '5px';
-                        button.style.borderRadius = '4px';
-                        button.disabled = true; // Buttons do nothing after prediction
-                        hospitalButtonsDiv.appendChild(button);
-                    });
-                    alertContainer.insertBefore(hospitalButtonsDiv, alertContainer.firstChild);
-
                     const responseForm = document.createElement('div');
                     responseForm.className = 'response-form';
                     responseForm.style.display = showResponseForm ? 'block' : 'none';
@@ -288,8 +269,14 @@
                     submitButton.addEventListener('click', () => {
                         const formData = {};
                         responseForm.querySelectorAll('select').forEach(select => {
-                            formData[select.name] = select.value;
+                            if (select.value) {
+                                formData[select.name] = select.value;
+                            }
                         });
+                        if (Object.keys(formData).length === 0) {
+                            console.error('No form data selected');
+                            return;
+                        }
                         formData.alert_id = data.alert_id;
                         formData.lat = data.lat;
                         formData.lon = data.lon;
@@ -338,6 +325,31 @@
                     });
                 }
 
+                function addHospitalButtons(alertId) {
+                    const alertContainer = document.getElementById('alert-container');
+                    const hospitalButtonsDiv = document.createElement('div');
+                    hospitalButtonsDiv.className = 'hospital-buttons';
+                    hospitalButtonsDiv.style.marginBottom = '10px';
+                    const hospitals = [
+                        'San Pablo City District Hospital',
+                        'San Pablo Colleges Medical Center',
+                        'Community General Hospital of San Pablo',
+                        'Immaculate Conception Hospital',
+                        'San Pablo City Medical Center',
+                        'San Pablo Doctors Hospital'
+                    ];
+                    hospitals.forEach(hospital => {
+                        const button = document.createElement('button');
+                        button.textContent = `Send to ${hospital}`;
+                        button.style.margin = '5px';
+                        button.style.padding = '5px';
+                        button.style.borderRadius = '4px';
+                        button.disabled = true; // No functionality on click
+                        hospitalButtonsDiv.appendChild(button);
+                    });
+                    alertContainer.insertBefore(hospitalButtonsDiv, alertContainer.firstChild);
+                }
+
                 function notifyAlert(data) {
                     const notificationDiv = document.getElementById('notification');
                     const notification = document.createElement('div');
@@ -349,6 +361,6 @@
                     }, 5000);
                 }
             });
-</script>
+        </script>
 </body>
 </html>

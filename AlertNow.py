@@ -892,7 +892,45 @@ def handle_pnp_redirect_alert(data):
     }, room=pnp_room)
     logger.info(f"Emergency type update emitted to room {pnp_room} for alert {data.get('alert_id')}")
 
+@socketio.on('health_redirect_alert')
+def handle_health_redirect_alert(data):
+    logger.info(f"Received health_redirect_alert: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        resident_barangay = data.get('resident_barangay', barangay)
+        image = data.get('image')
 
+        if not alert_id or not barangay:
+            logger.error("Missing required fields in health_redirect_alert")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
+            return
+
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO health_responses (alert_id, barangay, emergency_type, lat, lon, timestamp, status, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                  (alert_id, barangay, emergency_type, lat, lon, timestamp, 'PENDING', image))
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored health_redirect_alert for alert_id: {alert_id}")
+
+        emit('health_redirect_alert', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'emergency_type': emergency_type,
+            'lat': lat,
+            'lon': lon,
+            'resident_barangay': resident_barangay,
+            'image': image
+        }, broadcast=True, include_self=False)
+    except Exception as e:
+        logger.error(f"Error in health_redirect_alert: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('hospital_redirect_alert')
 def handle_hospital_redirect_alert(data):
@@ -2210,67 +2248,66 @@ def handle_barangay_health_response(data):
     
 @socketio.on('health_response')
 def handle_health_response(data):
-    logger.info(f"Received health_response: {data}")
+    logger.info(f"Received health response from barangay: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    
+    conn = get_db_connection()
     try:
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        emergency_type = data.get('emergency_type', 'Health Emergency')
-        lat = data.get('lat')
-        lon = data.get('lon')
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
-        resident_barangay = data.get('resident_barangay', barangay)
-        health_type = data.get('health_emergency_types', 'N/A')
-        health_cause = data.get('health_causes', 'N/A')
-        patient_gender = data.get('patient_gender', 'N/A')
-        patient_age = data.get('patient_age', 'N/A')
-
-        if not alert_id or not barangay:
-            logger.error("Missing required fields in health_response")
-            emit('error', {'message': 'Missing required fields'}, to=request.sid)
-            return
-
-        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO health_response (alert_id, barangay, emergency_type, lat, lon, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (alert_id, barangay, emergency_type, lat, lon, timestamp, 'PENDING'))
+        conn.execute('''
+                INSERT INTO health_response (
+                    alert_id, health_cause, health_type, patient_age, patient_gender, 
+                    lat, lon, barangay, emergency_type, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
+                data.get('patient_age'), data.get('patient_gender'), data.get('lat'), data.get('lon'),
+                data.get('barangay'), data.get('emergency_type'), data['timestamp']
+            ))
         conn.commit()
-        conn.close()
-        logger.info(f"Stored health_response for alert_id: {alert_id}")
-
-        prediction = 'prediction_error'
-        try:
-            predictor = health_predictor if emergency_type == 'Health Emergency' else health_predictor
-            input_data = pd.DataFrame([{
-                'Year': datetime.now().year,
-                'Barangay': data.get('barangay', 'Unknown'),
-                'Health Emergency Types': health_type,
-                'Health Causes': health_cause,
-                'Patient Gender': patient_gender,
-                'Patient Age': patient_age
-            }])
-            pred = predictor.predict_proba(input_data)[:, 1][0] * 100
-            prediction = f"{pred:.1f}% chance in year {datetime.now().year + 1}"
-        except Exception as e:
-            logger.error(f"Prediction error: {e}")
-
-        emit('health_response', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'emergency_type': emergency_type,
-            'lat': lat,
-            'lon': lon,
-            'resident_barangay': resident_barangay,
-            'prediction': prediction,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'patient_gender': patient_gender,
-            'patient_age': patient_age,
-            'year': datetime.now().year + 1
-        }, broadcast=True, include_self=False)
+        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error in health_response: {e}")
-        emit('error', {'message': str(e)}, to=request.sid)
+        logger.error(f"Error storing barangay response: {e}")
+    finally:
+        conn.close()
+         
+    try:
+        default_values = {
+            'Year': datetime.now().year,
+            'Barangay': data.get('barangay', 'Unknown'),
+            'Health_Type': 'Heart Attack',
+            'Health_Cause': 'Heatstroke'
+        }
+        htype_mapping = {
+            'Heart Attack': 'Heart Attack', 'stroke': 'Stroke', 'fall': 'Fall', 
+            'breathing difficulty': 'Breathing Difficulty', 'giving birth':'Giving Birth','seizure':'Seizure',
+            'burn': 'Burn', 'poisoning': 'Poisoning', 'allergic reaction': 'Allergic Reaction'
+        }
+        hcause_mapping = {
+            'pregnant': 'Pregnant', 'chronic illness': 'Chronic Illness', 'accident': 'Accident',
+            'allergy': 'Allergy', 'infection': 'Infection', 'overdose': 'Overdose', 'heatstroke': 'Heatstroke'
+        }
+        cleaned_data = {
+            'Year': default_values['Year'],
+            'Barangay': data.get('barangay', default_values['Barangay']),
+            'Health_Type': htype_mapping.get(data.get('health_type', default_values['Health_Type']), default_values['Health_Type']),
+            'Health_Cause': hcause_mapping.get(data.get('health_cause', default_values['Health_Cause']), default_values['Health_Cause'])
+        }
+        features = pd.DataFrame([[cleaned_data['Health_Type'], cleaned_data['Health_Cause'], 
+                                 cleaned_data['Barangay'], cleaned_data['Year']]], columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
+        if health_predictor:
+            probability = health_predictor.predict_proba(features)[0][1]*100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+        else:
+            data['prediction'] = 'prediction_error'
+    except Exception as e:
+        logger.error(f"Error in health_predictor: (e)")
+        data['prediction'] = 'prediction_error'
+        
+    responses.append(data)
+    today_responses.append(data)
+    health_room = f"health_{(data.get('municipality') or 'unknown').lower()}"
+    emit('health_response', data, room=health_room)
+    logger.info(f"City Health response emitted to room {health_room}")
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
@@ -3431,15 +3468,15 @@ if __name__ == '__main__':
         ''')
         c.execute('''
             CREATE TABLE IF NOT EXISTS health_responses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 alert_id TEXT NOT NULL,
                 barangay TEXT NOT NULL,
                 emergency_type TEXT NOT NULL,
-                lat REAL,
-                lon REAL,
+                lat REAL NOT NULL,
+                lon REAL NOT NULL,
                 timestamp TEXT NOT NULL,
                 status TEXT NOT NULL,
-                image TEXT
+                image TEXT,
+                PRIMARY KEY (alert_id)
             )
         ''')
         c.execute('''
