@@ -2288,9 +2288,10 @@ def handle_health_response(data):
             'prediction': prediction,
             'year': datetime.now().year + 1
         }
-        health_room = f"health_{(data.get('municipality') or 'unknown').lower()}"
-        emit('health_response', emit_data, room=health_room)
-        logger.info(f"Health response emitted to room {health_room}")
+        health_room = f"pnp_{data.get('municipality').lower() if data.get('municipality') else ''}"
+        emit('health_response', data, room=health_room)
+        logger.info(f"PNP response emitted to room {health_room}")
+
     except Exception as e:
         logger.error(f"Error in health_response: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
