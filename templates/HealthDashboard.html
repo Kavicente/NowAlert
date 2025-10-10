@@ -142,11 +142,6 @@
                 }
             });
 
-            socket.on('health_redirect_alert', (data) => {
-                console.log('Health redirect alert received:', data);
-                updateUIWithAlert(data, true);
-                addHospitalButtons(data.alert_id);
-            });
 
             socket.on('update_map', (data) => {
                 console.log('Update map received:', data);
