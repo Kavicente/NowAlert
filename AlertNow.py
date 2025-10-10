@@ -899,6 +899,8 @@ def handle_health_redirected_alert(data):
         alert_id = data.get('alert_id')
         barangay = data.get('barangay')
         emergency_type = data.get('emergency_type', 'Health Emergency')
+        if emergency_type != 'Health Emergency':
+            emergency_type = 'Health Emergency'  # Enforce Health Emergency
         lat = data.get('lat')
         lon = data.get('lon')
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
@@ -2264,9 +2266,9 @@ def handle_health_response(data):
                 data.get('barangay'), data.get('emergency_type'), data['timestamp']
             ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
+        logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error storing barangay response: {e}")
+        logger.error(f"Error storing health response: {e}")
     finally:
         conn.close()
          
