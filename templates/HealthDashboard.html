@@ -86,6 +86,7 @@
     
     <script>
         let menuData = {};
+        let submittedData = new Map(); // Store submitted form data for hospital buttons
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -177,8 +178,6 @@
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '16px';
-                    predictionDiv.style.color = 'black';
                     const responseForm = alertItem.querySelector('.response-form');
                     if (responseForm) {
                         responseForm.style.display = 'none';
@@ -187,6 +186,17 @@
                     if (statusDiv) {
                         statusDiv.textContent = 'RESPONDED';
                     }
+                    // Enable hospital buttons and store form data
+                    const hospitalButtonsDiv = alertItem.querySelector('.hospital-buttons');
+                    hospitalButtonsDiv.querySelectorAll('button').forEach(button => {
+                        button.disabled = false;
+                    });
+                    submittedData.set(data.alert_id, {
+                        health_type: data.health_type,
+                        health_cause: data.health_cause,
+                        patient_age: data.patient_age,
+                        patient_gender: data.patient_gender
+                    });
                 } else {
                     console.error(`Alert item not found for alert_id: ${data.alert_id}`);
                 }
@@ -313,7 +323,27 @@
                     button.style.margin = '5px';
                     button.style.padding = '5px';
                     button.style.borderRadius = '4px';
-                    button.disabled = true;
+                    button.disabled = true; // Initially disabled, enabled after health_response
+                    button.addEventListener('click', () => {
+                        const formData = submittedData.get(data.alert_id) || {};
+                        const hospitalData = {
+                            alert_id: data.alert_id,
+                            barangay: data.barangay,
+                            emergency_type: emergencyType,
+                            lat: data.lat,
+                            lon: data.lon,
+                            resident_barangay: data.resident_barangay || data.barangay,
+                            health_type: formData.health_type,
+                            health_cause: formData.health_cause,
+                            patient_age: formData.patient_age,
+                            patient_gender: formData.patient_gender,
+                            assigned_hospital: hospital,
+                            municipality: '{{ municipality }}',
+                            timestamp: new Date().toISOString()
+                        };
+                        socket.emit('hospital_redirect_alert', hospitalData);
+                        console.log('Emitted hospital_redirect_alert:', hospitalData);
+                    });
                     hospitalButtonsDiv.appendChild(button);
                 });
 
