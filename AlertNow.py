@@ -31,6 +31,7 @@ from HealthCharts import health_charts, health_charts_data
 from HospitalCharts import hospital_charts, hospital_charts_data
 import random
 import onnxruntime as ort
+import re
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -948,7 +949,8 @@ def handle_hospital_redirect_alert(data):
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
         assigned_hospital = data.get('assigned_hospital')
-        assigned_municipality = data.get('assigned_municipality', 'San Pablo City').lower().replace(' ', '')
+        # keep the readable municipality value for storage/emitting
+        assigned_municipality = data.get('assigned_municipality', 'San Pablo City')
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         if not all([alert_id, barangay, assigned_hospital, assigned_municipality]):
@@ -956,22 +958,34 @@ def handle_hospital_redirect_alert(data):
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
-        # Normalize inputs for validation
-        normalized_hospital = assigned_hospital.lower().replace(' ', '')
-        normalized_municipality = assigned_municipality.lower().replace(' ', '')
+        # normalization helper: lowercase and remove non-alphanumeric chars
+        def _norm(s: str) -> str:
+            if s is None:
+                return ''
+            return re.sub(r'[^a-z0-9]', '', s.lower())
 
-        # Validate assigned_hospital and role in users_web.db
+        normalized_hospital = _norm(assigned_hospital)
+        normalized_municipality = _norm(assigned_municipality)
+
+        # Validate assigned_hospital and assigned_municipality by comparing to DB rows in Python
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        # Debug: Log all hospital users
+
+        # fetch all hospital rows (role = 'hospital') and compare normalized forms
         c.execute("SELECT role, assigned_hospital, assigned_municipality FROM users WHERE role = ?", ('hospital',))
         hospital_users = c.fetchall()
         logger.info(f"Hospital users in database: {hospital_users}")
-        # Perform validation with normalized values
-        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND LOWER(REPLACE(assigned_hospital, ' ', '')) = ? AND LOWER(REPLACE(assigned_municipality, ' ', '')) = ?)",
-                  ('hospital', normalized_hospital, normalized_municipality))
-        valid_hospital = c.fetchone()[0]  # Returns 1 if exists, 0 if not
+
+        valid_hospital = False
+        matched_row = None
+        for row in hospital_users:
+            _, db_hospital, db_municipality = row
+            if _norm(db_hospital) == normalized_hospital and _norm(db_municipality) == normalized_municipality:
+                valid_hospital = True
+                matched_row = row
+                break
+
         conn.close()
 
         if not valid_hospital:
@@ -979,6 +993,7 @@ def handle_hospital_redirect_alert(data):
             emit('error', {'message': 'Invalid hospital or assigned_municipality'}, to=request.sid)
             return
 
+        # ... (rest of your function remains the same) ...
         # Store alert in database
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
