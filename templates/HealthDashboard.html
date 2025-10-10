@@ -113,7 +113,7 @@
                 };
                 L.control.layers(baseLayers).addTo(healthMap);
 
-                const socket = io('https://alertnow-t1kg.onrender.com', { transports: ['websocket'] });
+                const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
                 const alertElements = new Map();
 
                 fetch('/static/menu.txt')
