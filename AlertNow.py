@@ -2210,94 +2210,67 @@ def handle_barangay_health_response(data):
     
 @socketio.on('health_response')
 def handle_health_response(data):
+    logger.info(f"Received health_response: {data}")
     try:
-        logger.info(f"Received health response: {data}")
-        conn = get_db_connection()
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).isoformat()
+        resident_barangay = data.get('resident_barangay', barangay)
+        health_type = data.get('health_emergency_types', 'N/A')
+        health_cause = data.get('health_causes', 'N/A')
+        patient_gender = data.get('patient_gender', 'N/A')
+        patient_age = data.get('patient_age', 'N/A')
+
+        if not alert_id or not barangay:
+            logger.error("Missing required fields in health_response")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
+            return
+
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute('''
-                INSERT INTO health_response (
-                    alert_id, health_cause, health_type, patient_age, patient_gender, 
-                    lat, lon, barangay, emergency_type, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                data.get('alert_id'), data.get('health_cause'), data.get('health_type'),
-                data.get('patient_age'), data.get('patient_gender'), data.get('lat'), data.get('lon'),
-                data.get('barangay'), data.get('emergency_type'), data['timestamp']
-            ))
+        c.execute("INSERT OR REPLACE INTO health_response (alert_id, barangay, emergency_type, lat, lon, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (alert_id, barangay, emergency_type, lat, lon, timestamp, 'PENDING'))
         conn.commit()
         conn.close()
-        
-        emit('health_response', data, room=data.get('barangay', 'default_room'))
+        logger.info(f"Stored health_response for alert_id: {alert_id}")
 
+        prediction = 'prediction_error'
+        try:
+            predictor = health_predictor if emergency_type == 'Health Emergency' else health_predictor
+            input_data = pd.DataFrame([{
+                'Year': datetime.now().year,
+                'Barangay': data.get('barangay', 'Unknown'),
+                'Health Emergency Types': health_type,
+                'Health Causes': health_cause,
+                'Patient Gender': patient_gender,
+                'Patient Age': patient_age
+            }])
+            pred = predictor.predict_proba(input_data)[:, 1][0] * 100
+            prediction = f"{pred:.1f}% chance in year {datetime.now().year + 1}"
+        except Exception as e:
+            logger.error(f"Prediction error: {e}")
+
+        emit('health_response', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'emergency_type': emergency_type,
+            'lat': lat,
+            'lon': lon,
+            'resident_barangay': resident_barangay,
+            'prediction': prediction,
+            'health_type': health_type,
+            'health_cause': health_cause,
+            'patient_gender': patient_gender,
+            'patient_age': patient_age,
+            'year': datetime.now().year + 1
+        }, broadcast=True, include_self=False)
     except Exception as e:
-        logger.error(f"Error handling health response: {e}")
-        
-    logger.info(f"Receive health response: {data}")
-    logger.debug(f"Processing heealth response for alert_id: {data.get('alert_id')}")
-    default_values = {
-        'Year': datetime.now().year,
-        'Barangay': data.get('barangay', 'Unknown'),
-        'Health Cause': data.get('health_cause', 'Unknown'),
-        'Health Type': data.get('health_type', 'Unknown'),
-        
-    }
-    hcause_mapping = {
-        'Chronic Illness': 1,
-        'Allergy': 2,
-        'Infection': 3,
-        'Accident': 4,
-        'Overdose': 5,
-        'Pregnant': 6,
-        'Heatstroke': 7
-        
-    }
-    htype_mapping = {
-        'Heart Attack': 1,
-        'Stroke': 2,
-        'Fall': 3,
-        'Breathing Difficulty': 4,
-        'Seizure': 5,
-        'Giving Birth': 6,
-        'Poisoning': 7,
-        'Allergic Reaction': 8
-    }
-    
-    cleaned_data = {
-        'Year': default_values['Year'],
-        'Barangay': data.get('barangay', default_values['Barangay']),
-        'Health Cause': hcause_mapping.get(data.get('health_cause', default_values['Health Cause']), 0),
-        'Health Type': htype_mapping.get(data.get('health_type', default_values['Health Type']), 0)
-    }
-    cleaned_data.update(default_values)
-    
-    try: 
-        if health_predictor:
-            feature_names = ['Year', 'Barangay', 'Health Cause', 'Health Type']
-            features = pd.DataFrame([[
-                cleaned_data['Health Cause'],
-                cleaned_data['Health Type'],
-                cleaned_data['Barangay'],
-                datetime.now().year
-            ]], columns=feature_names)
-            prediction = health_predictor.predict(features)[0]
-            probability = fire_accident_predictor.predict_proba(features)[0][1]
-            cleaned_data['prediction'] = f"{probability*100:.2f}% chance in year {datetime.now().year + 1}"
-            
-        else:
-            cleaned_data['prediction'] = 'prediction_error'
-    except Exception as e:
-        logger.error(f"Prediction error: {e}")
-        cleaned_data['prediction'] = 'prediction_error'
-        
-    responses.append(cleaned_data)
-    today_responses.append(cleaned_data)
-    municipality = get_municipality_from_barangay(cleaned_data['barangay'])
-    if not municipality:
-        logger.error(f"No municipality found for barangay: {cleaned_data['barangay']}")
-        municipality = 'unknown'
-    health_room = f"health_{municipality.lower()}"
-    emit('health_response', cleaned_data, room=health_room)
-    logger.info(f"Health response broadcasted to room {health_room}: {cleaned_data}") 
+        logger.error(f"Error in health_response: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
 
 # /Barangay BFP, CDRRMO, City Health, Hospital, and PNP Preiction Display
 
