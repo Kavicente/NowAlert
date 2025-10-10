@@ -948,7 +948,7 @@ def handle_hospital_redirect_alert(data):
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
         assigned_hospital = data.get('assigned_hospital')
-        municipality = data.get('municipality', 'San Pablo').lower()
+        municipality = data.get('municipality', 'San Pablo City').lower().replace(' ', '')
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         if not all([alert_id, barangay, assigned_hospital, municipality]):
@@ -956,12 +956,21 @@ def handle_hospital_redirect_alert(data):
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
-        # Validate assigned_hospital and role in users_web.db without selecting id
+        # Normalize inputs for validation
+        normalized_hospital = assigned_hospital.lower().replace(' ', '')
+        normalized_municipality = municipality.lower().replace(' ', '')
+
+        # Validate assigned_hospital and role in users_web.db
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND assigned_hospital = ? AND municipality = ?)",
-                  ('hospital', assigned_hospital, municipality))
+        # Debug: Log all hospital users
+        c.execute("SELECT username, role, assigned_hospital, municipality FROM users WHERE role = ?", ('hospital',))
+        hospital_users = c.fetchall()
+        logger.info(f"Hospital users in database: {hospital_users}")
+        # Perform validation with normalized values
+        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND LOWER(REPLACE(assigned_hospital, ' ', '')) = ? AND LOWER(REPLACE(municipality, ' ', '')) = ?)",
+                  ('hospital', normalized_hospital, normalized_municipality))
         valid_hospital = c.fetchone()[0]  # Returns 1 if exists, 0 if not
         conn.close()
 
@@ -979,8 +988,8 @@ def handle_hospital_redirect_alert(data):
         conn.close()
         logger.info(f"Stored hospital_redirect_alert for alert_id: {alert_id}")
 
-        # Emit to hospital room
-        hospital_room = f"hospital_{municipality}_{assigned_hospital.lower().replace(' ', '_')}"
+        # Emit to hospital room with normalized room name
+        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
         emit('hospital_redirect_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
