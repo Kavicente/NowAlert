@@ -158,25 +158,17 @@
                 });
 
                 socket.on('health_response', (data) => {
-                    console.log('Health response submitted:', data);
+                    console.log('Health response received:', data);
                     const alertItem = alertElements.get(data.alert_id);
                     if (alertItem) {
                         const predictionDiv = alertItem.querySelector('.prediction');
                         const predictionText = data.prediction || 'N/A';
                         let formattedPrediction = 'N/A';
                         if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                            const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                            if (match) {
-                                const percentage = match[1];
-                                formattedPrediction = `There will be a ${percentage}% Chance of ${data.emergency_type} in year ${data.year || new Date().getFullYear() + 1}`;
-                            } else {
-                                formattedPrediction = predictionText;
-                            }
+                            formattedPrediction = predictionText;
                         }
                         predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                         predictionDiv.style.display = 'block';
-                        predictionDiv.style.fontSize = '16px';
-                        predictionDiv.style.color = 'black';
 
                         const hospitalButtonsDiv = document.createElement('div');
                         hospitalButtonsDiv.className = 'hospital-buttons';
@@ -195,28 +187,6 @@
                             button.style.margin = '5px';
                             button.style.padding = '5px';
                             button.style.borderRadius = '4px';
-                            button.addEventListener('click', () => {
-                                const formData = {
-                                    alert_id: data.alert_id,
-                                    barangay: data.barangay,
-                                    health_type: data.health_type,
-                                    health_cause: data.health_cause,
-                                    patient_gender: data.patient_gender,
-                                    patient_age: data.patient_age,
-                                    lat: data.lat,
-                                    lon: data.lon,
-                                    emergency_type: data.emergency_type,
-                                    assigned_hospital: hospital,
-                                    timestamp: new Date().toISOString()
-                                };
-                                socket.emit('hospital_redirect_alert', formData);
-                                socket.emit('hospital_admission_notification', {
-                                    alert_id: data.alert_id,
-                                    barangay: data.barangay,
-                                    assigned_hospital: hospital,
-                                    emergency_type: data.emergency_type
-                                });
-                            });
                             hospitalButtonsDiv.appendChild(button);
                         });
                         const alertContainer = document.getElementById('alert-container');
@@ -313,11 +283,11 @@
                     });
 
                     const submitButton = document.createElement('button');
-                    submitButton.textContent = 'Respond';
+                    submitButton.textContent = 'Submit';
                     submitButton.addEventListener('click', () => {
                         const formData = {};
                         responseForm.querySelectorAll('select').forEach(select => {
-                            formData[select.name] = select.value;
+                            formData[select.name] = select.value || 'N/A';
                         });
                         formData.alert_id = data.alert_id;
                         formData.lat = data.lat;
