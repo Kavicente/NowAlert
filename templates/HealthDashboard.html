@@ -334,7 +334,7 @@
                     alertItem.appendChild(declineButton);
                     alertItem.appendChild(responseForm);
                     alertItem.appendChild(predictionDiv);
-                    alertContainer.appendChild(alertItem);
+                    alertItem.append(statusDiv, alertText, typeDiv, timeDiv, imageDiv, respondButton, declineButton, responseForm, predictionDiv);
 
                     const modal = document.getElementById('image-modal');
                     const closeBtn = modal.querySelector('.close-btn');
