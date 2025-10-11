@@ -142,8 +142,8 @@
                 console.error('Connection error:', error);
             });
 
-            socket.on('hospital_redirect_alert', (data) => {
-                console.log('Hospital redirect alert received:', data);
+            socket.on('hospital_specific_notification', (data) => {
+                console.log('Hospital specific notification received:', data);
                 if (data.assigned_hospital === '{{ assigned_hospital | default("") }}') {
                     updateUIWithAlert(data);
                 }

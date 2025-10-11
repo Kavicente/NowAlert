@@ -993,7 +993,7 @@ def handle_hospital_redirect_alert(data):
 
         # Emit to hospital room with normalized room name
         hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
-        emit('hospital_redirect_alert', {
+        emit('hospital_specific_notification', {
             'alert_id': alert_id,
             'barangay': barangay,
             'emergency_type': emergency_type,
@@ -1004,12 +1004,76 @@ def handle_hospital_redirect_alert(data):
             'patient_age': patient_age,
             'patient_gender': patient_gender,
             'assigned_hospital': assigned_hospital,
-            'assigned_municipality': assigned_municipality,
+            'municipality': assigned_municipality,
             'timestamp': timestamp
         }, room=hospital_room)
-        logger.info(f"Hospital redirect alert emitted to room {hospital_room}")
+        logger.info(f"Hospital specific notification emitted to room {hospital_room}")
+
+        # Emit hospital_admission_notification to barangay room
+        barangay_room = f"barangay_{barangay.lower()}"
+        emit('hospital_admission_notification', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'assigned_hospital': assigned_hospital,
+            'emergency_type': emergency_type,
+            'municipality': assigned_municipality,
+            'lat': lat,
+            'lon': lon,
+            'resident_barangay': data.get('resident_barangay', barangay),
+            'patient_age': patient_age,
+            'patient_gender': patient_gender,
+            'timestamp': timestamp
+        }, room=barangay_room)
+        logger.info(f"Hospital admission notification emitted to room {barangay_room}")
     except Exception as e:
         logger.error(f"Error in hospital_redirect_alert: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
+
+@socketio.on('hospital_specific_notification')
+def handle_hospital_specific_notification(data):
+    logger.info(f"Received hospital_specific_notification: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        assigned_hospital = data.get('assigned_hospital')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+        municipality = data.get('municipality', 'San Pablo City')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        health_type = data.get('health_type')
+        health_cause = data.get('health_cause')
+        patient_age = data.get('patient_age')
+        patient_gender = data.get('patient_gender')
+        timestamp = data.get('timestamp')
+
+        if not alert_id or not barangay or not assigned_hospital or not municipality:
+            logger.error("Missing required fields in hospital_specific_notification")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
+            return
+
+        # Normalize inputs for room name
+        normalized_hospital = assigned_hospital.lower().replace(' ', '')
+        normalized_municipality = municipality.replace(' ', '')
+
+        # Emit to hospital-specific room
+        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
+        emit('hospital_specific_notification', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'emergency_type': emergency_type,
+            'lat': lat,
+            'lon': lon,
+            'health_type': health_type,
+            'health_cause': health_cause,
+            'patient_age': patient_age,
+            'patient_gender': patient_gender,
+            'assigned_hospital': assigned_hospital,
+            'municipality': municipality,
+            'timestamp': timestamp
+        }, room=hospital_room)
+        logger.info(f"Hospital specific notification emitted to room {hospital_room}")
+    except Exception as e:
+        logger.error(f"Error in hospital_specific_notification: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('hospital_admission_notification')
