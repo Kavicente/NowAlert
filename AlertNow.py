@@ -969,138 +969,25 @@ def handle_hospital_button_trigger(data):
         logger.error(f"Error in hospital_button_trigger: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
 
-@socketio.on('hospital_redirect_alert')
-def handle_hospital_redirect_alert(data):
-    logger.info(f"Received hospital_redirect_alert: {data}")
-    try:
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        emergency_type = data.get('emergency_type', 'Health Emergency')
-        lat = data.get('lat')
-        lon = data.get('lon')
-        health_type = data.get('health_type')
-        health_cause = data.get('health_cause')
-        patient_age = data.get('patient_age')
-        patient_gender = data.get('patient_gender')
-        assigned_hospital = data.get('assigned_hospital')
-        assigned_municipality = data.get('assigned_municipality', 'San Pablo City')
-        timestamp = data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
-
-        if not all([alert_id, barangay, assigned_hospital, assigned_municipality]):
-            logger.error("Missing required fields in hospital_redirect_alert")
-            emit('error', {'message': 'Missing required fields'}, to=request.sid)
-            return
-
-        normalized_hospital = assigned_hospital.lower().replace(' ', '')
-        normalized_municipality = assigned_municipality.lower().replace(' ', '')
-        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
-        emit('hospital_redirect_alert', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'emergency_type': emergency_type,
-            'lat': lat,
-            'lon': lon,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'patient_age': patient_age,
-            'patient_gender': patient_gender,
-            'assigned_hospital': assigned_hospital,
-            'assigned_municipality': assigned_municipality,
-            'timestamp': timestamp
-        }, room=hospital_room)
-        logger.info(f"Hospital redirect alert emitted to room {hospital_room}")
-    except Exception as e:
-        logger.error(f"Error in hospital_redirect_alert: {e}")
-        emit('error', {'message': str(e)}, to=request.sid)
-
-@socketio.on('hospital_specific_notification')
-def handle_hospital_specific_notification(data):
-    logger.info(f"Received hospital_specific_notification: {data}")
-    try:
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        assigned_hospital = data.get('assigned_hospital')
-        emergency_type = data.get('emergency_type', 'Health Emergency')
-        municipality = data.get('municipality', 'San Pablo City')
-        lat = data.get('lat')
-        lon = data.get('lon')
-        resident_barangay = data.get('resident_barangay', barangay)
-        patient_age = data.get('patient_age')
-        patient_gender = data.get('patient_gender')
-        health_type = data.get('health_type')
-        health_cause = data.get('health_cause')
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-
-        if not all([alert_id, barangay, assigned_hospital, municipality]):
-            logger.error("Missing required fields in hospital_specific_notification")
-            emit('error', {'message': 'Missing required fields'}, to=request.sid)
-            return
-
-        # Normalize inputs for validation
-        normalized_hospital = assigned_hospital.lower().replace(' ', '')
-        normalized_municipality = municipality.replace(' ', '')
-
-        # Validate assigned_hospital and municipality in users_web.db
-        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
-        conn = sqlite3.connect(db_path)
-        c = conn.cursor()
-        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND LOWER(REPLACE(assigned_hospital, ' ', '')) = ? AND REPLACE(assigned_municipality, ' ', '') = ?)",
-                  ('hospital', normalized_hospital, normalized_municipality))
-        valid_hospital = c.fetchone()[0]
-        conn.close()
-
-        if not valid_hospital:
-            logger.error(f"Invalid hospital or municipality: {assigned_hospital}, {municipality}")
-            emit('error', {'message': 'Invalid hospital or municipality'}, to=request.sid)
-            return
-
-        # Emit to hospital room
-        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
-        emit('hospital_specific_notification', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'assigned_hospital': assigned_hospital,
-            'emergency_type': emergency_type,
-            'municipality': municipality,
-            'lat': lat,
-            'lon': lon,
-            'resident_barangay': resident_barangay,
-            'patient_age': patient_age,
-            'patient_gender': patient_gender,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'timestamp': timestamp
-        }, room=hospital_room)
-        logger.info(f"Hospital specific notification emitted to room {hospital_room}")
-    except Exception as e:
-        logger.error(f"Error in hospital_specific_notification: {e}")
-        emit('error', {'message': str(e)}, to=request.sid)
-
 @socketio.on('hospital_admission_notification')
 def handle_hospital_admission_notification(data):
-    logger.info(f"Received hospital_admission_notification: {data}")
+    logger.info(f"Received hospital admission notification: {data}")
     try:
         alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        assigned_hospital = data.get('assigned_hospital')
-        emergency_type = data.get('emergency_type', 'Health Emergency')
-        municipality = data.get('municipality', 'San Pablo City')  # Add municipality from input data
-
-        if not alert_id or not barangay or not assigned_hospital or not municipality:
-            logger.error("Missing required fields in hospital_admission_notification")
-            emit('error', {'message': 'Missing required fields'}, to=request.sid)
-            return
-
-        emit('hospital_admission_notification', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'assigned_hospital': assigned_hospital,
-            'emergency_type': emergency_type,
-            'municipality': municipality
-        }, broadcast=True, include_self=False)
+        assigned_hospital = data.get('assigned_hospital').lower().replace(" ", "")
+        assigned_municipality = data.get('assigned_municipality', 'San Pablo City').lower()
+        hospital_room = f"hospital_{assigned_hospital}_{assigned_municipality}"
+        emit('hospital_admission_notification', data, room=hospital_room)
+        logger.info(f"Hospital admission notification emitted to room {hospital_room}")
+        emit('update_map', {
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type')
+        }, room=hospital_room)
+        logger.info(f"Map update emitted to room {hospital_room} for alert {alert_id}")
     except Exception as e:
-        logger.error(f"Error in hospital_admission_notification: {e}")
-        emit('error', {'message': str(e)}, to=request.sid)
+        logger.error(f"Error in handle_hospital_admission_notification: {e}")
 
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):

@@ -86,7 +86,7 @@
     
     <script>
         let menuData = {};
-        let submittedData = new Map(); // Store submitted form data for hospital buttons
+        let submittedData = new Map();
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -186,13 +186,26 @@
                     if (statusDiv) {
                         statusDiv.textContent = 'RESPONDED';
                     }
-                    // Store form data
                     submittedData.set(data.alert_id, {
                         health_type: data.health_type,
                         health_cause: data.health_cause,
                         patient_age: data.patient_age,
                         patient_gender: data.patient_gender
                     });
+                    socket.emit('hospital_button_trigger', {
+                        alert_id: data.alert_id,
+                        barangay: data.barangay,
+                        emergency_type: data.emergency_type,
+                        lat: data.lat,
+                        lon: data.lon,
+                        health_type: data.health_type,
+                        health_cause: data.health_cause,
+                        patient_age: data.patient_age,
+                        patient_gender: data.patient_gender,
+                        assigned_municipality: '{{ assigned_municipality | default("San Pablo City") }}',
+                        timestamp: new Date().toISOString()
+                    });
+                    console.log('Emitted hospital_button_trigger:', data);
                 } else {
                     console.error(`Alert item not found for alert_id: ${data.alert_id}`);
                 }
@@ -304,8 +317,6 @@
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
-                predictionDiv.style.fontSize = '16px';
-                predictionDiv.style.color = 'black';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
