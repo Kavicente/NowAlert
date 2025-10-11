@@ -983,7 +983,7 @@ def handle_hospital_redirect_alert(data):
         # Store alert in database
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("""""INSERT OR REPLACE INTO hospital_alerts 
+        c.execute("""INSERT OR REPLACE INTO hospital_alerts 
                   (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, 
                   assigned_hospital, assigned_municipality, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                   (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, assigned_hospital, assigned_municipality, timestamp, 'RESPONDED'))
