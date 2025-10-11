@@ -949,7 +949,7 @@ def handle_hospital_redirect_alert(data):
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
         assigned_hospital = data.get('assigned_hospital')
-        assigned_municipality = data.get('assigned_municipality'),
+        assigned_municipality = data.get('assigned_municipality')
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         if not all([alert_id, barangay, assigned_hospital, assigned_municipality]):
@@ -959,7 +959,7 @@ def handle_hospital_redirect_alert(data):
 
         # Normalize inputs for validation
         normalized_hospital = assigned_hospital.lower().replace(' ', '')
-        normalized_municipality = assigned_municipality.lower().replace(' ', '')
+        normalized_municipality = assigned_municipality.replace(' ', '')
 
         # Validate assigned_hospital and role in users_web.db
         db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -970,7 +970,7 @@ def handle_hospital_redirect_alert(data):
         hospital_users = c.fetchall()
         logger.info(f"Hospital users in database: {hospital_users}")
         # Perform validation with normalized values
-        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND LOWER(REPLACE(assigned_hospital, ' ', '')) = ? AND LOWER(REPLACE(assigned_municipality, ' ', '')) = ?)",
+        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND LOWER(REPLACE(assigned_hospital, ' ', '')) = ? AND REPLACE(assigned_municipality, ' ', '') = ?)",
                   ('hospital', normalized_hospital, normalized_municipality))
         valid_hospital = c.fetchone()[0]  # Returns 1 if exists, 0 if not
         conn.close()
