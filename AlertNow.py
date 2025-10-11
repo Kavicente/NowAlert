@@ -949,7 +949,7 @@ def handle_hospital_redirect_alert(data):
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
         assigned_hospital = data.get('assigned_hospital')
-        assigned_municipality = data.get('assigned_municipality', data.get('municipality', 'San Pablo'))
+        assigned_municipality = data.get('assigned_municipality', data.get('municipality', 'San Pablo City'))
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         if not all([alert_id, barangay, assigned_hospital, assigned_municipality]):
@@ -983,7 +983,9 @@ def handle_hospital_redirect_alert(data):
         # Store alert in database
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO hospital_alerts (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, assigned_hospital, assigned_municipality, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        c.execute("""""INSERT OR REPLACE INTO hospital_alerts 
+                  (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, 
+                  assigned_hospital, assigned_municipality, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                   (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, assigned_hospital, assigned_municipality, timestamp, 'RESPONDED'))
         conn.commit()
         conn.close()
@@ -1018,8 +1020,9 @@ def handle_hospital_admission_notification(data):
         barangay = data.get('barangay')
         assigned_hospital = data.get('assigned_hospital')
         emergency_type = data.get('emergency_type', 'Health Emergency')
+        municipality = data.get('municipality', 'San Pablo City')  # Add municipality from input data
 
-        if not alert_id or not barangay or not assigned_hospital:
+        if not alert_id or not barangay or not assigned_hospital or not municipality:
             logger.error("Missing required fields in hospital_admission_notification")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
@@ -1028,7 +1031,8 @@ def handle_hospital_admission_notification(data):
             'alert_id': alert_id,
             'barangay': barangay,
             'assigned_hospital': assigned_hospital,
-            'emergency_type': emergency_type
+            'emergency_type': emergency_type,
+            'municipality': municipality
         }, broadcast=True, include_self=False)
     except Exception as e:
         logger.error(f"Error in hospital_admission_notification: {e}")
