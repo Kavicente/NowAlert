@@ -85,6 +85,7 @@
     </main>
 
     <script>
+        let menuData = {};
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -115,12 +116,25 @@
             const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
+            fetch('/static/menu.txt')
+                .then(response => response.text())
+                .then(text => {
+                    menuData = parseMenuText(text);
+                    console.log('Menu data loaded:', menuData);
+                })
+                .catch(error => console.error('Error loading menu.txt:', error));
+
             socket.on('connect', () => {
                 console.log('Connected to server');
+                const assignedMunicipality = '{{ assigned_municipality | default("San Pablo City") }}';
+                const assignedHospital = '{{ assigned_hospital | default("") }}';
                 socket.emit('register_role', { 
                     role: 'hospital', 
-                    municipality: '{{ municipality }}'.toLowerCase(),
-                    assigned_hospital: '{{ assigned_hospital }}'
+                    assigned_municipality: assignedMunicipality.toLowerCase(),
+                    assigned_hospital: assignedHospital.toLowerCase()
+                });
+                socket.emit('join', { 
+                    room: `hospital_${assignedMunicipality.replace(/ /g, '')}_${assignedHospital.replace(/ /g, '')}` 
                 });
             });
 
@@ -130,17 +144,10 @@
 
             socket.on('hospital_redirect_alert', (data) => {
                 console.log('Hospital redirect alert received:', data);
-                if (data.assigned_hospital === '{{ assigned_hospital }}') {
+                if (data.assigned_hospital === '{{ assigned_hospital | default("") }}') {
                     updateUIWithAlert(data);
-                    notifyAlert(data);
-                    hospitalMap.setView([data.lat || {{ lat_coord|default(14.0549) }}, data.lon || {{ lon_coord|default(121.3013) }}], 16);
-                    L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
-                        `Health Emergency at ${data.barangay || 'Unknown'}`
-                    ).openPopup();
                 }
             });
-
-            
 
             socket.on('update_map', (data) => {
                 console.log('Update map received:', data);
@@ -153,6 +160,22 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
+            function parseMenuText(text) {
+                const sections = text.split('#').filter(s => s.trim());
+                const menu = {};
+                sections.forEach(section => {
+                    const lines = section.trim().split('\n');
+                    const sectionName = lines[0].trim();
+                    const options = {};
+                    lines.slice(1).forEach(line => {
+                        const [key, values] = line.split(':');
+                        options[key.trim()] = values.split(',').map(v => v.trim());
+                    });
+                    menu[sectionName] = options;
+                });
+                return menu;
+            }
+
             function updateUIWithAlert(data) {
                 const alertContainer = document.getElementById('alert-container');
                 const alertItem = document.createElement('div');
@@ -160,51 +183,53 @@
                 alertItem.dataset.alertId = data.alert_id;
                 alertElements.set(data.alert_id, alertItem);
 
+                const statusDiv = document.createElement('div');
+                statusDiv.textContent = 'RESPONDED';
+                statusDiv.style.fontWeight = 'bold';
+                statusDiv.style.fontSize = '16px';
+
                 const alertText = document.createElement('div');
-                alertText.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}\n` +
-                                        `Resident From ${data.barangay}\n` +
-                                        `Time: ${new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n` +
-                                        `Health Type: ${data.health_type || 'N/A'}\n` +
-                                        `Health Cause: ${data.health_cause || 'N/A'}\n` +
-                                        `Patient Age: ${data.patient_age || 'N/A'}\n` +
-                                        `Patient Gender: ${data.patient_gender || 'N/A'}`;
-                alertText.style.fontSize = '16px';
+                alertText.textContent = `Responded ${data.emergency_type} and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
 
-                const imageDiv = document.createElement('img');
-                imageDiv.className = 'clickable-img';
-                imageDiv.style.display = 'none';
-                if (data.image) {
-                    imageDiv.src = data.image;
-                    imageDiv.style.display = 'block';
-                    imageDiv.addEventListener('click', () => {
-                        const modal = document.getElementById('image-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = data.image;
-                        modal.style.display = 'flex';
-                    });
-                }
+                const typeDiv = document.createElement('div');
+                typeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
+                typeDiv.style.fontWeight = 'bold';
+                typeDiv.style.fontSize = '16px';
 
+                const causeDiv = document.createElement('div');
+                causeDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
+                causeDiv.style.fontWeight = 'bold';
+                causeDiv.style.fontSize = '16px';
+
+                const ageDiv = document.createElement('div');
+                ageDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
+                ageDiv.style.fontWeight = 'bold';
+                ageDiv.style.fontSize = '16px';
+
+                const genderDiv = document.createElement('div');
+                genderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
+                genderDiv.style.fontWeight = 'bold';
+                genderDiv.style.fontSize = '16px';
+
+                const timeDiv = document.createElement('div');
+                const timestamp = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                timeDiv.textContent = `Time: ${timestamp}`;
+
+                alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
-                alertItem.appendChild(imageDiv);
+                alertItem.appendChild(typeDiv);
+                alertItem.appendChild(causeDiv);
+                alertItem.appendChild(ageDiv);
+                alertItem.appendChild(genderDiv);
+                alertItem.appendChild(timeDiv);
                 alertContainer.appendChild(alertItem);
-
-                const modal = document.getElementById('image-modal');
-                const closeBtn = modal.querySelector('.close-btn');
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
             }
 
-            function notifyAlert(data) {
-                const notificationDiv = document.getElementById('notification');
-                const notification = document.createElement('div');
-                notification.className = 'notification';
-                notification.textContent = `New Alert: Health Emergency at ${data.barangay}`;
-                notificationDiv.appendChild(notification);
-                setTimeout(() => {
-                    notification.remove();
-                }, 5000);
-            }
+            const modal = document.getElementById('image-modal');
+            const closeBtn = modal.querySelector('.close-btn');
+            closeBtn.addEventListener('click', () => {
+                modal.style.display = 'none';
+            });
         });
 </script>
 </body>
