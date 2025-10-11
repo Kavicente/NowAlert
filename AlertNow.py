@@ -949,7 +949,7 @@ def handle_hospital_redirect_alert(data):
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
         assigned_hospital = data.get('assigned_hospital')
-        assigned_municipality = data.get('assigned_municipality', 'San Pablo').lower().replace(' ', '')
+        assigned_municipality = data.get('assigned_municipality'),
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
         if not all([alert_id, barangay, assigned_hospital, assigned_municipality]):
