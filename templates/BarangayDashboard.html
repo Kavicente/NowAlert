@@ -199,7 +199,7 @@
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const admissionDiv = document.createElement('div');
-                    admissionDiv.textContent = `RESPONDED\nEmergency at ${data.barangay}\nType: Health Emergency\nTime: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\nPrediction: ${alertItem.querySelector('.prediction').textContent.replace('Prediction: ', '')}\nAdmit to ${data.assigned_hospital}`;
+                    admissionDiv.textContent = `\nAdmit to ${data.assigned_hospital}`;
                     admissionDiv.style.fontSize = '16px';
                     admissionDiv.style.fontWeight = 'bold';
                     admissionDiv.style.color = 'black';
