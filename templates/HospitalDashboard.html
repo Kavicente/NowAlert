@@ -149,13 +149,6 @@
                 }
             });
 
-            socket.on('hospital_specific_notification', (data) => {
-                console.log('Hospital specific notification received:', data);
-                if (data.assigned_hospital === '{{ assigned_hospital | default("") }}') {
-                    updateUIWithAlert(data);
-                }
-            });
-
             socket.on('update_map', (data) => {
                 console.log('Update map received:', data);
                 const lat = data.lat || {{ lat_coord|default(14.0549) }};
@@ -196,7 +189,7 @@
                 statusDiv.style.fontSize = '16px';
 
                 const alertText = document.createElement('div');
-                alertText.textContent = `Responded ${data.emergency_type} and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
+                alertText.textContent = `Responded ${data.emergency_type || 'Health Emergency'} and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
@@ -238,6 +231,6 @@
                 modal.style.display = 'none';
             });
         });
-</script>
+    </script>
 </body>
 </html>

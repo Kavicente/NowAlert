@@ -298,73 +298,22 @@
                     formData.lon = data.lon;
                     formData.barangay = data.barangay;
                     formData.emergency_type = emergencyType;
-                    formData.municipality = '{{ municipality }}';
+                    formData.assigned_municipality = '{{ assigned_municipality | default("San Pablo City") }}';
                     formData.timestamp = new Date().toISOString();
                     socket.emit('health_response', formData);
                     console.log('Emitted health_response:', formData);
                 });
                 responseForm.appendChild(submitButton);
 
-                const hospitalButtonsDiv = document.createElement('div');
-                hospitalButtonsDiv.className = 'hospital-buttons';
-                hospitalButtonsDiv.style.marginBottom = '10px';
-                hospitalButtonsDiv.style.display = showResponseForm ? 'block' : 'none';
-                const hospitals = [
-                    'spc district hospital',
-                    'san pablo colleges medical center',
-                    'community general hospital',
-                    'immaculate conception hospital',
-                    'san pablo city medical center',
-                    'san pablo doctors hospital',
-                    'st. francis and paul general hospital'
-                ];
-                hospitals.forEach(hospital => {
-                    const button = document.createElement('button');
-                    button.textContent = `Send to ${hospital}`;
-                    button.style.margin = '5px';
-                    button.style.padding = '5px';
-                    button.style.borderRadius = '4px';
-                    button.disabled = true; // Initially disabled, enabled after health_response
-                    button.addEventListener('click', () => {
-                        const formData = submittedData.get(data.alert_id) || {};
-                        const hospitalData = {
-                            alert_id: data.alert_id,
-                            barangay: data.barangay,
-                            emergency_type: emergencyType,
-                            lat: data.lat,
-                            lon: data.lon,
-                            resident_barangay: data.resident_barangay || data.barangay,
-                            health_type: formData.health_type,
-                            health_cause: formData.health_cause,
-                            patient_age: formData.patient_age,
-                            patient_gender: formData.patient_gender,
-                            assigned_hospital: hospital,
-                            municipality: '{{ municipality }}',
-                            timestamp: new Date().toISOString()
-                        };
-
-                        socket.emit('hospital_redirect_alert', hospitalData);
-                        socket.emit('hospital_admission_notification', hospitalData);
-                        socket.emit('hospital_specific_notification', hospitalData);
-                        console.log('Emitted hospital_redirect_alert:', hospitalData);
-                        console.log('Emitted hospital_admission_notification:', hospitalData);
-                        console.log('Emitted hospital_specific_notification:', hospitalData);
-                    });
-                    hospitalButtonsDiv.appendChild(button);
-                });
-
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
-                predictionDiv.style.fontSize = '16px';
-                predictionDiv.style.color = 'black';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
                 alertItem.appendChild(typeDiv);
                 alertItem.appendChild(timeDiv);
                 alertItem.appendChild(imageDiv);
-                alertItem.appendChild(hospitalButtonsDiv);
                 alertItem.appendChild(responseForm);
                 alertItem.appendChild(predictionDiv);
                 alertContainer.appendChild(alertItem);
