@@ -991,23 +991,7 @@ def handle_hospital_redirect_alert(data):
         conn.close()
         logger.info(f"Stored hospital_redirect_alert for alert_id: {alert_id}")
 
-        # Emit to hospital room with normalized room name
-        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
-        emit('hospital_specific_notification', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'emergency_type': emergency_type,
-            'lat': lat,
-            'lon': lon,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'patient_age': patient_age,
-            'patient_gender': patient_gender,
-            'assigned_hospital': assigned_hospital,
-            'municipality': assigned_municipality,
-            'timestamp': timestamp
-        }, room=hospital_room)
-        logger.info(f"Hospital specific notification emitted to room {hospital_room}")
+        
 
         # Emit hospital_admission_notification to barangay room
         barangay_room = f"barangay_{barangay.lower()}"
