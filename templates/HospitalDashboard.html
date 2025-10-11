@@ -116,18 +116,9 @@
             const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
-            // Normalize assigned_hospital and assigned_municipality for room name
-            const normalizedHospital = '{{ assigned_hospital }}'.toLowerCase().replace(/\s+/g, '');
-            const normalizedMunicipality = '{{ assigned_municipality }}'.replace(/\s+/g, '');
-            const hospitalRoom = `hospital_${normalizedMunicipality}_${normalizedHospital}`;
-
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('register_role', { 
-                    role: 'hospital', 
-                    assigned_hospital: '{{ assigned_hospital }}', 
-                    assigned_municipality: '{{ assigned_municipality }}' 
-                });
+                const hospitalRoom = 'hospital_{{ assigned_municipality.replace(" ", "") }}_{{ assigned_hospital.lower().replace(" ", "") }}';
                 socket.emit('join', { room: hospitalRoom });
                 console.log(`Joined room: ${hospitalRoom}`);
             });
@@ -138,11 +129,8 @@
 
             socket.on('hospital_redirect_alert', (data) => {
                 console.log('Hospital redirect alert received:', data);
-                // Ensure alert is for the logged-in hospital
                 if (data.assigned_hospital === '{{ assigned_hospital }}') {
                     updateUIWithAlert(data);
-                } else {
-                    console.log(`Alert ignored: assigned_hospital ${data.assigned_hospital} does not match {{ assigned_hospital }}`);
                 }
             });
 
@@ -170,14 +158,7 @@
                 statusDiv.style.fontSize = '16px';
 
                 const alertText = document.createElement('div');
-                alertText.textContent = `Responded ${data.emergency_type || 'Health Emergency'} and On The Way To ${data.assigned_hospital}`;
-                alertText.style.fontWeight = 'bold';
-                alertText.style.fontSize = '16px';
-
-                const residentText = document.createElement('div');
-                residentText.textContent = `Resident From ${data.barangay}`;
-                residentText.style.fontWeight = 'bold';
-                residentText.style.fontSize = '16px';
+                alertText.textContent = `Responded ${data.emergency_type} and On The Way To ${data.assigned_hospital}\nResident From ${data.barangay}`;
 
                 const timeDiv = document.createElement('div');
                 const timestamp = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -185,9 +166,11 @@
 
                 const healthTypeDiv = document.createElement('div');
                 healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
+                healthTypeDiv.style.fontWeight = 'bold';
 
                 const healthCauseDiv = document.createElement('div');
                 healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
+                healthCauseDiv.style.fontWeight = 'bold';
 
                 const patientAgeDiv = document.createElement('div');
                 patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
@@ -195,38 +178,14 @@
                 const patientGenderDiv = document.createElement('div');
                 patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
 
-                const imageDiv = document.createElement('img');
-                imageDiv.className = 'clickable-img';
-                imageDiv.style.display = 'none';
-                if (data.image) {
-                    imageDiv.src = data.image;
-                    imageDiv.style.display = 'block';
-                    imageDiv.addEventListener('click', () => {
-                        const modal = document.getElementById('image-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = data.image;
-                        modal.style.display = 'flex';
-                    });
-                }
-
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
-                alertItem.appendChild(residentText);
                 alertItem.appendChild(timeDiv);
                 alertItem.appendChild(healthTypeDiv);
                 alertItem.appendChild(healthCauseDiv);
                 alertItem.appendChild(patientAgeDiv);
                 alertItem.appendChild(patientGenderDiv);
-                alertItem.appendChild(imageDiv);
                 alertContainer.appendChild(alertItem);
-
-                const modal = document.getElementById('image-modal');
-                const closeBtn = modal.querySelector('.close-btn');
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-
-                notifyAlert(data);
             }
 
             function notifyAlert(data) {
