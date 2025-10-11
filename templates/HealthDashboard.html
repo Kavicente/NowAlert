@@ -344,11 +344,11 @@
                         };
 
                         socket.emit('hospital_redirect_alert', hospitalData);
-                        socket.emit('hospital_specific_notification', hospitalData);
                         socket.emit('hospital_admission_notification', hospitalData);
-                        console.log('Emitted hospital_specific_notification:', hospitalData);
+                        socket.emit('hospital_specific_notification', hospitalData);
                         console.log('Emitted hospital_redirect_alert:', hospitalData);
-                        console.log('Admission emited succuessfuly:', hospitalData);
+                        console.log('Emitted hospital_admission_notification:', hospitalData);
+                        console.log('Emitted hospital_specific_notification:', hospitalData);
                     });
                     hospitalButtonsDiv.appendChild(button);
                 });
