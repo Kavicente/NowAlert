@@ -197,6 +197,18 @@
                         patient_age: data.patient_age,
                         patient_gender: data.patient_gender
                     });
+                    // Emit hospital_button_trigger
+                    socket.emit('hospital_button_trigger', {
+                        alert_id: data.alert_id,
+                        barangay: data.barangay,
+                        emergency_type: data.emergency_type,
+                        lat: data.lat,
+                        lon: data.lon,
+                        health_type: data.health_type || 'N/A',
+                        health_cause: data.health_cause || 'N/A',
+                        patient_age: data.patient_age || 'N/A',
+                        patient_gender: data.patient_gender || 'N/A'
+                    });
                 } else {
                     console.error(`Alert item not found for alert_id: ${data.alert_id}`);
                 }
@@ -305,9 +317,48 @@
                 });
                 responseForm.appendChild(submitButton);
 
+                const hospitalButtonsDiv = document.createElement('div');
+                hospitalButtonsDiv.className = 'hospital-buttons';
+                hospitalButtonsDiv.style.display = 'none';
+                const hospitals = [
+                    'SPC District Hospital',
+                    'San Pablo Colleges Medical Center',
+                    'Community General Hospital',
+                    'Immaculate Conception Hospital',
+                    'SPC General Hospital',
+                    'San Pablo Doctors Hospital',
+                    'St. Francis and Paul General Hospital'
+                ];
+                hospitals.forEach(hospital => {
+                    const button = document.createElement('button');
+                    button.textContent = hospital;
+                    button.disabled = true; // Disable until health_response
+                    button.addEventListener('click', () => {
+                        const savedData = submittedData.get(data.alert_id) || {};
+                        socket.emit('hospital_redirect_alert', {
+                            alert_id: data.alert_id,
+                            barangay: data.barangay,
+                            emergency_type: data.emergency_type,
+                            lat: data.lat,
+                            lon: data.lon,
+                            health_type: savedData.health_type || 'N/A',
+                            health_cause: savedData.health_cause || 'N/A',
+                            patient_age: savedData.patient_age || 'N/A',
+                            patient_gender: savedData.patient_gender || 'N/A',
+                            assigned_hospital: hospital,
+                            assigned_municipality: '{{ assigned_municipality | default("San Pablo City") }}',
+                            timestamp: new Date().toISOString()
+                        });
+                        hospitalButtonsDiv.style.display = 'none';
+                    });
+                    hospitalButtonsDiv.appendChild(button);
+                });
+
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.color = 'black';
 
                 alertItem.appendChild(statusDiv);
                 alertItem.appendChild(alertText);
@@ -315,6 +366,7 @@
                 alertItem.appendChild(timeDiv);
                 alertItem.appendChild(imageDiv);
                 alertItem.appendChild(responseForm);
+                alertItem.appendChild(hospitalButtonsDiv);
                 alertItem.appendChild(predictionDiv);
                 alertContainer.appendChild(alertItem);
 
