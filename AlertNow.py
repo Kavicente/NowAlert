@@ -935,7 +935,80 @@ def handle_health_redirected_alert(data):
         logger.error(f"Error in health_redirected_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
 
+@socketio.on('hospital_redirect_alert')
+def handle_hospital_redirect_alert(data):
+    logger.info(f"Received hospital_redirect_alert: {data}")
+    try:
+        alert_id = data.get('alert_id')
+        barangay = data.get('barangay')
+        emergency_type = data.get('emergency_type', 'Health Emergency')
+        lat = data.get('lat')
+        lon = data.get('lon')
+        health_type = data.get('health_type')
+        health_cause = data.get('health_cause')
+        patient_age = data.get('patient_age')
+        patient_gender = data.get('patient_gender')
+        assigned_hospital = data.get('assigned_hospital')
+        assigned_municipality = data.get('assigned_municipality', 'San Pablo').lower().replace(' ', '')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
+        if not all([alert_id, barangay, assigned_hospital, assigned_municipality]):
+            logger.error("Missing required fields in hospital_redirect_alert")
+            emit('error', {'message': 'Missing required fields'}, to=request.sid)
+            return
+
+        # Normalize inputs for validation
+        normalized_hospital = assigned_hospital.lower().replace(' ', '')
+        normalized_municipality = assigned_municipality.lower().replace(' ', '')
+
+        # Validate assigned_hospital and role in users_web.db
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        # Debug: Log all hospital users, handling NULL usernames
+        c.execute("SELECT COALESCE(username, 'NULL') AS username, role, assigned_hospital, assigned_municipality FROM users WHERE role = ?", ('hospital',))
+        hospital_users = c.fetchall()
+        logger.info(f"Hospital users in database: {hospital_users}")
+        # Perform validation with normalized values
+        c.execute("SELECT EXISTS(SELECT 1 FROM users WHERE role = ? AND LOWER(REPLACE(assigned_hospital, ' ', '')) = ? AND LOWER(REPLACE(assigned_municipality, ' ', '')) = ?)",
+                  ('hospital', normalized_hospital, normalized_municipality))
+        valid_hospital = c.fetchone()[0]  # Returns 1 if exists, 0 if not
+        conn.close()
+
+        if not valid_hospital:
+            logger.error(f"Invalid hospital or assigned_municipality: {assigned_hospital}, {assigned_municipality}")
+            emit('error', {'message': 'Invalid hospital or assigned_municipality'}, to=request.sid)
+            return
+
+        # Store alert in database
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("INSERT OR REPLACE INTO hospital_alerts (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, assigned_hospital, assigned_municipality, timestamp, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (alert_id, barangay, emergency_type, lat, lon, health_type, health_cause, patient_age, patient_gender, assigned_hospital, assigned_municipality, timestamp, 'RESPONDED'))
+        conn.commit()
+        conn.close()
+        logger.info(f"Stored hospital_redirect_alert for alert_id: {alert_id}")
+
+        # Emit to hospital room with normalized room name
+        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
+        emit('hospital_redirect_alert', {
+            'alert_id': alert_id,
+            'barangay': barangay,
+            'emergency_type': emergency_type,
+            'lat': lat,
+            'lon': lon,
+            'health_type': health_type,
+            'health_cause': health_cause,
+            'patient_age': patient_age,
+            'patient_gender': patient_gender,
+            'assigned_hospital': assigned_hospital,
+            'assigned_municipality': assigned_municipality,
+            'timestamp': timestamp
+        }, room=hospital_room)
+        logger.info(f"Hospital redirect alert emitted to room {hospital_room}")
+    except Exception as e:
+        logger.error(f"Error in hospital_redirect_alert: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('hospital_admission_notification')
 def handle_hospital_admission_notification(data):
