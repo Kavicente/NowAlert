@@ -194,7 +194,7 @@
                 }
             });
 
-            socket.on('hospital_admission_notification', (data) => {
+            socket.on('hospital_alert', (data) => {
                 console.log('Hospital admission notification received:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
