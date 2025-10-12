@@ -948,14 +948,16 @@ def handle_hospital_redirect_alert(data):
         emergency_type = data.get('emergency_type', 'Health Emergency')
         lat = data.get('lat')
         lon = data.get('lon')
+        hospital = data.get('hospital')  # Hospital name from button click
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
         image = data.get('image')
 
-        if not alert_id or not barangay:
+        if not alert_id or not barangay or not hospital:
             logger.error("Missing required fields in hospital_redirect_alert")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
+        hospital_room = f"hospital_{hospital.lower()}"
         emit('hospital_redirect_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
@@ -966,18 +968,19 @@ def handle_hospital_redirect_alert(data):
             'emergency_type': emergency_type,
             'lat': lat,
             'lon': lon,
-            'image': image,
-            'timestamp': timestamp
-        }, room='hospital')
-        logger.info("Hospital redirect alert emitted to room hospital")
+            'hospital': hospital,
+            'timestamp': timestamp,
+            'image': image
+        }, room=hospital_room)
+        logger.info(f"Hospital redirect alert emitted to room {hospital_room}")
 
         emit('update_map', {
             'lat': lat,
             'lon': lon,
             'barangay': barangay,
             'emergency_type': emergency_type
-        }, room='hospital')
-        logger.info(f"Map update emitted to room hospital for alert {alert_id}")
+        }, room=hospital_room)
+        logger.info(f"Map update emitted to room {hospital_room} for alert {alert_id}")
     except Exception as e:
         logger.error(f"Error in hospital_redirect_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
@@ -1271,10 +1274,9 @@ def handle_register_role(data):
                 logger.info(f"Client {request.sid} joined room health_{municipality}")
     elif role == 'hospital':
             municipality = data.get('municipality').lower() if data.get('municipality') else None
-            hospital = data.get('assigned_hospital', '').lower().replace(' ', '')
             if municipality:
-                join_room(f"hospital_{municipality}_{hospital}")
-                logger.info(f"Client {request.sid} joined room hospital_{hospital}_{municipality}")
+                join_room(f"hospital_{municipality}")
+                logger.info(f"Client {request.sid} joined room hospital_{municipality}")
 
 accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': False, 'pnp': False}
 
