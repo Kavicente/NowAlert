@@ -1274,9 +1274,10 @@ def handle_register_role(data):
                 logger.info(f"Client {request.sid} joined room health_{municipality}")
     elif role == 'hospital':
             municipality = data.get('municipality').lower() if data.get('municipality') else None
+            hospital = data.get('assigned_hospital', '').lower().replace(' ', '')
             if municipality:
-                join_room(f"hospital_{municipality}")
-                logger.info(f"Client {request.sid} joined room hospital_{municipality}")
+                join_room(f"hospital_{municipality}_{hospital}")
+                logger.info(f"Client {request.sid} joined room hospital_{hospital}_{municipality}")
 
 accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': False, 'pnp': False}
 
