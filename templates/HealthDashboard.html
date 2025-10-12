@@ -352,8 +352,6 @@
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
-                predictionDiv.style.fontSize = '16px';
-                predictionDiv.style.color = 'black';
                 alertItem.appendChild(predictionDiv);
 
                 alertContainer.prepend(alertItem);
@@ -378,7 +376,7 @@
                 const sections = text.split('\n\n');
                 sections.forEach(section => {
                     const lines = section.split('\n').filter(line => line.trim());
-                    iflines.length === 0) return;
+                    if (lines.length === 0) return;
                     const sectionName = lines[0].replace(/^# /, '').trim();
                     const sectionData = {};
                     lines.slice(1).forEach(line => {
