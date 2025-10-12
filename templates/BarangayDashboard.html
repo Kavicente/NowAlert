@@ -194,18 +194,7 @@
                 }
             });
 
-            socket.on('hospital_alert', (data) => {
-                console.log('Hospital admission notification received:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const admissionDiv = document.createElement('div');
-                    admissionDiv.textContent = `\nAdmit to ${data.assigned_hospital}`;
-                    admissionDiv.style.fontSize = '16px';
-                    admissionDiv.style.fontWeight = 'bold';
-                    admissionDiv.style.color = 'black';
-                    alertItem.appendChild(admissionDiv);
-                }
-            });
+            
 
             socket.on('barangay_response', (data) => {
                 console.log('Response submitted:', data);
