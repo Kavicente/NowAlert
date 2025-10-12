@@ -988,40 +988,17 @@ def handle_hospital_redirect_alert(data):
 def handle_hospital_alert(data):
     logger.info(f"Received hospital_alert: {data}")
     try:
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        emergency_type = data.get('emergency_type', 'Health Emergency')
-        lat = data.get('lat')
-        lon = data.get('lon')
-        health_type = data.get('health_type')
-        health_cause = data.get('health_cause')
-        patient_age = data.get('patient_age')
-        patient_gender = data.get('patient_gender')
-        hospital_name = data.get('hospital_name')
-        municipality = data.get('municipality', 'San Pablo City')
-        timestamp = data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
-
-        if not all([alert_id, barangay, hospital_name, municipality]):
-            logger.error("Missing required fields in hospital_alert")
-            emit('error', {'message': 'Missing required fields'}, to=request.sid)
-            return
-
-        hospital_room = f"hospital_{municipality.lower().replace(' ', '')}_{hospital_name.lower().replace(' ', '')}"
-        emit('hospital_alert', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'emergency_type': emergency_type,
-            'lat': lat,
-            'lon': lon,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'patient_age': patient_age,
-            'patient_gender': patient_gender,
-            'hospital_name': hospital_name,
-            'municipality': municipality,
-            'timestamp': timestamp
-        }, room=hospital_room)
+        municipality = data.get('municipality', '').lower()
+        hospital_room = f"hospital_{municipality}"
+        emit('hospital_alert', data, room=hospital_room)
         logger.info(f"Hospital alert emitted to room {hospital_room}")
+        emit('update_map', {
+            'lat': data.get('lat'),
+            'lon': data.get('lon'),
+            'barangay': data.get('barangay'),
+            'emergency_type': data.get('emergency_type')
+        }, room=hospital_room)
+        logger.info(f"Map update emitted to room {hospital_room} for alert {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error in hospital_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)

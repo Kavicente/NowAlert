@@ -201,7 +201,7 @@
                     });
                     responseForm.appendChild(patientAgeSelect);
 
-                    // Submit button
+                    // Submit button for health response
                     const submitButton = document.createElement('button');
                     submitButton.textContent = 'Submit';
                     submitButton.addEventListener('click', () => {
@@ -215,7 +215,9 @@
                             barangay: '{{ barangay }}',
                             municipality: '{{ municipality }}',
                             lat: data.lat,
-                            lon: data.lon
+                            lon: data.lon,
+                            resident_barangay: data.resident_barangay || data.barangay,
+                            image: data.image
                         };
                         socket.emit('health_response', formData);
                         responseForm.style.display = 'none';
@@ -227,12 +229,11 @@
                     responseForm.appendChild(submitButton);
                     responseForm.style.display = 'block';
 
-                    // Hospital dropdown (non-functional, persists)
+                    // Hospital dropdown
                     const hospitalForm = alertItem.querySelector('.hospital-form');
                     hospitalForm.innerHTML = '';
                     const hospitalSelect = document.createElement('select');
                     hospitalSelect.name = 'hospital_name';
-                    hospitalSelect.disabled = true; // Non-functional
                     hospitalOptions.forEach(hospital => {
                         const opt = document.createElement('option');
                         opt.value = hospital;
@@ -240,6 +241,32 @@
                         hospitalSelect.appendChild(opt);
                     });
                     hospitalForm.appendChild(hospitalSelect);
+
+                    // Submit button for hospital selection
+                    const hospitalSubmitButton = document.createElement('button');
+                    hospitalSubmitButton.textContent = 'Send to Hospital';
+                    hospitalSubmitButton.addEventListener('click', () => {
+                        const hospitalData = {
+                            alert_id: data.alert_id,
+                            health_type: healthTypeSelect.value,
+                            health_cause: healthCauseSelect.value,
+                            patient_gender: patientGenderSelect.value,
+                            patient_age: patientAgeSelect.value,
+                            emergency_type: emergencyType,
+                            barangay: '{{ barangay }}',
+                            municipality: '{{ municipality }}',
+                            lat: data.lat,
+                            lon: data.lon,
+                            resident_barangay: data.resident_barangay || data.barangay,
+                            hospital_name: hospitalSelect.value,
+                            timestamp: new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }),
+                            image: data.image
+                        };
+                        socket.emit('hospital_alert', hospitalData);
+                        hospitalSubmitButton.style.display = 'none'; // Hide submit button after sending
+                        hospitalSelect.disabled = true; // Disable dropdown after submission
+                    });
+                    hospitalForm.appendChild(hospitalSubmitButton);
                     hospitalForm.style.display = 'none';
                 }
             });
@@ -351,7 +378,7 @@
                 const sections = text.split('\n\n');
                 sections.forEach(section => {
                     const lines = section.split('\n').filter(line => line.trim());
-                    if (lines.length === 0) return;
+                    iflines.length === 0) return;
                     const sectionName = lines[0].replace(/^# /, '').trim();
                     const sectionData = {};
                     lines.slice(1).forEach(line => {
