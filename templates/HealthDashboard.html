@@ -263,8 +263,7 @@
                             image: data.image
                         };
                         socket.emit('hospital_alert', hospitalData);
-                        hospitalSubmitButton.style.display = 'none'; // Hide submit button after sending
-                        hospitalSelect.disabled = true; // Disable dropdown after submission
+                        // Do not hide hospital dropdown or submit button to ensure persistence
                     });
                     hospitalForm.appendChild(hospitalSubmitButton);
                     hospitalForm.style.display = 'none';
@@ -292,7 +291,7 @@
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
                     predictionDiv.style.display = 'block';
                     const hospitalForm = alertItem.querySelector('.hospital-form');
-                    hospitalForm.style.display = 'block';
+                    hospitalForm.style.display = 'block'; // Ensure hospital dropdown persists
                 }
             });
 
@@ -352,6 +351,8 @@
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
+                predictionDiv.style.fontSize = '16px';
+                predictionDiv.style.color = 'black';
                 alertItem.appendChild(predictionDiv);
 
                 alertContainer.prepend(alertItem);

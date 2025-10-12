@@ -996,6 +996,10 @@ def handle_hospital_alert(data):
             'lat': data.get('lat'),
             'lon': data.get('lon'),
             'barangay': data.get('barangay'),
+            'health_type': data.get('health_type'),
+            'health_cause': data.get('health_cause'),
+            'patient_age': data.get('patient_age'),
+            'patient_gender': data.get('patient_gender'),
             'emergency_type': data.get('emergency_type')
         }, room=hospital_room)
         logger.info(f"Map update emitted to room {hospital_room} for alert {data.get('alert_id')}")
