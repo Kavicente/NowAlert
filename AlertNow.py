@@ -1013,7 +1013,7 @@ def handle_hospital_alert_barangay(data):
     try:
         barangay = data.get('barangay', '').lower()
         barangay_room = f"barangay_{barangay}"
-        emit('hospital_alert', data, room=barangay_room)
+        emit('hospital_alert_barangay', data, room=barangay_room)
         logger.info(f"Hospital alert emitted to room {barangay_room} for alert {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error in hospital_alert_barangay: {e}")
