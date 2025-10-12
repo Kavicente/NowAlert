@@ -986,29 +986,13 @@ def handle_hospital_redirect_alert(data):
 
 @socketio.on('hospital_admission_notification')
 def handle_hospital_admission_notification(data):
-    logger.info(f"Received hospital_admission_notification: {data}")
+    logger.info(f"Received hospital admission notification: {data}")
     try:
-        alert_id = data.get('alert_id')
-        barangay = data.get('barangay')
-        assigned_hospital = data.get('assigned_hospital')
-        emergency_type = data.get('emergency_type', 'Health Emergency')
-        municipality = data.get('municipality', 'San Pablo City')  # Add municipality from input data
-
-        if not alert_id or not barangay or not assigned_hospital or not municipality:
-            logger.error("Missing required fields in hospital_admission_notification")
-            emit('error', {'message': 'Missing required fields'}, to=request.sid)
-            return
-
-        emit('hospital_admission_notification', {
-            'alert_id': alert_id,
-            'barangay': barangay,
-            'assigned_hospital': assigned_hospital,
-            'emergency_type': emergency_type,
-            'municipality': municipality
-        }, broadcast=True, include_self=False)
+        hospital_room = f"hospital_{data.get('assigned_hospital', '').lower()}"
+        emit('hospital_admission_notification', data, room=hospital_room)
+        logger.info(f"Hospital admission notification emitted to room {hospital_room}")
     except Exception as e:
-        logger.error(f"Error in hospital_admission_notification: {e}")
-        emit('error', {'message': str(e)}, to=request.sid)
+        logger.error(f"Error in handle_hospital_admission_notification: {e}")
 
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):

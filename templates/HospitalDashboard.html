@@ -87,6 +87,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
+            const assignedHospital = '{{ assigned_hospital }}'.toLowerCase();
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
@@ -116,17 +117,92 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('register_role', { role: 'hospital' });
+                socket.emit('register_role', { role: 'hospital', assigned_hospital: assignedHospital });
             });
 
             socket.on('connect_error', (error) => {
                 console.error('Connection error:', error);
             });
 
-            socket.on('hospital_redirect_alert', (data) => {
-                console.log('Hospital redirect alert received:', data);
-                updateUIWithAlert(data);
-                notifyAlert(data);
+            socket.on('hospital_admission_notification', (data) => {
+                console.log('Hospital admission notification received:', data);
+                if (data.assigned_hospital && data.assigned_hospital.toLowerCase() === assignedHospital) {
+                    const alertContainer = document.getElementById('alert-container');
+                    const alertItem = document.createElement('div');
+                    alertItem.className = 'alert-item';
+                    alertItem.dataset.alertId = data.alert_id;
+                    alertElements.set(data.alert_id, alertItem);
+
+                    const statusDiv = document.createElement('div');
+                    statusDiv.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}`;
+                    statusDiv.style.fontWeight = 'bold';
+                    statusDiv.style.fontSize = '16px';
+                    statusDiv.style.color = 'black';
+
+                    const residentDiv = document.createElement('div');
+                    residentDiv.textContent = `Resident From ${data.barangay || 'Unknown'}`;
+                    residentDiv.style.fontSize = '16px';
+                    residentDiv.style.color = 'black';
+
+                    const timeDiv = document.createElement('div');
+                    const timestamp = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' });
+                    timeDiv.textContent = `Time: ${timestamp}`;
+                    timeDiv.style.fontSize = '16px';
+                    timeDiv.style.color = 'black';
+
+                    const healthTypeDiv = document.createElement('div');
+                    healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
+                    healthTypeDiv.style.fontSize = '16px';
+                    healthTypeDiv.style.color = 'black';
+
+                    const healthCauseDiv = document.createElement('div');
+                    healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
+                    healthCauseDiv.style.fontSize = '16px';
+                    healthCauseDiv.style.color = 'black';
+
+                    const patientAgeDiv = document.createElement('div');
+                    patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
+                    patientAgeDiv.style.fontSize = '16px';
+                    patientAgeDiv.style.color = 'black';
+
+                    const patientGenderDiv = document.createElement('div');
+                    patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
+                    patientGenderDiv.style.fontSize = '16px';
+                    patientGenderDiv.style.color = 'black';
+
+                    alertItem.appendChild(statusDiv);
+                    alertItem.appendChild(residentDiv);
+                    alertItem.appendChild(timeDiv);
+                    alertItem.appendChild(healthTypeDiv);
+                    alertItem.appendChild(healthCauseDiv);
+                    alertItem.appendChild(patientAgeDiv);
+                    alertItem.appendChild(patientGenderDiv);
+
+                    if (data.image) {
+                        const imageDiv = document.createElement('img');
+                        imageDiv.className = 'clickable-img';
+                        imageDiv.src = data.image;
+                        imageDiv.addEventListener('click', () => {
+                            const modal = document.getElementById('image-modal');
+                            const modalImg = document.getElementById('modal-image');
+                            modalImg.src = data.image;
+                            modal.style.display = 'flex';
+                        });
+                        alertItem.appendChild(imageDiv);
+                    }
+
+                    alertContainer.appendChild(alertItem);
+
+                    if (data.lat && data.lon) {
+                        hospitalMap.setView([data.lat, data.lon], 16);
+                        L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
+                            `Health Emergency at ${data.barangay || 'Unknown'}`
+                        ).openPopup();
+                        document.getElementById('map-coordinates').textContent = `${data.lat}, ${data.lon}`;
+                    }
+
+                    notifyAlert(data);
+                }
             });
 
             socket.on('update_map', (data) => {
@@ -140,100 +216,11 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
-            socket.on('hospital_admission_notification', (data) => {
-                console.log('Hospital admission notification received:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const admissionDiv = document.createElement('div');
-                    admissionDiv.textContent = `\nResponded Health Emergency and On The Way To ${data.assigned_hospital} \nResident From ${data.barangay || 'Unknown'} \nTime: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' })} \nHealth Type: ${data.health_type || 'N/A'} \nHealth Cause: ${data.health_cause || 'N/A'} \nPatient Age: ${data.patient_age || 'N/A'} \nPatient Gender: ${data.patient_gender || 'N/A'} \nAdmit to ${data.assigned_hospital}`;
-                    admissionDiv.style.fontSize = '16px';
-                    admissionDiv.style.fontWeight = 'bold';
-                    admissionDiv.style.color = 'black';
-                    alertItem.appendChild(admissionDiv);
-                }
-            });
-
-            function updateUIWithAlert(data) {
-                const alertContainer = document.getElementById('alert-container');
-                const alertItem = document.createElement('div');
-                alertItem.className = 'alert-item';
-                alertItem.dataset.alertId = data.alert_id;
-                alertElements.set(data.alert_id, alertItem);
-
-                const statusDiv = document.createElement('div');
-                statusDiv.textContent = `Responded Health Emergency and On The Way To ${data.selected_hospital || 'Hospital'}`;
-                statusDiv.style.fontWeight = 'bold';
-                statusDiv.style.fontSize = '16px';
-
-                const residentDiv = document.createElement('div');
-                residentDiv.textContent = `Resident From ${data.barangay || 'Unknown'}`;
-                residentDiv.style.fontSize = '16px';
-
-                const timeDiv = document.createElement('div');
-                const timestamp = new Date(data.timestamp || Date.now()).toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' });
-                timeDiv.textContent = `Time: ${timestamp}`;
-                timeDiv.style.fontSize = '16px';
-
-                const healthTypeDiv = document.createElement('div');
-                healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
-                healthTypeDiv.style.fontSize = '16px';
-
-                const healthCauseDiv = document.createElement('div');
-                healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
-                healthCauseDiv.style.fontSize = '16px';
-
-                const patientAgeDiv = document.createElement('div');
-                patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
-                patientAgeDiv.style.fontSize = '16px';
-
-                const patientGenderDiv = document.createElement('div');
-                patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
-                patientGenderDiv.style.fontSize = '16px';
-
-                const imageDiv = document.createElement('img');
-                imageDiv.className = 'clickable-img';
-                imageDiv.style.display = 'none';
-                if (data.image) {
-                    imageDiv.src = data.image;
-                    imageDiv.style.display = 'block';
-                    imageDiv.addEventListener('click', () => {
-                        const modal = document.getElementById('image-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = data.image;
-                        modal.style.display = 'flex';
-                    });
-                }
-
-                alertItem.appendChild(statusDiv);
-                alertItem.appendChild(residentDiv);
-                alertItem.appendChild(timeDiv);
-                alertItem.appendChild(healthTypeDiv);
-                alertItem.appendChild(healthCauseDiv);
-                alertItem.appendChild(patientAgeDiv);
-                alertItem.appendChild(patientGenderDiv);
-                alertItem.appendChild(imageDiv);
-                alertContainer.appendChild(alertItem);
-
-                const modal = document.getElementById('image-modal');
-                const closeBtn = modal.querySelector('.close-btn');
-                closeBtn.addEventListener('click', () => {
-                    modal.style.display = 'none';
-                });
-
-                if (data.lat && data.lon) {
-                    hospitalMap.setView([data.lat, data.lon], 16);
-                    L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
-                        `Health Emergency at ${data.barangay || 'Unknown'}`
-                    ).openPopup();
-                    document.getElementById('map-coordinates').textContent = `${data.lat}, ${data.lon}`;
-                }
-            }
-
             function notifyAlert(data) {
                 const notificationDiv = document.getElementById('notification');
                 const notification = document.createElement('div');
                 notification.className = 'notification';
-                notification.textContent = `New Alert: Health Emergency at ${data.barangay || 'Unknown'}`;
+                notification.textContent = `New Alert: Health Emergency at ${data.barangay} for ${data.assigned_hospital}`;
                 notificationDiv.appendChild(notification);
                 setTimeout(() => {
                     notification.remove();
