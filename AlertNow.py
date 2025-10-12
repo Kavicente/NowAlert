@@ -945,19 +945,17 @@ def handle_hospital_redirect_alert(data):
         health_cause = data.get('health_cause', 'N/A')
         patient_gender = data.get('patient_gender', 'N/A')
         patient_age = data.get('patient_age', 'N/A')
-        assigned_hospital = data.get('assigned_hospital')
         emergency_type = data.get('emergency_type', 'Health Emergency')
         lat = data.get('lat')
         lon = data.get('lon')
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
         image = data.get('image')
 
-        if not alert_id or not barangay or not assigned_hospital:
+        if not alert_id or not barangay:
             logger.error("Missing required fields in hospital_redirect_alert")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
-        hospital_room = f"hospital_{assigned_hospital.lower()}"
         emit('hospital_redirect_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
@@ -965,22 +963,21 @@ def handle_hospital_redirect_alert(data):
             'health_cause': health_cause,
             'patient_gender': patient_gender,
             'patient_age': patient_age,
-            'assigned_hospital': assigned_hospital,
             'emergency_type': emergency_type,
             'lat': lat,
             'lon': lon,
             'image': image,
             'timestamp': timestamp
-        }, room=hospital_room)
-        logger.info(f"Hospital redirect alert emitted to room {hospital_room}")
+        }, room='hospital')
+        logger.info("Hospital redirect alert emitted to room hospital")
 
         emit('update_map', {
             'lat': lat,
             'lon': lon,
             'barangay': barangay,
             'emergency_type': emergency_type
-        }, room=hospital_room)
-        logger.info(f"Map update emitted to room {hospital_room} for alert {alert_id}")
+        }, room='hospital')
+        logger.info(f"Map update emitted to room hospital for alert {alert_id}")
     except Exception as e:
         logger.error(f"Error in hospital_redirect_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
