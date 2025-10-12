@@ -263,6 +263,7 @@
                             image: data.image
                         };
                         socket.emit('hospital_alert', hospitalData);
+                        socket.emit('hospital_alert_barangay', hospitalData);
                         // Do not hide hospital dropdown or submit button to ensure persistence
                     });
                     hospitalForm.appendChild(hospitalSubmitButton);

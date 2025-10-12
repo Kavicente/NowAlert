@@ -1007,6 +1007,18 @@ def handle_hospital_alert(data):
         logger.error(f"Error in hospital_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
 
+@socketio.on('hospital_alert_barangay')
+def handle_hospital_alert_barangay(data):
+    logger.info(f"Received hospital_alert_barangay: {data}")
+    try:
+        barangay = data.get('barangay', '').lower()
+        barangay_room = f"barangay_{barangay}"
+        emit('hospital_alert', data, room=barangay_room)
+        logger.info(f"Hospital alert emitted to room {barangay_room} for alert {data.get('alert_id')}")
+    except Exception as e:
+        logger.error(f"Error in hospital_alert_barangay: {e}")
+        emit('error', {'message': str(e)}, to=request.sid)
+
 @socketio.on('update_dashboard_emergency_type')
 def handle_update_dashboard_emergency_type(data):
     logger.info(f"Received update dashboard emergency type: {data}")
