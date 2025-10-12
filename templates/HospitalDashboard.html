@@ -142,18 +142,7 @@
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
-            socket.on('hospital_admission_notification', (data) => {
-                console.log('Hospital admission notification received:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const admissionDiv = document.createElement('div');
-                    admissionDiv.textContent = `\nResponded Health Emergency and On The Way To ${data.hospital} \nResident From ${data.barangay || 'Unknown'} \nTime: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' })} \nHealth Type: ${data.health_type || 'N/A'} \nHealth Cause: ${data.health_cause || 'N/A'} \nPatient Age: ${data.patient_age || 'N/A'} \nPatient Gender: ${data.patient_gender || 'N/A'} \nAdmit to ${data.hospital}`;
-                    admissionDiv.style.fontSize = '16px';
-                    admissionDiv.style.fontWeight = 'bold';
-                    admissionDiv.style.color = 'black';
-                    alertItem.appendChild(admissionDiv);
-                }
-            });
+        
 
             function updateUIWithAlert(data) {
                 const alertContainer = document.getElementById('alert-container');
