@@ -312,7 +312,7 @@
                 const lon = data.lon || {{ lon_coord|default(121.3013) }};
                 barangayMap.setView([lat, lon], 16);
                 L.marker([lat, lon]).addTo(barangayMap).bindPopup(
-                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                    `Emergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`
                 ).openPopup();
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
@@ -323,7 +323,7 @@
                 alertItem.className = 'alert-item';
                 alertItem.innerHTML = `
                     <div>PENDING ALERT</div>
-                    <div>Emergency at ${data.barangay || 'Unknown'}</div>
+                    <div>Emergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}</div>
                     <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
                     <img class="clickable-img" style="display: none;" src="${data.image || ''}">
