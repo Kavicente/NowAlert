@@ -125,90 +125,104 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('register_role', { 
-                    role: 'hospital', 
-                    assigned_hospital: '{{ assigned_hospital }}'.toLowerCase().replace(' ', ''),
-                    municipality: '{{ municipality }}'.toLowerCase().replace(' ', '')
-                });
+                socket.emit('register_role', { role: 'hospital', municipality: '{{ municipality }}'.toLowerCase() });
             });
 
             socket.on('connect_error', (error) => {
                 console.error('Connection error:', error);
             });
 
-            socket.on('hospital_admission_notification', (data) => {
-                console.log('Hospital admission notification received:', data);
+            socket.on('hospital_alert', (data) => {
+                console.log('Hospital alert received:', data);
                 updateUIWithAlert(data);
                 notifyAlert(data);
+
+                const marker = L.marker([data.lat, data.lon]).addTo(hospitalMap);
+                marker.bindPopup(`Alert: ${data.emergency_type || 'Health Emergency'} at ${data.barangay}`);
             });
 
             function updateUIWithAlert(data) {
                 const alertContainer = document.getElementById('alert-container');
                 const alertItem = document.createElement('div');
                 alertItem.className = 'alert-item';
-                alertItem.id = `alert-${data.alert_id}`;
                 alertElements.set(data.alert_id, alertItem);
 
                 const statusDiv = document.createElement('div');
-                statusDiv.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}`;
-                statusDiv.style.fontSize = '16px';
+                statusDiv.textContent = 'RESPONDED';
                 statusDiv.style.fontWeight = 'bold';
+                statusDiv.style.fontSize = '16px';
+                alertItem.appendChild(statusDiv);
 
-                const residentDiv = document.createElement('div');
-                residentDiv.textContent = `Resident From ${data.barangay}`;
-                residentDiv.style.fontSize = '16px';
+                const alertText = document.createElement('div');
+                alertText.textContent = `Health Emergency and On The Way To ${data.hospital_name}\nResident From ${data.resident_barangay || data.barangay}`;
+                alertText.style.fontSize = '16px';
+                alertItem.appendChild(alertText);
 
                 const timeDiv = document.createElement('div');
                 timeDiv.textContent = `Time: ${data.timestamp}`;
                 timeDiv.style.fontSize = '16px';
+                alertItem.appendChild(timeDiv);
 
                 const healthTypeDiv = document.createElement('div');
                 healthTypeDiv.textContent = `Health Type: ${data.health_type || 'N/A'}`;
                 healthTypeDiv.style.fontSize = '16px';
+                alertItem.appendChild(healthTypeDiv);
 
                 const healthCauseDiv = document.createElement('div');
                 healthCauseDiv.textContent = `Health Cause: ${data.health_cause || 'N/A'}`;
                 healthCauseDiv.style.fontSize = '16px';
+                alertItem.appendChild(healthCauseDiv);
 
                 const patientAgeDiv = document.createElement('div');
                 patientAgeDiv.textContent = `Patient Age: ${data.patient_age || 'N/A'}`;
                 patientAgeDiv.style.fontSize = '16px';
+                alertItem.appendChild(patientAgeDiv);
 
                 const patientGenderDiv = document.createElement('div');
                 patientGenderDiv.textContent = `Patient Gender: ${data.patient_gender || 'N/A'}`;
                 patientGenderDiv.style.fontSize = '16px';
-
-                alertItem.appendChild(statusDiv);
-                alertItem.appendChild(residentDiv);
-                alertItem.appendChild(timeDiv);
-                alertItem.appendChild(healthTypeDiv);
-                alertItem.appendChild(healthCauseDiv);
-                alertItem.appendChild(patientAgeDiv);
                 alertItem.appendChild(patientGenderDiv);
+
+                const img = document.createElement('img');
+                img.className = 'clickable-img';
+                if (data.image) {
+                    img.src = `data:image/jpeg;base64,${data.image}`;
+                    img.style.display = 'block';
+                } else {
+                    img.style.display = 'none';
+                }
+                img.addEventListener('click', () => {
+                    const modal = document.getElementById('image-modal');
+                    const modalImg = document.getElementById('modal-image');
+                    modalImg.src = img.src;
+                    modal.style.display = 'flex';
+                });
+                alertItem.appendChild(img);
+
                 alertContainer.prepend(alertItem);
 
-                const marker = L.marker([data.lat, data.lon]).addTo(hospitalMap);
-                marker.bindPopup(`Health Emergency at ${data.barangay}: ${data.health_type || 'N/A'}`);
+                const modal = document.getElementById('image-modal');
+                const closeBtn = modal.querySelector('.close-btn');
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
             }
 
             function notifyAlert(data) {
                 const notificationDiv = document.getElementById('notification');
-                notificationDiv.innerHTML = `<p>New alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}</p>`;
-                setTimeout(() => notificationDiv.innerHTML = '', 5000);
+                notificationDiv.innerHTML = `<p>New alert received for ${data.barangay}</p>`;
+                setTimeout(() => {
+                    notificationDiv.innerHTML = '';
+                }, 5000);
             }
-
-            document.getElementById('image-modal').addEventListener('click', (e) => {
-                if (e.target.className === 'close-btn' || e.target.id === 'image-modal') {
-                    document.getElementById('image-modal').style.display = 'none';
-                }
-            });
 
             function parseMenuText(text) {
                 const menuData = {};
-                const sections = text.split('#').filter(s => s.trim());
+                const sections = text.split('\n\n');
                 sections.forEach(section => {
-                    const lines = section.trim().split('\n');
-                    const sectionName = lines[0].trim();
+                    const lines = section.split('\n').filter(line => line.trim());
+                    if (lines.length === 0) return;
+                    const sectionName = lines[0].replace(/^# /, '').trim();
                     const sectionData = {};
                     lines.slice(1).forEach(line => {
                         const [key, values] = line.split(':');

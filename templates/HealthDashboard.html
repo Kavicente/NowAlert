@@ -87,13 +87,14 @@
     <script>
         let menuData = {};
         const hospitalOptions = [
-            'San Pablo City District Hospital',
-            'San Pablo Colleges Medical Center',
-            'Community General Hospital of San Pablo',
-            'Immaculate Conception Hospital',
-            'San Pablo City Medical Center',
-            'San Pablo Doctors Hospital'
+            "San Pablo City District Hospital",
+            "San Pablo Colleges Medical Center",
+            "Community General Hospital of San Pablo",
+            "Immaculate Conception Hospital",
+            "San Pablo City Medical Center",
+            "San Pablo Doctors Hospital"
         ];
+
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -155,8 +156,8 @@
                     typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                     typeDiv.style.display = 'block';
                     const responseForm = alertItem.querySelector('.response-form');
-                    let emergencyType = data.emergency_type || 'Health Emergency';
-                    let dropdownData = menuData[emergencyType] || menuData['Health Emergency'] || {};
+                    let emergencyType = data.emergency_type || 'Unknown';
+                    let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
                     responseForm.innerHTML = '';
                     Object.keys(dropdownData).forEach(key => {
                         const select = document.createElement('select');
@@ -179,77 +180,74 @@
                         formData.alert_id = data.alert_id;
                         formData.emergency_type = data.emergency_type;
                         formData.barangay = '{{ barangay }}';
-                        formData.lat = data.lat;
-                        formData.lon = data.lon;
+                        formData.municipality = '{{ municipality }}';
                         socket.emit('health_response', formData);
+                        responseForm.style.display = 'none';
+                        const statusDiv = alertItem.querySelector('div:nth-child(1)');
+                        statusDiv.textContent = 'RESPONDED';
                     });
                     responseForm.appendChild(submitButton);
                     responseForm.style.display = 'block';
-                }
-            });
 
-            socket.on('health_response', (data) => {
-                console.log('Health response received:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const predictionDiv = alertItem.querySelector('.prediction');
-                    const predictionText = data.prediction || 'N/A';
-                    let formattedPrediction = 'N/A';
-                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                        if (match) {
-                            const percentage = match[1];
-                            const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
-                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
-                        } else {
-                            formattedPrediction = predictionText;
-                        }
-                    }
-                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '16px';
-                    predictionDiv.style.color = 'black';
-
+                    // Add hospital dropdown after response submission
                     const hospitalForm = document.createElement('div');
                     hospitalForm.className = 'hospital-form';
+                    hospitalForm.style.marginTop = '10px';
+                    hospitalForm.style.display = 'none';
                     const hospitalSelect = document.createElement('select');
-                    hospitalSelect.name = 'assigned_hospital';
+                    hospitalSelect.name = 'hospital_name';
                     hospitalOptions.forEach(hospital => {
                         const opt = document.createElement('option');
                         opt.value = hospital;
                         opt.textContent = hospital;
                         hospitalSelect.appendChild(opt);
                     });
-                    const hospitalLabel = document.createElement('label');
-                    hospitalLabel.textContent = 'Send To: Hospital ';
-                    hospitalLabel.style.marginRight = '5px';
-                    hospitalForm.appendChild(hospitalLabel);
                     hospitalForm.appendChild(hospitalSelect);
-                    const sendButton = document.createElement('button');
-                    sendButton.textContent = 'Send';
-                    sendButton.addEventListener('click', () => {
+                    const hospitalSubmitButton = document.createElement('button');
+                    hospitalSubmitButton.textContent = 'Send to Hospital';
+                    hospitalSubmitButton.addEventListener('click', () => {
                         const hospitalData = {
                             alert_id: data.alert_id,
-                            barangay: data.barangay,
-                            emergency_type: data.emergency_type || 'Health Emergency',
+                            barangay: '{{ barangay }}',
+                            emergency_type: data.emergency_type,
                             lat: data.lat,
                             lon: data.lon,
-                            health_type: data.health_type,
-                            health_cause: data.health_cause,
-                            patient_age: data.patient_age,
-                            patient_gender: data.patient_gender,
-                            assigned_hospital: hospitalSelect.value,
+                            health_type: formData.health_type,
+                            health_cause: formData.health_cause,
+                            patient_age: formData.patient_age,
+                            patient_gender: formData.patient_gender,
+                            hospital_name: hospitalSelect.value,
+                            municipality: '{{ municipality }}',
                             timestamp: new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
                         };
-                        socket.emit('hospital_admission_notification', hospitalData);
+                        socket.emit('hospital_alert', hospitalData);
                         hospitalForm.style.display = 'none';
-                        const statusDiv = alertItem.querySelector('div:nth-child(1)');
-                        statusDiv.textContent = 'RESPONDED';
                     });
-                    hospitalForm.appendChild(sendButton);
+                    hospitalForm.appendChild(hospitalSubmitButton);
                     alertItem.appendChild(hospitalForm);
-                    hospitalForm.style.display = 'block';
+                    socket.on('health_response', (responseData) => {
+                        if (responseData.alert_id === data.alert_id) {
+                            const predictionDiv = alertItem.querySelector('.prediction');
+                            const predictionText = responseData.prediction || 'N/A';
+                            let formattedPrediction = 'N/A';
+                            if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
+                                const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
+                                if (match) {
+                                    const percentage = match[1];
+                                    const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
+                                    const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
+                                    formattedPrediction = `There will be a ${percentage}% chance of ${responseData.emergency_type || 'Unknown'} Again in next ${randomRange}`;
+                                } else {
+                                    formattedPrediction = predictionText;
+                                }
+                            }
+                            predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
+                            predictionDiv.style.display = 'block';
+                            predictionDiv.style.fontSize = '16px';
+                            predictionDiv.style.color = 'black';
+                            hospitalForm.style.display = 'block';
+                        }
+                    });
                 }
             });
 
@@ -257,79 +255,80 @@
                 const alertContainer = document.getElementById('alert-container');
                 const alertItem = document.createElement('div');
                 alertItem.className = 'alert-item';
-                alertItem.id = `alert-${data.alert_id}`;
                 alertElements.set(data.alert_id, alertItem);
 
                 const statusDiv = document.createElement('div');
-                statusDiv.textContent = 'PENDING ALERT';
-                statusDiv.style.fontSize = '16px';
+                statusDiv.textContent = 'PENDING';
                 statusDiv.style.fontWeight = 'bold';
+                statusDiv.style.fontSize = '16px';
+                alertItem.appendChild(statusDiv);
 
-                const alertDiv = document.createElement('div');
-                alertDiv.textContent = `RECEIVED ALERTS\nEmergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
-                alertDiv.style.fontSize = '16px';
+                const alertText = document.createElement('div');
+                alertText.textContent = `RECEIVED ALERTS\nResident From ${data.resident_barangay || data.barangay}`;
+                alertText.style.fontSize = '16px';
+                alertItem.appendChild(alertText);
 
                 const typeDiv = document.createElement('div');
                 typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
-                typeDiv.style.fontSize = '16px';
                 typeDiv.style.display = 'none';
+                typeDiv.style.fontWeight = 'bold';
+                typeDiv.style.fontSize = '16px';
+                alertItem.appendChild(typeDiv);
 
                 const timeDiv = document.createElement('div');
                 timeDiv.textContent = `Time: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`;
                 timeDiv.style.fontSize = '16px';
+                alertItem.appendChild(timeDiv);
+
+                const img = document.createElement('img');
+                img.className = 'clickable-img';
+                if (data.image) {
+                    img.src = `data:image/jpeg;base64,${data.image}`;
+                    img.style.display = 'block';
+                } else {
+                    img.style.display = 'none';
+                }
+                img.addEventListener('click', () => {
+                    const modal = document.getElementById('image-modal');
+                    const modalImg = document.getElementById('modal-image');
+                    modalImg.src = img.src;
+                    modal.style.display = 'flex';
+                });
+                alertItem.appendChild(img);
 
                 const responseForm = document.createElement('div');
                 responseForm.className = 'response-form';
+                alertItem.appendChild(responseForm);
 
                 const predictionDiv = document.createElement('div');
                 predictionDiv.className = 'prediction';
                 predictionDiv.style.display = 'none';
-
-                const img = document.createElement('img');
-                img.className = 'clickable-img';
-                img.style.display = 'none';
-                if (data.image) {
-                    img.src = `data:image/jpeg;base64,${data.image}`;
-                    img.style.display = 'block';
-                    img.addEventListener('click', () => {
-                        const modal = document.getElementById('image-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = img.src;
-                        modal.style.display = 'flex';
-                    });
-                }
-
-                alertItem.appendChild(statusDiv);
-                alertItem.appendChild(alertDiv);
-                alertItem.appendChild(typeDiv);
-                alertItem.appendChild(timeDiv);
-                alertItem.appendChild(responseForm);
                 alertItem.appendChild(predictionDiv);
-                alertItem.appendChild(img);
+
                 alertContainer.prepend(alertItem);
 
-                const marker = L.marker([data.lat, data.lon]).addTo(healthMap);
-                marker.bindPopup(`Emergency at ${data.barangay}: ${data.emergency_type || 'N/A'}`);
+                const modal = document.getElementById('image-modal');
+                const closeBtn = modal.querySelector('.close-btn');
+                closeBtn.addEventListener('click', () => {
+                    modal.style.display = 'none';
+                });
             }
 
             function notifyAlert(data) {
                 const notificationDiv = document.getElementById('notification');
-                notificationDiv.innerHTML = `<p>New alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}</p>`;
-                setTimeout(() => notificationDiv.innerHTML = '', 5000);
+                notificationDiv.innerHTML = `<p>New alert received for ${data.barangay}</p>`;
+                setTimeout(() => {
+                    notificationDiv.innerHTML = '';
+                }, 5000);
             }
-
-            document.getElementById('image-modal').addEventListener('click', (e) => {
-                if (e.target.className === 'close-btn' || e.target.id === 'image-modal') {
-                    document.getElementById('image-modal').style.display = 'none';
-                }
-            });
 
             function parseMenuText(text) {
                 const menuData = {};
-                const sections = text.split('#').filter(s => s.trim());
+                const sections = text.split('\n\n');
                 sections.forEach(section => {
-                    const lines = section.trim().split('\n');
-                    const sectionName = lines[0].trim();
+                    const lines = section.split('\n').filter(line => line.trim());
+                    if (lines.length === 0) return;
+                    const sectionName = lines[0].replace(/^# /, '').trim();
                     const sectionData = {};
                     lines.slice(1).forEach(line => {
                         const [key, values] = line.split(':');

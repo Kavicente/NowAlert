@@ -984,9 +984,9 @@ def handle_hospital_redirect_alert(data):
 
 
 
-@socketio.on('hospital_admission_notification')
-def handle_hospital_admission_notification(data):
-    logger.info(f"Received hospital_admission_notification: {data}")
+@socketio.on('hospital_alert')
+def handle_hospital_alert(data):
+    logger.info(f"Received hospital_alert: {data}")
     try:
         alert_id = data.get('alert_id')
         barangay = data.get('barangay')
@@ -997,19 +997,17 @@ def handle_hospital_admission_notification(data):
         health_cause = data.get('health_cause')
         patient_age = data.get('patient_age')
         patient_gender = data.get('patient_gender')
-        assigned_hospital = data.get('assigned_hospital')
+        hospital_name = data.get('hospital_name')
         municipality = data.get('municipality', 'San Pablo City')
         timestamp = data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
 
-        if not all([alert_id, barangay, assigned_hospital, municipality]):
-            logger.error("Missing required fields in hospital_admission_notification")
+        if not all([alert_id, barangay, hospital_name, municipality]):
+            logger.error("Missing required fields in hospital_alert")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
-        normalized_hospital = assigned_hospital.lower().replace(' ', '')
-        normalized_municipality = municipality.lower().replace(' ', '')
-        hospital_room = f"hospital_{normalized_municipality}_{normalized_hospital}"
-        emit('hospital_admission_notification', {
+        hospital_room = f"hospital_{municipality.lower().replace(' ', '')}_{hospital_name.lower().replace(' ', '')}"
+        emit('hospital_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
             'emergency_type': emergency_type,
@@ -1019,12 +1017,13 @@ def handle_hospital_admission_notification(data):
             'health_cause': health_cause,
             'patient_age': patient_age,
             'patient_gender': patient_gender,
-            'assigned_hospital': assigned_hospital,
+            'hospital_name': hospital_name,
+            'municipality': municipality,
             'timestamp': timestamp
         }, room=hospital_room)
-        logger.info(f"Hospital admission notification emitted to room {hospital_room}")
+        logger.info(f"Hospital alert emitted to room {hospital_room}")
     except Exception as e:
-        logger.error(f"Error in hospital_admission_notification: {e}")
+        logger.error(f"Error in hospital_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
 
 @socketio.on('update_dashboard_emergency_type')
