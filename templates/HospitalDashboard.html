@@ -118,7 +118,9 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                socket.emit('register_role', { role: 'hospital', assigned_hospital: assignedHospital });
+                const municipality = '{{ municipality|default("sanpablocity") }}'.toLowerCase().replace(/ /g, '');
+                const hospital = '{{ hospital|default("spcdistricthospital") }}'.toLowerCase().replace(/ /g, '');
+                socket.emit('register_role', { role: 'hospital', municipality: municipality, assigned_hospital: hospital });
             });
 
             socket.on('connect_error', (error) => {
