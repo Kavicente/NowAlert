@@ -941,46 +941,43 @@ def handle_hospital_redirect_alert(data):
     try:
         alert_id = data.get('alert_id')
         barangay = data.get('barangay')
-        health_type = data.get('health_type', 'N/A')
-        health_cause = data.get('health_cause', 'N/A')
-        patient_gender = data.get('patient_gender', 'N/A')
-        patient_age = data.get('patient_age', 'N/A')
         emergency_type = data.get('emergency_type', 'Health Emergency')
         lat = data.get('lat')
         lon = data.get('lon')
-        hospital = data.get('hospital') or data.get('assigned_hospital')  # Accept either hospital or assigned_hospital
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        image = data.get('image')
+        health_type = data.get('health_type')
+        health_cause = data.get('health_cause')
+        patient_age = data.get('patient_age')
+        patient_gender = data.get('patient_gender')
+        selected_hospital = data.get('selected_hospital')
+        timestamp = data.get('timestamp', datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S'))
 
-        if not alert_id or not barangay or not hospital:
+        if not all([alert_id, barangay, selected_hospital]):
             logger.error("Missing required fields in hospital_redirect_alert")
             emit('error', {'message': 'Missing required fields'}, to=request.sid)
             return
 
-        hospital_room = f"hospital_{hospital.lower()}"
         emit('hospital_redirect_alert', {
             'alert_id': alert_id,
             'barangay': barangay,
-            'health_type': health_type,
-            'health_cause': health_cause,
-            'patient_gender': patient_gender,
-            'patient_age': patient_age,
             'emergency_type': emergency_type,
             'lat': lat,
             'lon': lon,
-            'hospital': hospital,  # Use hospital for consistency in emitted data
-            'timestamp': timestamp,
-            'image': image
-        }, room=hospital_room)
-        logger.info(f"Hospital redirect alert emitted to room {hospital_room}")
+            'health_type': health_type,
+            'health_cause': health_cause,
+            'patient_age': patient_age,
+            'patient_gender': patient_gender,
+            'selected_hospital': selected_hospital,
+            'timestamp': timestamp
+        }, room='hospital')
+        logger.info("Hospital redirect alert emitted to room hospital")
 
         emit('update_map', {
             'lat': lat,
             'lon': lon,
             'barangay': barangay,
             'emergency_type': emergency_type
-        }, room=hospital_room)
-        logger.info(f"Map update emitted to room {hospital_room} for alert {alert_id}")
+        }, room='hospital')
+        logger.info(f"Map update emitted to room hospital for alert {alert_id}")
     except Exception as e:
         logger.error(f"Error in hospital_redirect_alert: {e}")
         emit('error', {'message': str(e)}, to=request.sid)
