@@ -149,62 +149,61 @@
 
                 const marker = L.marker([data.lat, data.lon]).addTo(healthMap);
                 marker.bindPopup(`Alert: ${data.emergency_type || 'Health Emergency'} at ${data.barangay}`);
-                
+
                 const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const responseForm = alertItem.querySelector('.response-form');
-                    const emergencyType = data.emergency_type || 'Health Emergency';
-                    const dropdownData = menuData[emergencyType] || menuData['Health Emergency'] || {};
-                    responseForm.innerHTML = '';
-                    Object.keys(dropdownData).forEach(key => {
-                        const select = document.createElement('select');
-                        select.name = key.toLowerCase().replace(/\s+/g, '_');
-                        dropdownData[key].forEach(option => {
-                            const opt = document.createElement('option');
-                            opt.value = option;
-                            opt.textContent = option;
-                            select.appendChild(opt);
-                        });
-                        responseForm.appendChild(select);
-                    });
-                    const submitButton = document.createElement('button');
-                    submitButton.textContent = 'Submit';
-                    submitButton.addEventListener('click', () => {
-                        const formData = {
-                            alert_id: data.alert_id,
-                            barangay: data.barangay,
-                            emergency_type: emergencyType,
-                            lat: data.lat,
-                            lon: data.lon
-                        };
-                        responseForm.querySelectorAll('select').forEach(select => {
-                            formData[select.name] = select.value;
-                        });
-                        formData.municipality = '{{ municipality }}';
-                        formData.timestamp = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' });
-                        socket.emit('health_response', formData);
-                        responseForm.style.display = 'none';
-                        const statusDiv = alertItem.querySelector('div:nth-child(1)');
-                        statusDiv.textContent = 'RESPONDED';
-                    });
-                    responseForm.appendChild(submitButton);
-                    
-                    const hospitalForm = document.createElement('div');
-                    hospitalForm.className = 'hospital-form';
-                    hospitalForm.style.marginTop = '10px';
-                    const hospitalSelect = document.createElement('select');
-                    hospitalSelect.name = 'hospital_name';
-                    hospitalOptions.forEach(hospital => {
+                const responseForm = alertItem.querySelector('.response-form');
+                let emergencyType = data.emergency_type || 'Health Emergency';
+                let dropdownData = menuData['Health Emergency'] || {};
+                responseForm.innerHTML = '';
+                Object.keys(dropdownData).forEach(key => {
+                    const select = document.createElement('select');
+                    select.name = key.toLowerCase().replace(/\s+/g, '_');
+                    dropdownData[key].forEach(option => {
                         const opt = document.createElement('option');
-                        opt.value = hospital;
-                        opt.textContent = hospital;
-                        hospitalSelect.appendChild(opt);
+                        opt.value = option;
+                        opt.textContent = option;
+                        select.appendChild(opt);
                     });
-                    hospitalForm.appendChild(hospitalSelect);
-                    responseForm.appendChild(hospitalForm);
-                    
-                    responseForm.style.display = 'block';
-                }
+                    responseForm.appendChild(select);
+                });
+                const submitButton = document.createElement('button');
+                submitButton.textContent = 'Submit';
+                submitButton.addEventListener('click', () => {
+                    const formData = {
+                        alert_id: data.alert_id,
+                        barangay: '{{ barangay }}',
+                        emergency_type: emergencyType,
+                        lat: data.lat,
+                        lon: data.lon,
+                        timestamp: new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })
+                    };
+                    responseForm.querySelectorAll('select').forEach(select => {
+                        formData[select.name] = select.value;
+                    });
+                    socket.emit('health_response', formData);
+                    const statusDiv = alertItem.querySelector('div:nth-child(1)');
+                    statusDiv.textContent = 'RESPONDED';
+                    responseForm.style.display = 'none';
+                    const hospitalForm = alertItem.querySelector('.hospital-form');
+                    hospitalForm.style.display = 'block';
+                });
+                responseForm.appendChild(submitButton);
+                responseForm.style.display = 'block';
+
+                const hospitalForm = document.createElement('div');
+                hospitalForm.className = 'hospital-form';
+                hospitalForm.style.display = 'none';
+                const hospitalSelect = document.createElement('select');
+                hospitalSelect.name = 'hospital_name';
+                hospitalSelect.disabled = true; // Non-functional hospital dropdown
+                hospitalOptions.forEach(hospital => {
+                    const opt = document.createElement('option');
+                    opt.value = hospital;
+                    opt.textContent = hospital;
+                    hospitalSelect.appendChild(opt);
+                });
+                hospitalForm.appendChild(hospitalSelect);
+                alertItem.appendChild(hospitalForm);
             });
 
             socket.on('health_response', (data) => {
@@ -220,7 +219,7 @@
                             const percentage = match[1];
                             const yearRanges = ['2-3 years', '4-5 years', '2 years', '3-4 years', '1-2 years', '5-6 years'];
                             const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Health Emergency'} Again in next ${randomRange}`;
+                            formattedPrediction = `There will be a ${percentage}% chance of ${data.emergency_type || 'Unknown'} Again in next ${randomRange}`;
                         } else {
                             formattedPrediction = predictionText;
                         }
@@ -229,6 +228,8 @@
                     predictionDiv.style.display = 'block';
                     predictionDiv.style.fontSize = '16px';
                     predictionDiv.style.color = 'black';
+                    const hospitalForm = alertItem.querySelector('.hospital-form');
+                    hospitalForm.style.display = 'block'; // Persist hospital dropdown
                 }
             });
 
@@ -250,7 +251,7 @@
                 alertItem.appendChild(alertText);
 
                 const typeDiv = document.createElement('div');
-                typeDiv.textContent = `Type: ${data.emergency_type || 'Health Emergency'}`;
+                typeDiv.textContent = `Type: ${data.emergency_type || 'N/A'}`;
                 typeDiv.style.fontWeight = 'bold';
                 typeDiv.style.fontSize = '16px';
                 alertItem.appendChild(typeDiv);
