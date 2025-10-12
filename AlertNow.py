@@ -948,7 +948,7 @@ def handle_hospital_redirect_alert(data):
         emergency_type = data.get('emergency_type', 'Health Emergency')
         lat = data.get('lat')
         lon = data.get('lon')
-        hospital = data.get('hospital')  # Hospital name from button click
+        hospital = data.get('hospital') or data.get('assigned_hospital')  # Accept either hospital or assigned_hospital
         timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
         image = data.get('image')
 
@@ -968,7 +968,7 @@ def handle_hospital_redirect_alert(data):
             'emergency_type': emergency_type,
             'lat': lat,
             'lon': lon,
-            'hospital': hospital,
+            'hospital': hospital,  # Use hospital for consistency in emitted data
             'timestamp': timestamp,
             'image': image
         }, room=hospital_room)
