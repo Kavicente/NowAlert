@@ -88,7 +88,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
-            const assignedHospital = '{{ assigned_hospital }}'.toLowerCase();
+            const hospital = '{{ hospital }}'.toLowerCase();
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
             const tileLayerUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/{z}/{x}/{y}?access_token=${mapboxToken}`;
 
@@ -118,9 +118,7 @@
 
             socket.on('connect', () => {
                 console.log('Connected to server');
-                const municipality = '{{ municipality|default("sanpablocity") }}'.toLowerCase().replace(/ /g, '');
-                const hospital = '{{ hospital|default("spcdistricthospital") }}'.toLowerCase().replace(/ /g, '');
-                socket.emit('register_role', { role: 'hospital', municipality: municipality, assigned_hospital: hospital });
+                socket.emit('register_role', { role: 'hospital', hospital: hospital });
             });
 
             socket.on('connect_error', (error) => {
@@ -129,12 +127,8 @@
 
             socket.on('hospital_redirect_alert', (data) => {
                 console.log('Hospital redirect alert received:', data);
-                if (data.assigned_hospital && data.assigned_hospital.toLowerCase() === assignedHospital) {
-                    updateUIWithAlert(data);
-                    notifyAlert(data);
-                } else {
-                    console.log('Alert ignored: assigned_hospital does not match', data.assigned_hospital);
-                }
+                updateUIWithAlert(data);
+                notifyAlert(data);
             });
 
             socket.on('update_map', (data) => {
@@ -153,7 +147,7 @@
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const admissionDiv = document.createElement('div');
-                    admissionDiv.textContent = `\nResponded Health Emergency and On The Way To ${data.assigned_hospital} \nResident From ${data.barangay || 'Unknown'} \nTime: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' })} \nHealth Type: ${data.health_type || 'N/A'} \nHealth Cause: ${data.health_cause || 'N/A'} \nPatient Age: ${data.patient_age || 'N/A'} \nPatient Gender: ${data.patient_gender || 'N/A'} \nAdmit to ${data.assigned_hospital}`;
+                    admissionDiv.textContent = `\nResponded Health Emergency and On The Way To ${data.hospital} \nResident From ${data.barangay || 'Unknown'} \nTime: ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' })} \nHealth Type: ${data.health_type || 'N/A'} \nHealth Cause: ${data.health_cause || 'N/A'} \nPatient Age: ${data.patient_age || 'N/A'} \nPatient Gender: ${data.patient_gender || 'N/A'} \nAdmit to ${data.hospital}`;
                     admissionDiv.style.fontSize = '16px';
                     admissionDiv.style.fontWeight = 'bold';
                     admissionDiv.style.color = 'black';
@@ -169,7 +163,7 @@
                 alertElements.set(data.alert_id, alertItem);
 
                 const statusDiv = document.createElement('div');
-                statusDiv.textContent = `Responded Health Emergency and On The Way To ${data.assigned_hospital}`;
+                statusDiv.textContent = `Responded Health Emergency and On The Way To ${data.hospital}`;
                 statusDiv.style.fontWeight = 'bold';
                 statusDiv.style.fontSize = '16px';
 
@@ -178,7 +172,7 @@
                 residentDiv.style.fontSize = '16px';
 
                 const timeDiv = document.createElement('div');
-                const timestamp = new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' });
+                const timestamp = new Date(data.timestamp).toLocaleString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', second: '2-digit', year: 'numeric', month: 'numeric', day: 'numeric' });
                 timeDiv.textContent = `Time: ${timestamp}`;
                 timeDiv.style.fontSize = '16px';
 
@@ -228,7 +222,6 @@
                     modal.style.display = 'none';
                 });
 
-                // Pin on map
                 if (data.lat && data.lon) {
                     hospitalMap.setView([data.lat, data.lon], 16);
                     L.marker([data.lat, data.lon]).addTo(hospitalMap).bindPopup(
@@ -242,7 +235,7 @@
                 const notificationDiv = document.getElementById('notification');
                 const notification = document.createElement('div');
                 notification.className = 'notification';
-                notification.textContent = `New Alert: Health Emergency at ${data.barangay} for ${data.assigned_hospital}`;
+                notification.textContent = `New Alert: Health Emergency at ${data.barangay} for ${data.hospital}`;
                 notificationDiv.appendChild(notification);
                 setTimeout(() => {
                     notification.remove();
