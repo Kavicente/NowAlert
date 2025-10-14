@@ -4,6 +4,7 @@
     <title>Choose Account To Sign Up</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/type.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="form2">
@@ -13,5 +14,25 @@
         <h2 class="h2">Or</h2>
         <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
     </div>
+    <div class="form3">
+        <h2>To Install The App Scan This QR Code</h2>
+        <div id="qrcode" class="qrcode"></div>
+    </div>
+    <script>
+       document.addEventListener('DOMContentLoaded', function() {
+            try {
+                new QRCode(document.getElementById('qrcode'), {
+                    text: '{{ url_for('download_apk_folder') }}',
+                    width: 250,
+                    height: 250,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } catch (error) {
+                console.error('Failed to generate QR code:', error);
+            }
+        });
+    </script>
 </body>
 </html>
