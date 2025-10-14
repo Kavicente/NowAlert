@@ -17,7 +17,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import uuid
 from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
-from SignUpType import download_apk_folder
+from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import get_barangay_stats, get_latest_alert
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
 from PNPDashboard import get_pnp_stats, get_latest_alert
@@ -3244,6 +3244,7 @@ app.route('/hospital_charts')(hospital_charts)
 app.route('/hospital_charts_data')(hospital_charts_data)
 
 app.route('/download_apk_folder')(download_apk_folder)
+app.route('/generate_qr')(generate_qr)
 
 if __name__ == '__main__':
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
