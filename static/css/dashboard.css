@@ -151,7 +151,7 @@ main {
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     color: #000000;
     row-gap: 5px; /* Vertical spacing */
-    column-gap: 5px;
+    column-gap: 8px;
 }
 
 .alert-container p {
