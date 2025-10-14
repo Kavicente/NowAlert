@@ -16,23 +16,8 @@
     </div>
     <div class="form3">
         <h2>To Install The App Scan This QR Code</h2>
-        <div id="qrcode" class="qrcode"></div>
+        <img src="{{ url_for('static', filename='qrcode.png') }}" alt="QR Code" style="width: 250px; height: 250px;">
     </div>
-    <script>
-       document.addEventListener('DOMContentLoaded', function() {
-            try {
-                new QRCode(document.getElementById('qrcode'), {
-                    text: '{{ url_for('download_apk_folder') }}',
-                    width: 250,
-                    height: 250,
-                    colorDark: '#000000',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            } catch (error) {
-                console.error('Failed to generate QR code:', error);
-            }
-        });
-    </script>
+    
 </body>
 </html>
