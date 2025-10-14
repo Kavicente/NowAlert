@@ -269,6 +269,7 @@
                     <div>Emergency at ${data.municipality || 'N/A'}</div>
                     <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
+                    ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
                     <div class="response-form"></div>
                     <div class="prediction"></div>
                 `;

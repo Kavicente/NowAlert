@@ -225,19 +225,19 @@
 
                 
 
-                const imageDiv = document.createElement('img');
-                imageDiv.className = 'clickable-img';
-                imageDiv.style.display = 'none';
-                if (data.image) {
-                    imageDiv.src = data.image;
-                    imageDiv.style.display = 'block';
+                const imageHtml = data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : '';
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = imageHtml;
+                const imageDiv = tempDiv.firstChild;
+                if (imageDiv) {
                     imageDiv.addEventListener('click', () => {
                         const modal = document.getElementById('image-modal');
                         const modalImg = document.getElementById('modal-image');
-                        modalImg.src = data.image;
+                        modalImg.src = imageDiv.src;
                         modal.style.display = 'flex';
                     });
                 }
+                alertItem.appendChild(imageDiv || document.createElement('div')); 
 
                 const responseForm = document.createElement('div');
                 responseForm.className = 'response-form';

@@ -334,21 +334,20 @@
                 timeDiv.style.fontSize = '16px';
                 alertItem.appendChild(timeDiv);
 
-                const img = document.createElement('img');
-                img.className = 'clickable-img';
-                if (data.image) {
-                    img.src = `data:image/jpeg;base64,${data.image}`;
-                    img.style.display = 'block';
-                } else {
-                    img.style.display = 'none';
+                const imageHtml = data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : '';
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = imageHtml;
+                const imageDiv = tempDiv.firstChild;
+                if (imageDiv) {
+                    imageDiv.addEventListener('click', () => {
+                        const modal = document.getElementById('image-modal');
+                        const modalImg = document.getElementById('modal-image');
+                        modalImg.src = imageDiv.src;
+                        modal.style.display = 'flex';
+                    });
                 }
-                img.addEventListener('click', () => {
-                    const modal = document.getElementById('image-modal');
-                    const modalImg = document.getElementById('modal-image');
-                    modalImg.src = img.src;
-                    modal.style.display = 'flex';
-                });
-                alertItem.appendChild(img);
+                alertItem.appendChild(imageDiv || document.createElement('div'));
+
 
                 const responseForm = document.createElement('div');
                 responseForm.className = 'response-form';
