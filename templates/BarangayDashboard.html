@@ -348,7 +348,7 @@
 
             function notifyAlert(data) {
                 const notification = document.getElementById('notification');
-                notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay} from ${data.resident_barangay || data.barangay}`;
+                notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}`;
                 setTimeout(() => notification.textContent = '', 5000);
             }
 

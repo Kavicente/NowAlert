@@ -303,27 +303,21 @@ def handle_new_alert(data):
         alert_id = str(uuid.uuid4())
         data['alert_id'] = alert_id
         data['timestamp'] = datetime.utcnow().isoformat()
-        data['resident_barangay'] = data.get('resident_barangay', data.get('barangay', 'Unknown'))
+        data['resident_barangay'] = data.get('barangay', 'Unknown')
 
         alerts.append(data)
 
         barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-        resident_barangay_room = f"barangay_{data.get('resident_barangay').lower() if data.get('resident_barangay') else ''}"
         emit('new_alert', data, room=barangay_room)
-        if data.get('resident_barangay') and data.get('resident_barangay').lower() != data.get('barangay').lower():
-            emit('new_alert', data, room=resident_barangay_room)
-        logger.info(f"Alert emitted to rooms {barangay_room} and {resident_barangay_room}")
+        logger.info(f"Alert emitted to room {barangay_room}")
 
         map_data = {
             'lat': data.get('lat'),
             'lon': data.get('lon'),
             'barangay': data.get('barangay'),
-            'resident_barangay': data.get('resident_barangay'),
             'emergency_type': data.get('emergency_type')
         }
         emit('update_map', map_data, room=barangay_room)
-        if data.get('resident_barangay') and data.get('resident_barangay').lower() != data.get('barangay').lower():
-            emit('update_map', map_data, room=resident_barangay_room)
     except Exception as e:
         logger.error(f"Error handling alert: {e}")
 
