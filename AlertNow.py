@@ -309,7 +309,8 @@ def handle_new_alert(data):
 
         barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
         resident_barangay_room = f"barangay_{data.get('resident_barangay').lower() if data.get('resident_barangay') else ''}"
-        if data.get('resident_barangay') != data.get('barangay'):
+        emit('new_alert', data, room=barangay_room)
+        if data.get('resident_barangay') and data.get('resident_barangay').lower() != data.get('barangay').lower():
             emit('new_alert', data, room=resident_barangay_room)
         logger.info(f"Alert emitted to rooms {barangay_room} and {resident_barangay_room}")
 
@@ -321,7 +322,7 @@ def handle_new_alert(data):
             'emergency_type': data.get('emergency_type')
         }
         emit('update_map', map_data, room=barangay_room)
-        if data.get('resident_barangay') != data.get('barangay'):
+        if data.get('resident_barangay') and data.get('resident_barangay').lower() != data.get('barangay').lower():
             emit('update_map', map_data, room=resident_barangay_room)
     except Exception as e:
         logger.error(f"Error handling alert: {e}")
