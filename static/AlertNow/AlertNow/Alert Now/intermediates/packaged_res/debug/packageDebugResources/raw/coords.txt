@@ -1,0 +1,109 @@
+barangay,Barangay Atisan,13.9818,121.3182
+barangay,Barangay Bagong Bayan,14.0665,121.3250
+barangay,Barangay Bagong Pook,14.0759,121.3206
+barangay,Barangay Bautista,13.9921,121.2827
+barangay,Barangay Concepcion,14.0791,121.3384
+barangay,Barangay Del Remedio,14.0785,121.3135
+barangay,Barangay Dolores,14.1029,121.3341
+barangay,Barangay San Antonio 1,14.0097,121.3373
+barangay,Barangay San Antonio 2,13.9963,121.3333
+barangay,Barangay San Bartolome,14.0272,121.2884
+barangay,Barangay San Buenaventura,14.1140,121.3284
+barangay,Barangay San Crispin,14.0794,121.2827
+barangay,Barangay San Cristobal,14.0490,121.4056
+barangay,Barangay San Diego,14.0920,121.3742
+barangay,Barangay San Francisco,14.0661,121.3399
+barangay,Barangay San Gabriel,14.0591,121.3170
+barangay,Barangay San Gregorio,14.0472,121.3284
+barangay,Barangay San Ignacio,14.0456,121.3399
+barangay,Barangay San Isidro,13.9880,121.3113
+barangay,Barangay San Jose,14.0647,121.3856
+barangay,Barangay San Juan,14.0924,121.2998
+barangay,Barangay San Lorenzo,14.1107,121.3513
+barangay,Barangay San Lucas 1,14.0828,121.3263
+barangay,Barangay San Lucas 2,14.0898,121.3270
+barangay,Barangay San Marcos,14.1034,121.3041
+barangay,Barangay San Mateo,14.1093,121.2984
+barangay,Barangay San Miguel,14.0351,121.3055
+barangay,Barangay Santa Monica,14.0549,121.3013
+barangay,Barangay San Nicolas,14.0675,121.2941
+barangay,Barangay San Pedro,14.0937,121.3356
+barangay,Barangay San Rafael,14.0710,121.3055
+barangay,Barangay San Roque,14.0640,121.3098
+barangay,Barangay San Vicente,14.0181,121.3393
+barangay,Barangay Santa Ana,14.0156,121.3263
+barangay,Barangay Santa Catalina,14.1210,121.3423
+barangay,Barangay Santa Cruz,14.0270,121.3505
+barangay,Barangay Santa Felomina,14.0893,121.2872
+barangay,Barangay Santa Maria,14.0275,121.3115
+barangay,Barangay Santa Veronica,14.0469,121.2881
+barangay,Barangay Santiago 1,14.0204,121.2783
+barangay,Barangay Santiago 2,14.0090,121.2738
+barangay,Barangay Santisima Trinidad,14.2650,121.5150
+barangay,Barangay Santo Angel,14.2700,121.5200
+barangay,Barangay Santo Cristo,14.0634,121.3303
+barangay,Barangay Santo Niño,14.0448,121.3489
+barangay,Barangay Soledad,14.0401,121.3157
+barangay,Barangay I-A,14.0733,121.3163
+barangay,Barangay I-B,14.0692,121.3164
+barangay,Barangay II-A,14.0632,121.3196
+barangay,Barangay II-B,14.0633,121.3216
+barangay,Barangay II-C,14.0656,121.3229
+barangay,Barangay II-D,14.0674,121.3232
+barangay,Barangay II-E,14.0653,121.3253
+barangay,Barangay II-F,14.0610,121.3227
+barangay,Barangay III-A,14.0670,121.3268
+barangay,Barangay III-B,14.0696,121.3278
+barangay,Barangay III-C,14.0673,121.3294
+barangay,Barangay III-D,14.0702,121.3313
+barangay,Barangay III-E,14.0710,121.3333
+barangay,Barangay III-F,14.0683,121.3283
+barangay,Barangay IV-A,14.0723,121.3292
+barangay,Barangay IV-B,14.3650,121.6150
+barangay,Barangay IV-C,14.3700,121.6200
+barangay,Barangay V-A,14.0748,121.3246
+barangay,Barangay V-B,14.0736,121.3249
+barangay,Barangay V-C,14.0734,121.3255
+barangay,Barangay V-D,14.0714,121.3252
+barangay,Barangay VI-A,14.0736,121.3234
+barangay,Barangay VI-B,14.0785,121.3233
+barangay,Barangay VI-D,14.0781,121.3191
+barangay,Barangay VI-E,14.0750,121.3179
+barangay,Barangay VII-A,14.0704,121.3216
+barangay,Barangay VII-B,14.0697,121.3239
+barangay,Barangay VII-C,14.0691,121.3250
+barangay,Barangay VII-D,14.0687,121.3256
+barangay,Barangay VII-E,14.0680,121.3241
+barangay,Barangay Anastacia,13.9600,121.3200
+barangay,Barangay Aquino,13.9650,121.3250
+barangay,Barangay Ayusan,13.9700,121.3300
+barangay,Barangay Bago,13.9750,121.3350
+barangay,Barangay Behia,13.9800,121.3400
+barangay,Barangay Bukal,13.9850,121.3450
+barangay,Barangay Bula,13.9900,121.3500
+barangay,Barangay Bulakin,13.9950,121.3550
+barangay,Barangay Cabatang,14.0000,121.3600
+barangay,Barangay Cabay,14.0050,121.3650
+barangay,Barangay Del Rosario,14.0100,121.3700
+barangay,Barangay Lagalag,14.0150,121.3750
+barangay,Barangay Laiya,14.0200,121.5100
+barangay,Barangay Lalig,14.0250,121.3850
+barangay,Barangay Lumingon,14.0300,121.3900
+barangay,Barangay Lusacan,14.0350,121.3950
+barangay,Barangay Paiisa,14.0400,121.4000
+barangay,Barangay Palagao,14.0450,121.4050
+barangay,Barangay Poblacion I,14.0500,121.4100
+barangay,Barangay Poblacion II,14.0550,121.4150
+barangay,Barangay Poblacion III,14.0600,121.4200
+barangay,Barangay Poblacion IV,14.0650,121.4250
+barangay,Barangay Quipot,14.0700,121.4300
+barangay,Barangay San Agustin,14.0750,121.4350
+barangay,Barangay San Antonio,14.0800,121.4400
+barangay,Barangay San Apolinaro,14.0850,121.4450
+barangay,Barangay San Isidro,14.0900,121.4500
+barangay,Barangay San Jose,14.0950,121.4550
+barangay,Barangay San Juan,14.1000,121.4600
+barangay,Barangay San Pedro,14.1050,121.4650
+barangay,Barangay Tagbakin,14.1100,121.4700
+municipality,San Pablo City,14.0642,121.3233
+municipality,Quezon Province,13.9296,121.3427
