@@ -311,10 +311,9 @@
                 const lat = data.lat || {{ lat_coord|default(14.0549) }};
                 const lon = data.lon || {{ lon_coord|default(121.3013) }};
                 barangayMap.setView([lat, lon], 16);
-                const popupText = data.resident_barangay && data.resident_barangay !== data.barangay ?
-                    `Emergency at ${data.barangay} Resident from ${data.resident_barangay}` :
-                    `Emergency at ${data.barangay}`;
-                L.marker([lat, lon]).addTo(barangayMap).bindPopup(popupText).openPopup();
+                L.marker([lat, lon]).addTo(barangayMap).bindPopup(
+                    `Emergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`
+                ).openPopup();
                 document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
             });
 
@@ -322,11 +321,9 @@
                 const alertContainer = document.getElementById('alert-container');
                 const alertItem = document.createElement('div');
                 alertItem.className = 'alert-item';
-                const alertText = data.resident_barangay && data.resident_barangay !== data.barangay ?
-                    `Emergency at ${data.barangay} Resident from ${data.resident_barangay}` :
-                    `Emergency at ${data.barangay}`;
                 alertItem.innerHTML = `
                     <div>PENDING ALERT</div>
+                    <div>Emergency at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}</div>
                     <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
                     ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
@@ -351,10 +348,7 @@
 
             function notifyAlert(data) {
                 const notification = document.getElementById('notification');
-                const notificationText = data.resident_barangay && data.resident_barangay !== data.barangay ?
-                    `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay} from ${data.resident_barangay}` :
-                    `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay}`;
-                notification.textContent = notificationText;
+                notification.textContent = `New Alert: ${data.emergency_type || 'Unknown'} at ${data.barangay} Resident from ${data.resident_barangay || data.barangay}`;
                 setTimeout(() => notification.textContent = '', 5000);
             }
 
