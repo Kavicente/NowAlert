@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/residentPageLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:background="#8B0000"
+    android:padding="16dp">
+
+
+
+
+
+
+
+    <ImageView
+        android:id="@+id/mapView"
+        android:layout_width="match_parent"
+        android:layout_height="310dp"
+
+        android:contentDescription="Live map location"
+        android:scaleType="centerCrop" />
+
+    <TextView
+        android:id="@+id/latLonText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/mapView"
+        android:layout_marginTop="8dp"
+        android:textColor="#FFFFFF"
+        android:text="Location: N/A"
+        android:textSize="16sp" />
+
+    <ImageView
+        android:id="@+id/photoView"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_below="@id/latLonText"
+        android:layout_marginTop="8dp"
+        android:contentDescription="Uploaded photo"
+
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/uploadPhotoButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/photoView"
+        android:layout_marginLeft="120dp"
+        android:layout_marginTop="8dp"
+        android:text="Upload Photo" />
+
+
+    <Button
+        android:id="@+id/alertButton"
+        android:layout_width="170dp"
+        android:layout_height="250dp"
+        android:layout_marginLeft="100dp"
+        android:layout_below="@id/uploadPhotoButton"
+        android:background="@drawable/circle"
+        android:layout_marginTop="8dp"
+        android:text="Alert Now"
+        android:textColor="#FFFFFF"
+        android:textSize="30dp"/>
+
+    <Button
+        android:id="@+id/layas"
+        android:layout_width="100dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/alertButton"
+        android:background="@drawable/button_background"
+
+        android:text="Log Out"/>
+</RelativeLayout>
