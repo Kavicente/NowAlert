@@ -22,6 +22,7 @@
                 <li><a href="#" onclick="showSection('road')">Road Accident Reports</a></li>
                 <li><a href="#" onclick="showSection('fire')">Fire Incidents</a></li>
                 <li><a href="#" onclick="showSection('health')">Health Emergency</a></li>
+                <li><a href="#" onclick="showSection('crime')">Crime Incident Reports</a></li>
             </ul>
         </nav>
     </div>
@@ -86,6 +87,22 @@
             </div>
             {% endfor %}
         </div>
+        <div id="crimeSection" class="section" style="display: none;">
+            {% for barangay in barangays %}
+            <div class="barangay-section" id="crime-barangay-{{ barangay | replace(' ', '-') }}">
+                <h2>{{ barangay }} Crime Incident Reports</h2>
+                <div class="chart-grid">
+                    <div class="chart-container"><h2>Crime Type Chart</h2><canvas id="crimeTypeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Crime Cause Chart</h2><canvas id="crimeCauseChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Crime Level Chart</h2><canvas id="crimeLevelChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Suspect Gender Chart</h2><canvas id="suspectGenderChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Victim Gender Chart</h2><canvas id="victimGenderChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Suspect Age Chart</h2><canvas id="suspectAgeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Victim Age Chart</h2><canvas id="victimAgeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </main>
     <script>
         const socket = io.connect('https://alertnow-cgre.onrender.com');
@@ -103,6 +120,7 @@
             document.getElementById('roadSection').style.display = section === 'road' ? 'block' : 'none';
             document.getElementById('fireSection').style.display = section === 'fire' ? 'block' : 'none';
             document.getElementById('healthSection').style.display = section === 'health' ? 'block' : 'none';
+            document.getElementById('crimeSection').style.display = section === 'crime' ? 'block' : 'none';
             currentSection = section;
             filterData('today');
         }
@@ -147,6 +165,17 @@
             charts[`${safeBarangay}-healthResponderChart`] = new Chart(document.getElementById(`healthResponderChart-${safeBarangay}`).getContext('2d'), { type: 'polarArea', data: data.responder, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
+        function initCrimeCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            charts[`${safeBarangay}-crimeTypeChart`] = new Chart(document.getElementById(`crimeTypeChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.crime_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-crimeCauseChart`] = new Chart(document.getElementById(`crimeCauseChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.crime_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-crimeLevelChart`] = new Chart(document.getElementById(`crimeLevelChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.level, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-suspectGenderChart`] = new Chart(document.getElementById(`suspectGenderChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.suspect_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-victimGenderChart`] = new Chart(document.getElementById(`victimGenderChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.victim_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-suspectAgeChart`] = new Chart(document.getElementById(`suspectAgeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.suspect_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-victimAgeChart`] = new Chart(document.getElementById(`victimAgeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.victim_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+        }
+
         function updateRoadCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
             charts[`${safeBarangay}-roadCauseChart`].data = data.cause;
@@ -179,6 +208,18 @@
             Object.keys(charts).filter(key => key.startsWith(`${safeBarangay}-health`)).forEach(key => charts[key].update());
         }
 
+        function updateCrimeCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            charts[`${safeBarangay}-crimeTypeChart`].data = data.crime_type;
+            charts[`${safeBarangay}-crimeCauseChart`].data = data.crime_cause;
+            charts[`${safeBarangay}-crimeLevelChart`].data = data.level;
+            charts[`${safeBarangay}-suspectGenderChart`].data = data.suspect_gender;
+            charts[`${safeBarangay}-victimGenderChart`].data = data.victim_gender;
+            charts[`${safeBarangay}-suspectAgeChart`].data = data.suspect_age;
+            charts[`${safeBarangay}-victimAgeChart`].data = data.victim_age;
+            Object.keys(charts).filter(key => key.startsWith(`${safeBarangay}-crime`)).forEach(key => charts[key].update());
+        }
+
         socket.on('barangay_response_update', (data) => {
             if (currentSection === 'road' && document.querySelector('.tab.active').textContent.toLowerCase() === 'today') {
                 updateRoadCharts(data.barangay, data);
@@ -203,11 +244,26 @@
             }
         });
 
+        socket.on('barangay_crime_response_update', (data) => {
+            if (currentSection === 'crime' && document.querySelector('.tab.active').textContent.toLowerCase() === 'today') {
+                updateCrimeCharts(data.barangay, data);
+            }
+        });
+
         function filterData(timeFilter) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
             const barangay = document.getElementById('barangayDropdown').value.replace(/-/g, ' ') || '{{ barangays[0] }}';
-            const endpoint = currentSection === 'road' ? '/barangay_charts_data' : currentSection === 'fire' ? '/barangay_fire_charts_data' : '/barangay_health_charts_data';
+            let endpoint;
+            if (currentSection === 'road') {
+                endpoint = '/barangay_charts_data';
+            } else if (currentSection === 'fire') {
+                endpoint = '/barangay_fire_charts_data';
+            } else if (currentSection === 'health') {
+                endpoint = '/barangay_health_charts_data';
+            } else if (currentSection === 'crime') {
+                endpoint = '/barangay_crime_charts_data';
+            }
             fetch(`${endpoint}?time_filter=${timeFilter}&barangay=${barangay}`)
                 .then(response => response.json())
                 .then(data => {
@@ -224,6 +280,8 @@
                 initFireCharts(barangay, data);
             } else if (currentSection === 'health') {
                 initHealthCharts(barangay, data);
+            } else if (currentSection === 'crime') {
+                initCrimeCharts(barangay, data);
             }
         }
 

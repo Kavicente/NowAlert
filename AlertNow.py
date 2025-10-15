@@ -24,7 +24,7 @@ from PNPDashboard import get_pnp_stats, get_latest_alert
 from BFPDashboard import get_bfp_stats, get_latest_alert
 from HealthDashboard import get_health_stats, get_latest_alert
 from HospitalDashboard import get_hospital_stats, get_latest_alert
-from BarangayCharts import  barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_fire_chart_data, get_barangay_health_chart_data
+from BarangayCharts import barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_health_chart_data, barangay_crime_charts_data
 from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data, get_cdrrmo_chart_data
 from PNPCharts import pnp_charts, pnp_charts_data, get_pnp_chart_data, pnp_fire_charts_data, pnp_crime_charts_data
 from BFPCharts import bfp_charts, bfp_charts_data, get_bfp_chart_data
@@ -3232,6 +3232,7 @@ app.route('/barangay_charts')(barangay_charts)
 app.route('/barangay_charts_data')(barangay_charts_data)
 app.route('/barangay_fire_charts_data')(barangay_fire_charts_data)
 app.route('/barangay_health_charts_data')(barangay_health_charts_data)
+app.route('/barangay_crime_charts_data')(barangay_crime_charts_data)
 app.route('/cdrrmo_charts')(cdrrmo_charts)
 app.route('/cdrrmo_charts_data')(cdrrmo_charts_data)
 app.route('/pnp_charts')(pnp_charts)

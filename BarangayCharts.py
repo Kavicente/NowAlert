@@ -181,6 +181,61 @@ def get_barangay_health_chart_data(time_filter, barangay=None):
         'patient_gender': {'labels': list(genders.keys()) if genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(genders.values()) if genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
         'responder': {'labels': list(responders.keys()) if responders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(responders.values()) if responders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]}
     }
+    
+def get_barangay_crime_chart_data(time_filter, barangay=None):
+    conn = get_db_connection()
+    c = conn.cursor()
+    manila = pytz.timezone('Asia/Manila')
+    now = datetime.now(manila)
+    base_time = now.strftime('%Y-%m-%d')
+    query = '''
+        SELECT crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, barangay, timestamp
+        FROM barangay_crime_response
+        WHERE barangay = ?
+    '''
+    params = [barangay]
+    if time_filter == 'today':
+        query += " AND date(timestamp) = date(?)"
+        params.append(base_time)
+    elif time_filter == 'daily':
+        query += " AND date(timestamp) = date(?)"
+        params.append(base_time)
+    elif time_filter == 'weekly':
+        query += " AND strftime('%Y-%W', timestamp) = strftime('%Y-%W', ?)"
+        params.append(base_time)
+    elif time_filter == 'monthly':
+        query += " AND strftime('%Y-%m', timestamp) = strftime('%Y-%m', ?)"
+        params.append(base_time)
+    elif time_filter == 'yearly':
+        query += " AND strftime('%Y', timestamp) = strftime('%Y', ?)"
+        params.append(base_time)
+    
+    c.execute(query, params)
+    rows = c.fetchall()
+    conn.close()
+
+    crime_types = {}; crime_causes = {}; levels = {}; suspect_genders = {}; victim_genders = {}; suspect_ages = {}; victim_ages = {}; barangays = {}
+    for row in rows:
+        crime_types[row[0]] = crime_types.get(row[0], 0) + 1
+        crime_causes[row[1]] = crime_causes.get(row[1], 0) + 1
+        levels[row[2]] = levels.get(row[2], 0) + 1
+        suspect_genders[row[3]] = suspect_genders.get(row[3], 0) + 1
+        victim_genders[row[4]] = victim_genders.get(row[4], 0) + 1
+        suspect_ages[row[5]] = suspect_ages.get(row[5], 0) + 1
+        victim_ages[row[6]] = victim_ages.get(row[6], 0) + 1
+        barangays[row[7]] = barangays.get(row[7], 0) + 1
+
+    return {
+        'barangay': {'labels': list(barangays.keys()) if barangays else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(barangays.values()) if barangays else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        'crime_type': {'labels': list(crime_types.keys()) if crime_types else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(crime_types.values()) if crime_types else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        'crime_cause': {'labels': list(crime_causes.keys()) if crime_causes else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(crime_causes.values()) if crime_causes else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']}]},
+        'level': {'labels': list(levels.keys()) if levels else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(levels.values()) if levels else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]},
+        'suspect_gender': {'labels': list(suspect_genders.keys()) if suspect_genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(suspect_genders.values()) if suspect_genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
+        'victim_gender': {'labels': list(victim_genders.keys()) if victim_genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(victim_genders.values()) if victim_genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
+        'suspect_age': {'labels': list(suspect_ages.keys()) if suspect_ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(suspect_ages.values()) if suspect_ages else [0], 'backgroundColor': '#36A2EB', 'borderColor': '#FF6384', 'fill': False}]},
+        'victim_age': {'labels': list(victim_ages.keys()) if victim_ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(victim_ages.values()) if victim_ages else [0], 'backgroundColor': '#36A2EB', 'borderColor': '#FF6384', 'fill': False}]}
+    }
+        
 def barangay_charts():
     if 'role' not in session or session['role'] != 'barangay':
         logger.warning("Unauthorized access to barangay_charts")
@@ -211,6 +266,28 @@ def barangay_health_charts_data():
     data = get_barangay_health_chart_data(time_filter, barangay)
     return jsonify(data)
 
+def barangay_crime_charts_data():
+    time_filter = request.args.get('time_filter', 'today')
+    barangay = request.args.get('barangay')
+    data = get_barangay_crime_chart_data(time_filter, barangay)
+    return jsonify(data)
+
 def handle_barangay_response(data):
+    from AlertNow import socketio, app
     chart_data = get_barangay_chart_data('today', data.get('barangay'))
     socketio.emit('barangay_response_update', chart_data, broadcast=True)
+
+def handle_barangay_fire_response(data):
+    from AlertNow import socketio, app
+    chart_data = get_barangay_fire_chart_data('today', data.get('barangay'))
+    socketio.emit('bfp_response_update', chart_data, broadcast=True)
+
+def handle_barangay_health_response(data):
+    from AlertNow import socketio, app
+    chart_data = get_barangay_health_chart_data('today', data.get('barangay'))
+    socketio.emit('barangay_health_response_update', chart_data, broadcast=True)
+
+def handle_barangay_crime_response(data):
+    from AlertNow import socketio, app
+    chart_data = get_barangay_crime_chart_data('today', data.get('barangay'))
+    socketio.emit('barangay_crime_response_update', chart_data, broadcast=True)
