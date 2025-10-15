@@ -26,7 +26,7 @@ from HealthDashboard import get_health_stats, get_latest_alert
 from HospitalDashboard import get_hospital_stats, get_latest_alert
 from BarangayCharts import  barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_fire_chart_data, get_barangay_health_chart_data
 from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data, get_cdrrmo_chart_data
-from PNPCharts import pnp_charts, pnp_charts_data, get_pnp_chart_data
+from PNPCharts import pnp_charts, pnp_charts_data, get_pnp_chart_data, pnp_fire_charts_data, pnp_crime_charts_data
 from BFPCharts import bfp_charts, bfp_charts_data, get_bfp_chart_data
 from HealthCharts import health_charts, health_charts_data
 from HospitalCharts import hospital_charts, hospital_charts_data
@@ -3236,6 +3236,8 @@ app.route('/cdrrmo_charts')(cdrrmo_charts)
 app.route('/cdrrmo_charts_data')(cdrrmo_charts_data)
 app.route('/pnp_charts')(pnp_charts)
 app.route('/pnp_charts_data')(pnp_charts_data)
+app.route('/pnp_fire_charts_data')(pnp_fire_charts_data)
+app.route('/pnp_crime_charts_data')(pnp_crime_charts_data)
 app.route('/bfp_charts')(bfp_charts)
 app.route('/bfp_charts_data')(bfp_charts_data)
 app.route('/health_charts')(health_charts)
