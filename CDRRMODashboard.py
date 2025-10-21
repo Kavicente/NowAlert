@@ -13,7 +13,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_latest_alert():
+def get_new_alert():
     if alerts:
         return list(alerts)[-1]
     return None
