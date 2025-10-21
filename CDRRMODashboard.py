@@ -13,11 +13,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_new_alert():
-    if alerts:
-        return list(alerts)[-1]
-    return None
-
 def get_cdrrmo_stats():
     try:
         conn = get_db_connection()
@@ -32,20 +27,19 @@ def get_cdrrmo_stats():
         logger.error(f"Error fetching CDRRMO stats: {e}")
         return type('Stats', (), {'total': lambda self: 0})()
 
-def get_cdrrmo_alert(assigned_municipality):
+def get_latest_alert():
     try:
         conn = get_db_connection()
         cursor = conn.execute('''
             SELECT alert_id, emergency_type, timestamp 
             FROM cdrrmo_response
-            WHERE assigned_municipality = ?
             ORDER BY timestamp DESC LIMIT 1
-        ''', (assigned_municipality,))
+        ''')
         alert = cursor.fetchone()
         conn.close()
         return dict(alert) if alert else None
     except Exception as e:
-        logger.error(f"Error fetching latest alert for {assigned_municipality}: {e}")
+        logger.error(f"Error fetching latest alert: {e}")
         return None
 
 def get_cdrrmo_alerts_per_month():
