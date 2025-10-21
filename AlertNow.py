@@ -18,11 +18,11 @@ from sklearn.pipeline import Pipeline
 import uuid
 from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
 from SignUpType import download_apk_folder, generate_qr
-from BarangayDashboard import get_barangay_stats, get_latest_alert
-from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert
-from PNPDashboard import get_pnp_stats, get_latest_alert
-from BFPDashboard import get_bfp_stats, get_latest_alert
-from HealthDashboard import get_health_stats, get_latest_alert
+from BarangayDashboard import get_barangay_stats, get_latest_alert, get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update
+from CDRRMODashboard import get_cdrrmo_stats, get_cdrrmo_latest_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
+from PNPDashboard import get_pnp_stats, get_pnp_latest_alert, get_pnp_emergency_types, get_pnp_responded_count, emit_pnp_emergency_types_update
+from BFPDashboard import get_bfp_stats, get_bfp_latest_alert, get_bfp_alerts_per_month, get_bfp_responded_count, emit_bfp_alerts_per_month_update
+from HealthDashboard import get_health_stats, get_health_latest_alert, get_health_alerts_per_month, get_health_responded_count, emit_health_alerts_per_month_update
 from HospitalDashboard import get_hospital_stats, get_latest_alert
 from BarangayCharts import barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_health_chart_data, barangay_crime_charts_data
 from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data, get_cdrrmo_chart_data
@@ -253,6 +253,11 @@ def handle_new_alert(data):
         emit('update_map', map_data, room=barangay_room)
     except Exception as e:
         logger.error(f"Error handling alert: {e}")
+    barangay = data.get('barangay')
+    if barangay:
+        emit_emergency_types_update(socketio, barangay)
+    else:
+        logger.error("No barangay provided in new_alert data")
 
 @socketio.on('forward_alert')
 def handle_forward_alert(data):
@@ -1143,7 +1148,11 @@ def handle_disconnect():
 
 @socketio.on('connect')
 def handle_connect():
-    logger.info(f"Client connected: {request.sid}")
+    if 'role' in session and session['role'] == 'barangay' and 'barangay' in session:
+        barangay = session['barangay']
+        join_room(barangay)
+        logger.info(f"Client connected and joined room: {barangay}")
+        emit_emergency_types_update(socketio, barangay)
 
 
 @socketio.on('request_response_popup')
@@ -2856,167 +2865,277 @@ def handle_pnp_charts_response(data):
 
 
 #/For Charts
-
 @app.route('/barangay_dashboard')
 def barangay_dashboard():
     try:
         if 'role' not in session or session['role'] != 'barangay':
-            return redirect(url_for('login'))
-        stats = get_barangay_stats()
+            logger.warning("Unauthorized access to barangay_dashboard")
+            return redirect(url_for('login_agency'))
         unique_id = session.get('unique_id')
+        if not unique_id:
+            logger.error("No unique_id found in session")
+            return redirect(url_for('login_agency'))
+        barangay = unique_id.split('_')[0] if unique_id and '_' in unique_id else None
+        if not barangay:
+            logger.error(f"No valid barangay extracted from unique_id: {unique_id}")
+            return redirect(url_for('login_agency'))
+        logger.info(f"Calling get_barangay_stats for barangay: {barangay}")
+        
+        stats = get_barangay_stats(barangay)
+        # Fetch assigned_municipality from database instead of assuming barangay is a dict
         conn = get_db_connection()
-        user = conn.execute('''
-            SELECT * FROM users WHERE barangay = ? AND contact_no = ?
-        ''', (unique_id.split('_')[0], unique_id.split('_')[1])).fetchone()
+        user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND barangay = ?', ('barangay', barangay)).fetchone()
         conn.close()
-        
-        if not unique_id or not user or user['role'] != 'barangay':
-            logger.warning("Unauthorized access to barangay_dashboard. Session: %s, User: %s", session, user)
-            return redirect(url_for('login'))
-        
-        barangay = user['barangay']
-        assigned_municipality = user['assigned_municipality'] or 'San Pablo City'
-        latest_alert = get_latest_alert()
-        stats = get_barangay_stats()
+        assigned_municipality = user['assigned_municipality'] if user and user['assigned_municipality'] else 'San Pablo City'
+        responded_count = get_barangay_responded_count(barangay)
+        latest_alert = get_latest_alert(barangay)
         coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
-        
         try:
-            lat_coord = float(coords.get('lat', 14.5995))
-            lon_coord = float(coords.get('lon', 120.9842))
+            lat_coord = float(coords.get('lat', 14.0549))
+            lon_coord = float(coords.get('lon', 121.3013))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {barangay} in {assigned_municipality}, using defaults")
-            lat_coord = 14.5995
-            lon_coord = 120.9842
-
-        logger.debug(f"Rendering BarangayDashboard for {barangay} in {assigned_municipality}")
+            logger.error(f"Invalid coordinates for {barangay}, using defaults")
+            lat_coord = 14.0549
+            lon_coord = 121.3013
+        session['barangay'] = barangay  # Store barangay in session
         return render_template('BarangayDashboard.html', 
-                            latest_alert=latest_alert, 
-                            stats=stats, 
-                            barangay=barangay, 
-                            lat_coord=lat_coord, 
-                            lon_coord=lon_coord, 
-                            google_api_key=GOOGLE_API_KEY)
-
+                             latest_alert=latest_alert, 
+                             stats=stats, 
+                             responded_count=responded_count,
+                             barangay=barangay, 
+                             lat_coord=lat_coord, 
+                             lon_coord=lon_coord, 
+                             google_api_key=GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error in barangay_dashboard: {e}")
         return "Internal Server Error", 500
 
+@app.route('/barangay_emergency_types')
+def barangay_emergency_types():
+    if 'role' not in session or session['role'] != 'barangay':
+        logger.warning("Unauthorized access to barangay_emergency_types")
+        return jsonify({'error': 'Unauthorized'}), 401
+    barangay = session.get('barangay')  # Use session-stored barangay
+    if not barangay:
+        logger.error("No barangay found in session")
+        return jsonify({'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0, 'Health Emergency': 0}), 200
+    emergency_types = get_barangay_emergency_types(barangay)
+    return jsonify(emergency_types)
+
+@app.route('/barangay_responded_count')
+def barangay_responded_count():
+    try:
+        barangay = session.get('barangay')
+        if not barangay:
+            logger.error("No barangay found in session for responded count")
+            return jsonify({'responded_count': 0}), 200
+        count = get_barangay_responded_count(barangay)
+        return jsonify({'responded_count': count})
+    except Exception as e:
+        logger.error(f"Error in barangay_responded_count: {e}")
+        return jsonify({'responded_count': 0}), 500
 
 @app.route('/cdrrmo_dashboard')
 def cdrrmo_dashboard():
     try:
         if 'role' not in session or session['role'] != 'cdrrmo':
+            logger.warning("No valid CDRRMO role in session: %s", session)
             return redirect(url_for('login_agency'))
-        stats = get_cdrrmo_stats()
         unique_id = session.get('unique_id')
+        if not unique_id:
+            logger.error("No unique_id found in session: %s", session)
+            return redirect(url_for('login_agency'))
+        
         conn = get_db_connection()
         user = conn.execute('''
-            SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-        ''', ('cdrrmo', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+            SELECT * FROM users WHERE role = ? AND contact_no = ?
+        ''', ('cdrrmo', unique_id.split('_')[2])).fetchone()
         conn.close()
         
-        if not unique_id or not user or user['role'] != 'cdrrmo':
+        if not user or user['role'] != 'cdrrmo':
             logger.warning("Unauthorized access to cdrrmo_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
-        stats = get_cdrrmo_stats()
+        stats = get_cdrrmo_stats(municipality=user['municipality'])
+        responded_count = get_cdrrmo_responded_count()
         coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
         
+        
+        
         try:
-            lat_coord = float(coords.get('lat', 14.5995))
-            lon_coord = float(coords.get('lon', 120.9842))
+            lat_coord = float(coords.get('lat', 14.0549))
+            lon_coord = float(coords.get('lon', 121.3013))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-            lat_coord = 14.5995
-            lon_coord = 120.9842
+            logger.error("Invalid coordinates, using defaults")
+            lat_coord = 14.0549
+            lon_coord = 121.3013
 
-        logger.debug(f"Rendering CDRRMODashboard for {assigned_municipality}")
+        alerts_per_month = get_cdrrmo_alerts_per_month()
+        logger.debug("Rendering CDRRMODashboard with alerts_per_month: %s", alerts_per_month)
+        logger.debug("Rendering CDRRMODashboard")
         return render_template('CDRRMODashboard.html', 
                                stats=stats, 
-                               municipality=assigned_municipality, 
                                lat_coord=lat_coord, 
                                lon_coord=lon_coord, 
+                               responded_count=responded_count,
+                               alerts_per_month=alerts_per_month,
                                google_api_key=GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error in cdrrmo_dashboard: {e}")
         return "Internal Server Error", 500
 
+@socketio.on('cdrrmo_response')
+def handle_cdrrmo_response(data):
+    logger.info(f"Response submitted: {data}")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        manila = pytz.timezone('Asia/Manila')
+        timestamp = datetime.now(manila).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+            INSERT INTO cdrrmo_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('road_accident_cause'), data.get('road_accident_type'),
+            data.get('weather'), data.get('road_condition'), data.get('vehicle_type'),
+            data.get('driver_age'), data.get('driver_gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), timestamp, True
+        ))
+        conn.commit()
+        emit_cdrrmo_alerts_per_month_update(socketio)
+        socketio.emit('cdrrmo_response', data, room=f"cdrrmo")
+    except Exception as e:
+        logger.error(f"Error handling cdrrmo_response: {e}")
+    finally:
+        conn.close()
+
 @app.route('/pnp_dashboard')
 def pnp_dashboard():
     try:
         if 'role' not in session or session['role'] != 'pnp':
+            logger.warning("No valid PNP role in session: %s", session)
             return redirect(url_for('login_agency'))
-        stats = get_pnp_stats()
         unique_id = session.get('unique_id')
+        if not unique_id:
+            logger.error("No unique_id found in session: %s", session)
+            return redirect(url_for('login_agency'))
+        
         conn = get_db_connection()
-        user = conn.execute('''
-            SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
+        # Check if 'assigned_barangay' column exists, fallback to 'assigned_municipality'
+        cursor = conn.execute("PRAGMA table_info(users)")
+        columns = [col['name'] for col in cursor.fetchall()]
+        location_column = 'assigned_barangay' if 'assigned_barangay' in columns else 'assigned_municipality'
+        
+        user = conn.execute(f'''
+            SELECT * FROM users WHERE role = ? AND contact_no = ? AND {location_column} = ?
         ''', ('pnp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
         conn.close()
         
-        if not unique_id or not user or user['role'] != 'pnp':
+        if not user or user['role'] != 'pnp':
             logger.warning("Unauthorized access to pnp_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
-        assigned_municipality = user['assigned_municipality'] or "San Pablo City"
-        stats = get_pnp_stats()
-        coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
+        assigned_barangay = user[location_column] or "San Pablo City"  # Fallback to default
+        session['assigned_barangay'] = assigned_barangay  # Ensure session has barangay
+        logger.debug("Set assigned_barangay in session: %s", assigned_barangay)
+        
+        stats = get_pnp_stats(assigned_barangay)
+        responded_count = get_pnp_responded_count(assigned_barangay)
+        coords = municipality_coords.get(assigned_barangay, {'lat': 14.5995, 'lon': 120.9842})
         
         try:
             lat_coord = float(coords.get('lat', 14.5995))
             lon_coord = float(coords.get('lon', 120.9842))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
+            logger.error(f"Invalid coordinates for {assigned_barangay}, using defaults")
             lat_coord = 14.5995
             lon_coord = 120.9842
 
-        logger.debug(f"Rendering PNPDashboard for {assigned_municipality}")
+        logger.debug(f"Rendering PNPDashboard for {assigned_barangay}")
         return render_template('PNPDashboard.html', 
                                stats=stats, 
-                               municipality=assigned_municipality, 
+                               municipality=assigned_barangay,  # Keep 'municipality' for template compatibility
                                lat_coord=lat_coord, 
                                lon_coord=lon_coord, 
+                               responded_count=responded_count,
                                google_api_key=GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error in pnp_dashboard: {e}")
         return "Internal Server Error", 500
 
+@app.route('/pnp_emergency_types')
+def pnp_emergency_types():
+    if 'role' not in session or session['role'] != 'pnp':
+        logger.warning("Unauthorized access to pnp_emergency_types. Session: %s", session)
+        return jsonify({'error': 'Unauthorized'}), 401
+    barangay = session.get('assigned_barangay')
+    if not barangay:
+        logger.error("No barangay found in session: %s. Using default 'San Pablo City'", session)
+        barangay = "San Pablo City"  # Fallback to default
+    emergency_types = get_pnp_emergency_types(barangay)
+    logger.debug("Fetched emergency types for %s: %s", barangay, emergency_types)
+    return jsonify(emergency_types)
+
+@app.route('/pnp_responded_count')
+def pnp_responded_count():
+    try:
+        barangay = session.get('assigned_barangay')
+        if not barangay:
+            logger.error("No barangay found in session: %s. Using default 'San Pablo City'", session)
+            barangay = "San Pablo City"  # Fallback to default
+        count = get_pnp_responded_count(barangay)
+        logger.debug("Fetched responded count for %s: %s", barangay, count)
+        return jsonify({'responded_count': count})
+    except Exception as e:
+        logger.error(f"Error in pnp_responded_count: {e}")
+        return jsonify({'responded_count': 0}), 500
+
 @app.route('/bfp_dashboard')
 def bfp_dashboard():
     try:
         if 'role' not in session or session['role'] != 'bfp':
+            logger.warning("No valid BFP role in session: %s", session)
             return redirect(url_for('login_agency'))
-        stats = get_bfp_stats()
         unique_id = session.get('unique_id')
+        if not unique_id:
+            logger.error("No unique_id found in session: %s", session)
+            return redirect(url_for('login_agency'))
+        
         conn = get_db_connection()
         user = conn.execute('''
-            SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
-        ''', ('bfp', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
+            SELECT * FROM users WHERE role = ? AND contact_no = ?
+        ''', ('bfp', unique_id.split('_')[2])).fetchone()
         conn.close()
         
-        if not unique_id or not user or user['role'] != 'bfp':
+        if not user or user['role'] != 'bfp':
             logger.warning("Unauthorized access to bfp_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
         stats = get_bfp_stats()
+        responded_count = get_bfp_responded_count()
         coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
         
         try:
-            lat_coord = float(coords.get('lat', 14.5995))
-            lon_coord = float(coords.get('lon', 120.9842))
+            lat_coord = float(coords.get('lat', 14.0549))
+            lon_coord = float(coords.get('lon', 121.3013))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-            lat_coord = 14.5995
-            lon_coord = 120.9842
-
-        logger.debug(f"Rendering BFPDashboard for {assigned_municipality}")
+            logger.error("Invalid coordinates, using defaults")
+            lat_coord = 14.0549
+            lon_coord = 121.3013
+        
+        alerts_per_month = get_bfp_alerts_per_month()
+        logger.debug("Rendering BFP Dashboard with alerts_per_month: %s", alerts_per_month)
         return render_template('BFPDashboard.html', 
                                stats=stats, 
-                               municipality=assigned_municipality, 
-                               lat_coord=lat_coord,
-                               lon_coord=lon_coord,
+                               lat_coord=lat_coord, 
+                               lon_coord=lon_coord, 
+                               responded_count=responded_count,
+                               alerts_per_month=alerts_per_month,
                                google_api_key=GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error in bfp_dashboard: {e}")
@@ -3026,37 +3145,44 @@ def bfp_dashboard():
 def health_dashboard():
     try:
         if 'role' not in session or session['role'] != 'health':
+            logger.warning("No valid Health role in session: %s", session)
             return redirect(url_for('login_agency'))
-        stats = get_health_stats()
         unique_id = session.get('unique_id')
+        if not unique_id:
+            logger.error("No unique_id found in session: %s", session)
+            return redirect(url_for('login_agency'))
+        
         conn = get_db_connection()
         user = conn.execute('''
             SELECT * FROM users WHERE role = ? AND contact_no = ? AND assigned_municipality = ?
         ''', ('health', unique_id.split('_')[2], unique_id.split('_')[1])).fetchone()
         conn.close()
         
-        if not unique_id or not user or user['role'] != 'health':
+        if not user or user['role'] != 'health':
             logger.warning("Unauthorized access to health_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
         assigned_municipality = user['assigned_municipality'] or "San Pablo City"
         stats = get_health_stats()
+        responded_count = get_health_responded_count()
         coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
         
         try:
-            lat_coord = float(coords.get('lat', 14.5995))
-            lon_coord = float(coords.get('lon', 120.9842))
+            lat_coord = float(coords.get('lat', 14.0549))
+            lon_coord = float(coords.get('lon', 121.3013))
         except (ValueError, TypeError):
-            logger.error(f"Invalid coordinates for {assigned_municipality}, using defaults")
-            lat_coord = 14.5995
-            lon_coord = 120.9842
-
-        logger.debug(f"Rendering HealthDashboard for {assigned_municipality}")
+            logger.error("Invalid coordinates, using defaults")
+            lat_coord = 14.0549
+            lon_coord = 121.3013
+        
+        alerts_per_month = get_health_alerts_per_month()
+        logger.debug("Rendering Health Dashboard with alerts_per_month: %s", alerts_per_month)
         return render_template('HealthDashboard.html', 
                                stats=stats, 
-                               municipality=assigned_municipality, 
-                               lat_coord=lat_coord,
-                               lon_coord=lon_coord,
+                               lat_coord=lat_coord, 
+                               lon_coord=lon_coord, 
+                               responded_count=responded_count,
+                               alerts_per_month=alerts_per_month,
                                google_api_key=GOOGLE_API_KEY)
     except Exception as e:
         logger.error(f"Error in health_dashboard: {e}")
@@ -3104,22 +3230,18 @@ def hospital_dashboard():
         logger.error(f"Error in health_dashboard: {e}")
         return "Internal Server Error", 500
 
-def get_latest_alert():
+def get_latest_alert(barangay):
     try:
-        if alerts:
-            return alerts[-1]
-        return None
+        conn = get_db_connection()
+        cursor = conn.execute('SELECT * FROM alerts WHERE barangay = ? ORDER BY timestamp DESC LIMIT 1', (barangay,))
+        alert = cursor.fetchone()
+        conn.close()
+        return dict(alert) if alert else None
     except Exception as e:
-        logger.error(f"Error in get_latest_alert: {e}")
+        logger.error(f"Error fetching latest alert for {barangay}: {e}")
         return None
 
-def get_barangay_stats():
-    try:
-        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'barangay' or a.get('barangay')]
-        return Counter(types)
-    except Exception as e:
-        logger.error(f"Error in get_barangay_stats: {e}")
-        return Counter()
+
 
 def get_cdrrmo_stats():
     try:
@@ -3129,29 +3251,73 @@ def get_cdrrmo_stats():
         logger.error(f"Error in get_cdrrmo_stats: {e}")
         return Counter()
 
-def get_pnp_stats():
-    try:
-        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'pnp' or a.get('assigned_municipality')]
-        return Counter(types)
-    except Exception as e:
-        logger.error(f"Error in get_pnp_stats: {e}")
-        return Counter()
-
 def get_bfp_stats():
     try:
-        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'bfp' or a.get('assigned_municipality')]
-        return Counter(types)
+        conn = get_db_connection()
+        cursor = conn.execute('''
+            SELECT COUNT(*) as total 
+            FROM bfp_response
+        ''')
+        total = cursor.fetchone()['total']
+        conn.close()
+        return type('Stats', (), {'total': lambda self: total})()
     except Exception as e:
-        logger.error(f"Error in get_bfp_stats: {e}")
-        return Counter()
+        logger.error(f"Error fetching CDRRMO stats: {e}")
+        return type('Stats', (), {'total': lambda self: 0})()
+
+def get_pnp_stats(municipality):
+    try:
+        conn = get_db_connection()
+        cursor = conn.execute('''
+            SELECT COUNT(*) as total 
+            FROM (
+                SELECT municipality FROM pnp_response WHERE municipality = ?
+                UNION ALL
+                SELECT municipality FROM pnp_crime_response WHERE municipality = ?
+                UNION ALL
+                SELECT municipality FROM pnp_fire_response WHERE municipality = ?
+            ) AS combined
+        ''', (municipality, municipality, municipality))
+        total = cursor.fetchone()['total']
+        conn.close()
+        return type('Stats', (), {'total': lambda self: total})()
+    except Exception as e:
+        logger.error(f"Error fetching PNP stats for {municipality}: {e}")
+        return type('Stats', (), {'total': lambda self: 0})()
+
+def get_cdrrmo_stats(municipality):
+    try:
+        conn = get_db_connection()
+        # Check if 'municipality' column exists
+        cursor = conn.execute("PRAGMA table_info(cdrrmo_response)")
+        columns = [col['name'] for col in cursor.fetchall()]
+        location_column = 'municipality' if 'municipality' in columns else 'barangay'
+        
+        cursor = conn.execute(f'''
+            SELECT COUNT(*) as total 
+            FROM cdrrmo_response 
+            WHERE {location_column} = ? OR {location_column} IS NULL
+        ''', (municipality,))
+        total = cursor.fetchone()['total']
+        conn.close()
+        return type('Stats', (), {'total': lambda self: total})()
+    except Exception as e:
+        logger.error(f"Error fetching CDRRMO stats for {municipality}: {e}")
+        return type('Stats', (), {'total': lambda self: 0})()
     
 def get_health_stats():
     try:
-        types = [a.get('emergency_type', 'unknown') for a in alerts if a.get('role') == 'health' or a.get('assigned_municipality')]
-        return Counter(types)
+        conn = get_db_connection()
+        cursor = conn.execute('''
+            SELECT COUNT(*) as total 
+            FROM health_response
+        ''')
+        total = cursor.fetchone()['total']
+        conn.close()
+        return type('Stats', (), {'total': lambda self: total})()
     except Exception as e:
-        logger.error(f"Error in get_health_stats: {e}")
-        return Counter()
+        logger.error(f"Error fetching City Health stats: {e}")
+        return type('Stats', (), {'total': lambda self: 0})()
 
 def get_hospital_stats():
     try:
@@ -3503,6 +3669,7 @@ if __name__ == '__main__':
         ''')
         c.execute('''
             CREATE TABLE IF NOT EXISTS alerts (
+                barangay TEXT NOT NULL,
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 data TEXT NOT NULL,
                 synced INTEGER DEFAULT 0

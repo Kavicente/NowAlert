@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hospital Dashboard</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hdashboard.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
@@ -70,8 +70,12 @@
         <p class="p">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Hospital: {{ assigned_hospital }})</p>
         <div id="map"></div>
         <section class="stats">
-            <p class="p">Total Incidents: <span id="total-incidents">{{ stats.total() if stats else 0 }}</span></p>
-            <p class="p">Critical Incidents: <span id="critical-incidents">{{ stats.critical if stats else 0 }}</span></p>
+            <p class="p" style="position: relative; display: inline-block; margin: 0 auto;">
+                Total Incidents: 
+                <span id="total-incidents" class="incident-number">
+                    {{ stats.total() if stats else 0 }}
+                </span>
+            </p>
         </section>
         <section id="alerts">
             <h2 class="h2">Live Alerts</h2>
