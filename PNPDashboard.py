@@ -14,7 +14,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_pnp_stats(municipality):
+def get_pnp_stats(barangay):
     try:
         conn = get_db_connection()
         # Check if 'municipality' column exists in any of the tables
@@ -31,12 +31,12 @@ def get_pnp_stats(municipality):
                 UNION ALL
                 SELECT {location_column} FROM pnp_fire_response WHERE {location_column} = ? OR {location_column} IS NULL
             ) AS combined
-        ''', (municipality, municipality, municipality))
+        ''', (barangay, barangay, barangay))
         total = cursor.fetchone()['total']
         conn.close()
         return type('Stats', (), {'total': lambda self: total})()
     except Exception as e:
-        logger.error(f"Error fetching PNP stats for {municipality}: {e}")
+        logger.error(f"Error fetching PNP stats for {barangay}: {e}")
         return type('Stats', (), {'total': lambda self: 0})()
 
 def get_pnp_latest_alert(municipality):
