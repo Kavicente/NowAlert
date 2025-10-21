@@ -19,7 +19,7 @@ import uuid
 from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import get_barangay_stats, get_latest_alert, get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update
-from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert, get_cdrrmo_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
+from CDRRMODashboard import get_cdrrmo_stats, get_new_alert, get_cdrrmo_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
 from PNPDashboard import get_pnp_stats, get_pnp_latest_alert, get_pnp_emergency_types, get_pnp_responded_count, emit_pnp_emergency_types_update
 from BFPDashboard import get_bfp_stats, get_bfp_latest_alert, get_bfp_alerts_per_month, get_bfp_responded_count, emit_bfp_alerts_per_month_update
 from HealthDashboard import get_health_stats, get_health_latest_alert, get_health_alerts_per_month, get_health_responded_count, emit_health_alerts_per_month_update
@@ -3164,13 +3164,13 @@ def get_latest_alert(barangay):
         logger.error(f"Error fetching latest alert for {barangay}: {e}")
         return None
 
-def get_latest_alert():
+def get_new_alert():
     try:
         if alerts:
             return alerts[-1]
         return None
     except Exception as e:
-        logger.error(f"Error in get_latest_alert: {e}")
+        logger.error(f"Error in get_new_alert: {e}")
         return None
 
 def get_cdrrmo_stats():
