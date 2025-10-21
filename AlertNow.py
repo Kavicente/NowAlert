@@ -19,7 +19,7 @@ import uuid
 from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import get_barangay_stats, get_latest_alert, get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update
-from CDRRMODashboard import get_cdrrmo_stats, get_cdrrmo_latest_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
+from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert, get_cdrrmo_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
 from PNPDashboard import get_pnp_stats, get_pnp_latest_alert, get_pnp_emergency_types, get_pnp_responded_count, emit_pnp_emergency_types_update
 from BFPDashboard import get_bfp_stats, get_bfp_latest_alert, get_bfp_alerts_per_month, get_bfp_responded_count, emit_bfp_alerts_per_month_update
 from HealthDashboard import get_health_stats, get_health_latest_alert, get_health_alerts_per_month, get_health_responded_count, emit_health_alerts_per_month_update
@@ -642,82 +642,6 @@ def handle_response(data):
     finally:
         conn.close()
 
-@socketio.on('submit_response')
-def handle_submit_response(data):
-    try:
-        alert_id = data.get('alert_id', str(uuid.uuid4()))
-        role = data.get('role', '').lower()
-        barangay = data.get('barangay', '')
-        municipality = get_municipality_from_barangay(barangay) or data.get('municipality', '')
-        emergency_type = data.get('emergency_type', '')
-        road_accident_cause = data.get('road_accident_cause', '')
-        road_accident_type = data.get('road_accident_type', '')
-        weather = data.get('weather', '')
-        road_condition = data.get('road_condition', '')
-        vehicle_type = data.get('vehicle_type', '')
-        driver_age = data.get('driver_age', '')
-        driver_gender = data.get('driver_gender', '')
-        health_type = data.get('health_type', '')
-        health_cause = data.get('health_cause', '')
-        patient_age = data.get('patient_age', '')
-        patient_gender = data.get('patient_gender', '')
-        lat = data.get('lat', 0.0)
-        lon = data.get('lon', 0.0)
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')  # Changed to string
-        responded = True
-
-        conn = get_db_connection()
-        if role == 'barangay':
-            conn.execute('''
-                INSERT INTO barangay_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-        elif role == 'cdrrmo':
-            conn.execute('''
-                INSERT INTO cdrrmo_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-            prediction = handle_cdrrmo_response_submitted(data)
-        elif role == 'pnp':
-            conn.execute('''
-                INSERT INTO pnp_response (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-            prediction = handle_pnp_response_submitted(data)
-        elif role == 'bfp':
-            # Existing BFP logic remains unchanged
-            pass
-        elif role == 'health':
-            conn.execute('''
-            INSERT INTO health_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded))
-            prediction = handle_health_response(data)
-        elif role == 'hospital':
-            conn.execute('''
-            INSERT INTO hospital_response (
-                alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, assigned_hospital
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''',(alert_id, health_type, health_cause, weather, patient_age, patient_gender, lat, lon, barangay, emergency_type, timestamp, responded, data.get('assigned_hospital')))
-            prediction = handle_hospital_response(data)
-        conn.commit()
-        conn.close()
-
-        # Emit response with prediction
-        response_data = {
-            'alert_id': alert_id,
-            'role': role,
-            'barangay': barangay,
-            'municipality': municipality,
-            'emergency_type': emergency_type,
-            'prediction': prediction,
-            'timestamp': timestamp  # Using the string timestamp
-        }
-        socketio.emit(f'{role}_response', response_data)
-        logger.info(f"Response submitted for alert {alert_id} by {role}")
-    except Exception as e:
-        logger.error(f"Error in handle_submit_response: {e}")
 
 @socketio.on('role_accepted')
 def role_accepted(data):
@@ -2881,14 +2805,13 @@ def barangay_dashboard():
             return redirect(url_for('login_agency'))
         logger.info(f"Calling get_barangay_stats for barangay: {barangay}")
         
-        stats = get_barangay_stats(barangay)
-        # Fetch assigned_municipality from database instead of assuming barangay is a dict
         conn = get_db_connection()
         user = conn.execute('SELECT assigned_municipality FROM users WHERE role = ? AND barangay = ?', ('barangay', barangay)).fetchone()
         conn.close()
         assigned_municipality = user['assigned_municipality'] if user and user['assigned_municipality'] else 'San Pablo City'
+        stats = get_barangay_stats(barangay)
+        latest_alert = get_latest_alert(barangay)  # Ensure barangay is passed
         responded_count = get_barangay_responded_count(barangay)
-        latest_alert = get_latest_alert(barangay)
         coords = barangay_coords.get(assigned_municipality, {}).get(barangay, {'lat': 14.5995, 'lon': 120.9842})
         try:
             lat_coord = float(coords.get('lat', 14.0549))
@@ -3241,7 +3164,14 @@ def get_latest_alert(barangay):
         logger.error(f"Error fetching latest alert for {barangay}: {e}")
         return None
 
-
+def get_latest_alert():
+    try:
+        if alerts:
+            return alerts[-1]
+        return None
+    except Exception as e:
+        logger.error(f"Error in get_latest_alert: {e}")
+        return None
 
 def get_cdrrmo_stats():
     try:
@@ -3265,25 +3195,31 @@ def get_bfp_stats():
         logger.error(f"Error fetching CDRRMO stats: {e}")
         return type('Stats', (), {'total': lambda self: 0})()
 
-def get_pnp_stats(municipality):
+def get_pnp_stats(barangay):
     try:
         conn = get_db_connection()
-        cursor = conn.execute('''
+        # Check if 'municipality' column exists in any of the tables
+        cursor = conn.execute("PRAGMA table_info(pnp_response)")
+        columns = [col['name'] for col in cursor.fetchall()]
+        location_column = 'municipality' if 'municipality' in columns else 'barangay'
+        
+        cursor = conn.execute(f'''
             SELECT COUNT(*) as total 
             FROM (
-                SELECT municipality FROM pnp_response WHERE municipality = ?
+                SELECT {location_column} FROM pnp_response WHERE {location_column} = ? OR {location_column} IS NULL
                 UNION ALL
-                SELECT municipality FROM pnp_crime_response WHERE municipality = ?
+                SELECT {location_column} FROM pnp_crime_response WHERE {location_column} = ? OR {location_column} IS NULL
                 UNION ALL
-                SELECT municipality FROM pnp_fire_response WHERE municipality = ?
+                SELECT {location_column} FROM pnp_fire_response WHERE {location_column} = ? OR {location_column} IS NULL
             ) AS combined
-        ''', (municipality, municipality, municipality))
+        ''', (barangay, barangay, barangay))
         total = cursor.fetchone()['total']
         conn.close()
         return type('Stats', (), {'total': lambda self: total})()
     except Exception as e:
-        logger.error(f"Error fetching PNP stats for {municipality}: {e}")
+        logger.error(f"Error fetching PNP stats for {barangay}: {e}")
         return type('Stats', (), {'total': lambda self: 0})()
+
 
 def get_cdrrmo_stats(municipality):
     try:
