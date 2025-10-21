@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="AlertNow">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/static/AlertNow.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
