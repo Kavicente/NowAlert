@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="AlertNowLocal.db2">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/static/AlertNow/AlertNow/Alert Now/intermediates/compressed_assets/debug/compressDebugAssets/out/assets/AlertNowLocal.db.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
