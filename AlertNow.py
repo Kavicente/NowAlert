@@ -19,7 +19,7 @@ import uuid
 from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import get_barangay_stats, get_latest_alert, get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update
-from CDRRMODashboard import get_cdrrmo_stats, get_new_alert, get_cdrrmo_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
+from CDRRMODashboard import get_cdrrmo_stats, get_cdrrmo_stats, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
 from PNPDashboard import get_pnp_stats, get_pnp_latest_alert, get_pnp_emergency_types, get_pnp_responded_count, emit_pnp_emergency_types_update
 from BFPDashboard import get_bfp_stats, get_bfp_latest_alert, get_bfp_alerts_per_month, get_bfp_responded_count, emit_bfp_alerts_per_month_update
 from HealthDashboard import get_health_stats, get_health_latest_alert, get_health_alerts_per_month, get_health_responded_count, emit_health_alerts_per_month_update
@@ -37,7 +37,6 @@ import re
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# heyy
 
 road_accident_predictor 
 try:
@@ -2880,12 +2879,9 @@ def cdrrmo_dashboard():
             logger.warning("Unauthorized access to cdrrmo_dashboard. Session: %s, User: %s", session, user)
             return redirect(url_for('login_agency'))
         
-        assigned_municipality = user['assigned_municipality'] or "San Pablo City"
         stats = get_cdrrmo_stats(municipality=user['municipality'])
         responded_count = get_cdrrmo_responded_count()
-        coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
-        
-        
+        coords = {'lat': 14.0549, 'lon': 121.3013}  # Default coordinates
         
         try:
             lat_coord = float(coords.get('lat', 14.0549))
@@ -2894,10 +2890,9 @@ def cdrrmo_dashboard():
             logger.error("Invalid coordinates, using defaults")
             lat_coord = 14.0549
             lon_coord = 121.3013
-
+        
         alerts_per_month = get_cdrrmo_alerts_per_month()
         logger.debug("Rendering CDRRMODashboard with alerts_per_month: %s", alerts_per_month)
-        logger.debug("Rendering CDRRMODashboard")
         return render_template('CDRRMODashboard.html', 
                                stats=stats, 
                                lat_coord=lat_coord, 
@@ -3165,14 +3160,7 @@ def get_latest_alert(barangay):
         logger.error(f"Error fetching latest alert for {barangay}: {e}")
         return None
 
-def get_new_alert():
-    try:
-        if alerts:
-            return alerts[-1]
-        return None
-    except Exception as e:
-        logger.error(f"Error in get_new_alert: {e}")
-        return None
+
 
 def get_cdrrmo_stats():
     try:
