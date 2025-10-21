@@ -455,6 +455,8 @@
                     socket.emit('fire_response_submitted', responseData);
                     statusDiv.textContent = 'RESPONDED';
                 });
+                
+                responseForm.appendChild(submitButton);
 
                 const respondButton = document.createElement('button');
                 respondButton.textContent = 'Respond';
