@@ -47,9 +47,10 @@
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <nav>
             <ul>
+                <img src="{{ url_for('static', filename='logo/alertlogo.png') }}" alt="Alert Logo" class="alert-logo">
                 <li><a href="{{ url_for('pnp_dashboard') }}"><span>🏠</span> Dashboard</a></li>
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
@@ -62,11 +63,13 @@
     </div>
     <div class="dashboard">
         <header>
+            <div class="header-content">
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
             <h1>PNP {{ municipality }} Dashboard</h1>
             <div class="filters"></div>
         </header>
     </div>
-    <main class="main-content">
+    <main class="main-content" id="mainContent">
         <h2 class="h2" style="position: relative; display: inline-block; margin: 0 auto;">PNP {{ municipality }} Map </h2>
         <p class="p" style="position: relative; display: inline-block; margin: 0 auto;">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Barangay: {{ barangay }})</p>
         <div class="dashboard-container">
@@ -109,6 +112,14 @@
 
     <script>
         let menuData = {};
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -148,7 +159,7 @@
                         label: 'Emergency Types',
                         data: [0, 0, 0, 0], // Initial placeholder data
                         backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'],
-                        borderColor: ['#fff', '#fff', '#fff', '#fff'],
+                        borderColor: ['#000000ff', '#000000ff', '#000000ff', '#000000ff'],
                         borderWidth: 1
                     }]
                 },
@@ -234,6 +245,7 @@
                     Object.keys(dropdownData).forEach(key => {
                         const select = document.createElement('select');
                         select.name = key.toLowerCase().replace(/\s+/g, '_');
+                        select.className = 'dropdown-emergency';
                         dropdownData[key].forEach(option => {
                             const opt = document.createElement('option');
                             opt.value = option;
@@ -244,6 +256,7 @@
                     });
                     const submitButton = document.createElement('button');
                     submitButton.textContent = 'Respond';
+                    submitButton.className = 'submit-emergency';
                     submitButton.addEventListener('click', () => {
                         const formData = {};
                         responseForm.querySelectorAll('select').forEach(select => {

@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Sign Up (Barangay)</title>
+    <title>Sign Up Barangay</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
 </head>
 <body>
-    <h1 class="h1">Sign Up (Barangay)</h1>
     <form action="/signup_barangay" method="post">
+        <h1 class="h1">Sign Up Barangay</h1>
         <label>Barangay: <input type="text" name="barangay" required></label><br>
         <label>Municipality: <input type="text" name="municipality" required></label><br>
         <label>Province: <input type="text" name="province" required></label><br>

@@ -3,11 +3,12 @@
 <head>
     <title>Sign Up Agencies</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/asignup.css') }}">
 </head>
 <body>
-    <h1 class="h1">Select Agency To Sign Up</h1>
+    
     <form action="/signup_agency" method="post">
+        <h1 class="h1">Select Agency To Sign Up</h1>
         <label>Role: 
             <select name="role" id="role" class="select-role">
                 <option value="cdrrmo">CDRRMO</option>

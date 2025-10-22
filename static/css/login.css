@@ -46,7 +46,7 @@ body {
 }
 .form2 {
     background-color: #deeaee; 
-    margin-top: 80px;
+    margin-top: 150px;
     display: block;
     margin-left: auto;
     margin-right: auto;
@@ -84,44 +84,60 @@ body {
 .form2 button {
     background-color: #66c2ff;
     color: #000000;
+    left: 0;
+    right:0;
+    font-size: 20px;
     padding: 10px 20px;
-    font-weight: bold;
     border: none;
     border-radius: 4px;
+    font-size: 20px;
     cursor: pointer;
     width: 30%;
+    display: block; /* Ensure each button takes full width and stacks vertically */
+    margin: 10px auto;
 }
 
 .form2 .button2 {
     background-color: #66c2ff;
     color: #000000;
+    left: 0;
+    right:0;
+    font-size: 20px;
     padding: 10px 20px;
-    margin-top: 10px;
-    font-weight: bold;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    width: 45%;
+    width: 60%;
+    display: block; /* Ensure each button takes full width and stacks vertically */
+    margin: 10px auto;
 }
 .form2 .button3 {
     background-color: #66c2ff;
+    left: 0;
+    right:0;
+    font-size: 20px;
     color: #000000;
     padding: 10px 20px;
-    font-weight: bold;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    width: 30%;
+    width: 60%;
+    display: block; /* Ensure each button takes full width and stacks vertically */
+    margin: 10px auto;
 }
 .form2 .button4 {
     background-color: #66c2ff;
+    left: 0;
+    right:0;
+    font-size: 20px;
     color: #000000;
     padding: 10px 20px;
-    font-weight: bold;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    width: 30%;
+    width: 60%;
+    display: block; /* Ensure each button takes full width and stacks vertically */
+    margin: 10px auto;
 }
 
 .form2 button:hover {
@@ -131,25 +147,26 @@ body {
 
 .form3 {
     background-color: #deeaee; 
-    margin-top: 80px;
     display: block;
-    
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     color: #000000;
     text-align: center;
     padding: 20px;
     border-radius: 5px;
     backdrop-filter: blur(5px);
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    max-width: 300px;
+    max-width: 600px;
+    height: 718px;
     margin-left: auto;
-    margin-right: 380px;
-    margin-top: -493px; /* Adjusted to align with form2 */
+    margin-right: 130px;
+    margin-top: -717px;
     color: #000000;
 }
 
 .form3 .role-item {
-    padding: 10px;
-    margin: 15px 25px;
+    padding: 20px;
+    margin: 25px 25px;
     background-color: #66c2ff;
     width: 80%;
     position: center;
@@ -192,3 +209,26 @@ body {
     
     transform: scale(1.05);
 }
+
+@media (max-width: 1440px) {
+    .form2 {
+        margin-top: 150px;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 30%;
+    }
+    .form3 {
+        margin-top: 20px;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 50%;
+        max-height: none;
+    }
+    .form4 {
+        margin-top: 20px;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 90%;
+    }
+}
+
