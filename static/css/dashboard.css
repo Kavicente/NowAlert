@@ -6,7 +6,7 @@
 
 body {
     font-family: Arial, sans-serif;
-    background-color: #224380;
+    background: linear-gradient(135deg, #2c3e50, #3498db);
     color: #ffffff;
     line-height: 1.6;
 }
@@ -33,6 +33,22 @@ header {
     color: #000000;
 }
 
+.header-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.alert-logo {
+    height: 50px; /* Adjust height as needed */
+    width: auto; /* Maintain aspect ratio */
+    margin-left: 15px; /* Space between logo and text */
+}
+
+h1 {
+    margin: 0; /* Remove default margin to align properly */
+}
+
 header h1 {
     font-size: 2.5em;
 }
@@ -50,7 +66,21 @@ h3 {
     top: 0; /* Anchor to the top */
     left: 80px; 
 }
+.toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    color: #fff;
+    font-size: 24px;
+    transition: transform 0.3s ease;
+}
 
+.toggle-btn:hover {
+    transform: rotate(90deg);
+}
 .sidebar {
     width: 260px;
     position: fixed;
@@ -59,6 +89,10 @@ h3 {
     color: #fff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     top: 75px;
+}
+
+.sidebar.open {
+    width: 230px;
 }
 
 .sidebar nav ul {
@@ -109,6 +143,7 @@ h3 {
 .dashboard {
     position: static;
     margin-bottom: 10px;
+    
 }
 
 main {
@@ -120,25 +155,11 @@ main {
 .main-content {
     position: fixed; /* Fix the element to the viewport */
     top: 0; /* Anchor to the top */
-    left: 0%; /* Start from the left edge */
+    left: -14%; /* Start from the left edge */
     height: 95%; /* Match original height */
     overflow: auto; /* Enable scrolling for overflow */
     padding: 20px;
-    width: 88%;
-    margin-top: 76px;  
-    margin-left: 260px; /* Retain original padding */
-    background-color: #d6d5d5; /* Light gray background */
-    transition: left 0.3s ease, width 0.3s ease;
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-}
-.secondary-content { /* Fix the element to the viewport */
-    top: 0; /* Anchor to the top */
-    right: 100px; /* Start from the left edge */
-    height: 95%; /* Match original height */
-    overflow: auto; /* Enable scrolling for overflow */
-    padding: 20px;
-    width: 15%;
+    width: 108%;
     margin-top: 76px;  
     margin-left: 260px; /* Retain original padding */
     background-color: #d6d5d5; /* Light gray background */
@@ -147,11 +168,31 @@ main {
     scrollbar-width: none; /* Firefox */
 }
 
-.secondary-content::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, and Opera */
-}
 .main-content::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, and Opera */
+    display: none;             /* Chrome, Safari, and Opera */
+}
+
+.main-content::before,
+.main-content::after {
+    position: fixed;
+    right: 40px;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    color: #000;
+    font-weight: bold;
+}
+.main-content::before {
+    margin-left: 1px;
+    top: 50px;
+}
+.main-content::after {
+    bottom: 50px;
+    margin-left: 10px;
+}
+
+.main-content.shifted {
+    left: 1px;
+    width: calc(96% - 180px);
 }
 
 /* New: Dashboard container for side-by-side layout */
@@ -165,8 +206,8 @@ main {
 
 /* Map styling */
 #map { 
-    height: 800px; /* As provided */
-    width: 1200px; /* As provided */
+    height: 600px; /* As provided */
+    width: 1250px; /* As provided */
     position: relative; /* Flow naturally in dashboard-container */
     top: 0; 
     left: 0; /* Reset left */
@@ -193,7 +234,7 @@ main {
     padding: 60px; /* Inner padding */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Subtle shadow */
     height: 170px; /* Adjust to content */
-    max-width: 350px; /* As provided */
+    max-width: 300px; /* As provided */
     width: 650px; 
     display: flex;
     flex-direction: column;
@@ -201,19 +242,59 @@ main {
     text-align: center;
 }
 
+
 /* Chart container within stat-item */
 .chart-container {
     background: #ffffff; 
     border-right: 4px solid #3498db; 
     margin-top: 50px; /* Remove extra margins */
     width: 100%; /* Full width within stat-item */
-    height: 580px; /* As provided, adjusted to max-height */
+    height: 380px; /* As provided, adjusted to max-height */
     border-radius: 10px;
 }
 #emergencyTypeChart {
-        width: 70% !important;
-        height: 90% !important;
+        width: 40% !important;
+        height: 80% !important;
+        transition: transform 0.3s ease;
+        
     }
+#emergencyTypeChart:hoover {
+    background-color: #66c2ff;
+    cursor: pointer;
+    transform: scale(1.05); /* Slight zoom in on hover (5% scale up) */
+
+}
+
+.dropdown-emergency {
+    width: 100%; 
+    padding: 10px; 
+    margin: 5px 0; 
+    box-sizing: border-box; 
+    background-color: #66c2ff; 
+    border: 1px solid #000000ff; 
+    border-radius: 4px; 
+    text-align: center;
+    cursor: pointer;
+}
+
+.dropdown-emergency:hover {
+    transform: scale(1.05);
+}
+
+.submit-emergency {
+    background-color: #66c2ff;
+    color: #000000;
+    padding: 10px 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px 0;
+}
+
+.submit-emergency:hover {
+    transform: scale(1.05);
+}
 
 /* Ensure p elements have no extra margins */
 .stats p {
@@ -342,32 +423,111 @@ canvas {
 .heatmap-layer:hover {
     opacity: 0.9; /* Slightly more opaque on hover for interactivity */
 }
+@media (max-width: 1440px) {
+    .main-content {
+        position: fixed; /* Fix the element to the viewport */
+        top: 0; /* Anchor to the top */
+        left: -14%; /* Start from the left edge */
+        height: 95%; /* Match original height */
+        overflow: auto; /* Enable scrolling for overflow */
+        padding: 20px;
+        width: 108%;
+        margin-top: 76px;  
+        margin-left: 202px; /* Retain original padding */
+        background-color: #d6d5d5; /* Light gray background */
+        transition: left 0.3s ease, width 0.3s ease;
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+    }
 
-@media (max-width: 600px) {
-    .sidebar {
-        width: 200px;
+    .main-content::-webkit-scrollbar {
+        display: none;             /* Chrome, Safari, and Opera */
     }
-    .dashboard {
-        margin-left: 210px;
+
+    .main-content::before,
+    .main-content::after {
+        position: fixed;
+        right: 40px;
+        writing-mode: vertical-rl;
+        text-orientation: upright;
+        color: #000;
+        font-weight: bold;
     }
-    header h1 {
-        font-size: 2em;
+    .main-content::before {
+        margin-left: 1px;
+        top: 50px;
     }
-    
-    /* New: Stack map and stats vertically on mobile */
+    .main-content::after {
+        bottom: 50px;
+        margin-left: 50px;
+    }
+
+    .main-content.shifted {
+        left: 21px;
+        width: calc(99% - 170px);
+    }
+
+    /* New: Dashboard container for side-by-side layout */
     .dashboard-container {
-        flex-direction: column; /* Stack vertically */
-        gap: 10px; /* Reduce gap */
+        display: flex; /* Horizontal flexbox */
+        gap: 20px; /* Space between map and stats */
+        align-items: flex-start; /* Align top for consistency */
+        margin-bottom: 20px; /* Space below the container */
+        
     }
-    
-    #map {
-        width: 100%; /* Full width on small screens */
-        order: 1; /* Map first */
+
+    /* Map styling */
+    #map { 
+        height: 600px; /* As provided */
+        width: 700px; /* As provided */
+        position: relative; /* Flow naturally in dashboard-container */
+        top: 0; 
+        left: 0; /* Reset left */
+        border-radius: 20px; 
     }
-    
-    .stats {
-        width: 100%; /* Full width on small screens */
-        max-width: none;
-        order: 2; /* Stats below map */
+
+    /* Stats section */
+
+
+    /* New: Row for Total Incidents and Responded */
+    .stats-row {
+        display: flex;
+        flex-direction: row; /* Side-by-side layout */
+        gap: 20px; /* Space between Total Incidents and Responded */
+        width: 90%; /* Full width within stats */
+        justify-content: center; /* Center the stat-items */
     }
+
+    /* Individual container for each stat item */
+    .stat-item {
+        background: #ffffff; /* White background */
+        border-right: 4px solid #3498db; 
+        border-radius: 10px;
+        padding: 60px; /* Inner padding */
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Subtle shadow */
+        height: 170px; /* Adjust to content */
+        max-width: 240px; /* As provided */
+        width: 600px; 
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+
+    /* Chart container within stat-item */
+    .chart-container {
+        background: #ffffff; 
+        border-right: 4px solid #3498db; 
+        margin-top: 50px; /* Remove extra margins */
+        width: 91%; /* Full width within stat-item */
+        height: 380px; /* As provided, adjusted to max-height */
+        border-radius: 10px;
+    }
+    #emergencyTypeChart {
+            width: 40% !important;
+            height: 80% !important;
+            transition: transform 0.3s ease;
+            
+        }
 }

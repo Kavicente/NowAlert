@@ -6,8 +6,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
 <body>
-    <h1 class="h1">Select Agency To Log In</h1>
+    
     <form class="form2" action="/login_agency" method="post">
+        <h1 class="h1">Select Agency To Log In</h1>
         <label>Role: 
             <select name="role" id="role" required class="select-role">
                 <option value="cdrrmo">CDRRMO</option>

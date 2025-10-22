@@ -47,9 +47,10 @@
     </style>
 </head>
 <body>
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <nav>
             <ul>
+                <img src="{{ url_for('static', filename='logo/alertlogo.png') }}" alt="Alert Logo" class="alert-logo">
                 <li><a href="{{ url_for('bfp_dashboard') }}"><span>🏠</span> Dashboard</a></li>
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
@@ -62,11 +63,13 @@
     </div>
     <div class="dashboard">
         <header>
+            <div class="header-content">
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
             <h1>BFP {{ municipality }} Dashboard</h1>
             <div class="filters"></div>
         </header>
     </div>
-    <main class="main-content">
+    <main class="main-content" id="mainContent">
         <h2 class="h2" style="position: relative; display: inline-block; margin: 0 auto;">BFP {{ municipality }} Map </h2>
         <p class="p" style="position: relative; display: inline-block; margin: 0 auto;">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div class="dashboard-container">
@@ -109,6 +112,14 @@
 
     <script>
         let menuData = {};
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -139,144 +150,166 @@
             const socket = io('https://alertnow-cgre.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
-            const ctx = document.getElementById('alertsPerMonthChart').getContext('2d');
-            let alertsPerMonthChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-                    datasets: [{
-                        label: 'Alerts Per Month',
-                        data: [
-                            {{ alerts_per_month['January']|default(0) }},
-                            {{ alerts_per_month['February']|default(0) }},
-                            {{ alerts_per_month['March']|default(0) }},
-                            {{ alerts_per_month['April']|default(0) }},
-                            {{ alerts_per_month['May']|default(0) }},
-                            {{ alerts_per_month['June']|default(0) }},
-                            {{ alerts_per_month['July']|default(0) }},
-                            {{ alerts_per_month['August']|default(0) }},
-                            {{ alerts_per_month['September']|default(0) }},
-                            {{ alerts_per_month['October']|default(0) }},
-                            {{ alerts_per_month['November']|default(0) }},
-                            {{ alerts_per_month['December']|default(0) }}
-                        ],
-                        backgroundColor: [
-                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
-                            '#FF6F61', '#6B7280', '#F4A261', '#2A9D8F', '#E76F51', '#D00000'
-                        ],
-                        borderColor: ['#fff', '#fff', '#fff', '#fff', '#fff', '#fff', '#fff', '#fff', '#fff', '#fff', '#fff', '#fff'],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    aspectRatio: 1.5,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                                color: '#000000',
-                                font: { size: 17 },
-                                generateLabels: function(chart) {
-                                    const labels = chart.data.labels;
-                                    return labels.map((label, index) => ({
-                                        text: label,
-                                        fillStyle: chart.data.datasets[0].backgroundColor[index],
-                                        strokeStyle: chart.data.datasets[0].borderColor[index],
-                                        lineWidth: chart.data.datasets[0].borderWidth,
-                                        hidden: false,
-                                        index: index,
-                                        datasetIndex: 0
-                                    }));
+            const ctx = document.getElementById('alertsPerMonthChart');
+            if (!ctx) {
+                console.error('Canvas element #alertsPerMonthChart not found');
+            } else {
+                const chartCtx = ctx.getContext('2d');
+                if (!chartCtx) {
+                    console.error('Failed to get 2D context for #alertsPerMonthChart');
+                } else {
+                    let alertsPerMonthChart = new Chart(chartCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+                            datasets: [{
+                                data: [
+                                    {{ alerts_per_month['January']|default(0) }},
+                                    {{ alerts_per_month['February']|default(0) }},
+                                    {{ alerts_per_month['March']|default(0) }},
+                                    {{ alerts_per_month['April']|default(0) }},
+                                    {{ alerts_per_month['May']|default(0) }},
+                                    {{ alerts_per_month['June']|default(0) }},
+                                    {{ alerts_per_month['July']|default(0) }},
+                                    {{ alerts_per_month['August']|default(0) }},
+                                    {{ alerts_per_month['September']|default(0) }},
+                                    {{ alerts_per_month['October']|default(0) }},
+                                    {{ alerts_per_month['November']|default(0) }},
+                                    {{ alerts_per_month['December']|default(0) }}
+                                ],
+                                backgroundColor: [
+                                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+                                    '#FF6F61', '#6B7280', '#F4A261', '#2A9D8F', '#E76F51', '#D00000'
+                                ],
+                                borderColor: ['#000000ff', '#000000ff', '#000000ff', '#020202ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff'],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            aspectRatio: 1.5,
+                            plugins: {
+                                legend: {
+                                    display: false,
+                                    position: 'bottom',
+                                    labels: {
+                                        color: '#000000',
+                                        font: { size: 17 },
+                                        generateLabels: function(chart) {
+                                            const labels = chart.data.labels;
+                                            return labels.map((label, index) => ({
+                                                text: label,
+                                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                                strokeStyle: chart.data.datasets[0].borderColor[index],
+                                                lineWidth: chart.data.datasets[0].borderWidth,
+                                                hidden: false,
+                                                index: index,
+                                                datasetIndex: 0
+                                            }));
+                                        },
+                                        boxWidth: 20,
+                                        padding: 10,
+                                        usePointStyle: true
+                                    },
+                                    onClick: function(e, legendItem, legend) {
+                                        const index = legendItem.index;
+                                        const ci = legend.chart;
+                                        const meta = ci.getDatasetMeta(0);
+                                        meta.data[index].hidden = !meta.data[index].hidden;
+                                        ci.update();
+                                    }
                                 },
-                                boxWidth: 20,
-                                padding: 10,
-                                usePointStyle: true
-                            },
-                            onClick: function(e, legendItem, legend) {
-                                const index = legendItem.index;
-                                const ci = legend.chart;
-                                const meta = ci.getDatasetMeta(0);
-                                meta.data[index].hidden = !meta.data[index].hidden;
-                                ci.update();
+                                layout: {
+                                    padding: {
+                                        bottom: 10
+                                    }
+                                }
                             }
                         }
-                    },
-                    layout: {
-                        padding: {
-                            bottom: 20
+                    });
+
+                    const twoRowLegendPlugin = {
+                        id: 'twoRowLegend',
+                        afterUpdate(chart) {
+                            const legend = chart.options.plugins.legend;
+                            if (legend && legend.position === 'bottom') {
+                                const legendElement = document.querySelector(`#${chart.canvas.id}-legend`);
+                                if (!legendElement) {
+                                    const container = document.createElement('div');
+                                    container.id = `${chart.canvas.id}-legend`;
+                                    container.className = 'chart-legend-two-rows';
+                                    chart.canvas.parentNode.appendChild(container);
+                                    
+                                    const labels = chart.data.labels;
+                                    const firstRow = labels.slice(0, 6); // January to June
+                                    const secondRow = labels.slice(6, 12); // July to December
+                                    
+                                    [firstRow, secondRow].forEach((row, rowIndex) => {
+                                        const rowDiv = document.createElement('div');
+                                        rowDiv.style.display = 'flex';
+                                        rowDiv.style.justifyContent = 'center';
+                                        rowDiv.style.marginBottom = rowIndex === 0 ? '10px' : '20px';
+                                        rowDiv.style.gap = '15px'; // optional: control space between legend items
+                                        
+                                        
+                                        row.forEach((label, index) => {
+                                            const actualIndex = rowIndex * 6 + index;
+                                            const item = document.createElement('div');
+                                            item.className = 'chart-legend-item';
+                                            item.innerHTML = `
+                                                <span style="
+                                                    display: inline-block;
+                                                    width: 18px;
+                                                    height: 18px;
+                                                    background-color: ${chart.data.datasets[0].backgroundColor[actualIndex]};
+                                                    margin-right: 3px; 
+                                                    vertical-align: middle;
+                                                "></span>
+                                                <span style="color: #000000; font-size: 17px;">${label}</span>
+                                            `;
+                                            item.onclick = () => {
+                                                const meta = chart.getDatasetMeta(0);
+                                                meta.data[actualIndex].hidden = !meta.data[actualIndex].hidden;
+                                                chart.update();
+                                            };
+                                            rowDiv.appendChild(item);
+                                        });
+                                        
+                                        container.appendChild(rowDiv);
+                                    });
+                                }
+                            }
                         }
+                    };
+
+                    Chart.register(twoRowLegendPlugin);
+
+                    // Fallback if data is empty
+                    if (alertsPerMonthChart.data.datasets[0].data.every(value => value === 0)) {
+                        console.warn('Chart initialized with zero data. Check database or server logs.');
                     }
+
+                    socket.on('update_alerts_per_month', (data) => {
+                        console.log('Received update_alerts_per_month:', data);
+                        alertsPerMonthChart.data.datasets[0].data = [
+                            data['January'] || 0,
+                            data['February'] || 0,
+                            data['March'] || 0,
+                            data['April'] || 0,
+                            data['May'] || 0,
+                            data['June'] || 0,
+                            data['July'] || 0,
+                            data['August'] || 0,
+                            data['September'] || 0,
+                            data['October'] || 0,
+                            data['November'] || 0,
+                            data['December'] || 0
+                        ];
+                        alertsPerMonthChart.update();
+                    });
                 }
-            });
-
-            const twoRowLegendPlugin = {
-                id: 'twoRowLegend',
-                afterUpdate(chart) {
-                    const legend = chart.options.plugins.legend;
-                    if (legend && legend.position === 'bottom') {
-                        const legendElement = document.querySelector(`#${chart.canvas.id}-legend`);
-                        if (!legendElement) {
-                            const container = document.createElement('div');
-                            container.id = `${chart.canvas.id}-legend`;
-                            container.className = 'chart-legend-two-rows';
-                            chart.canvas.parentNode.appendChild(container);
-                            
-                            const labels = chart.data.labels;
-                            const firstRow = labels.slice(0, 6); // January to June
-                            const secondRow = labels.slice(6, 12); // July to December
-                            
-                            [firstRow, secondRow].forEach((row, rowIndex) => {
-                                const rowDiv = document.createElement('div');
-                                rowDiv.style.display = 'flex';
-                                rowDiv.style.justifyContent = 'center';
-                                rowDiv.style.marginBottom = rowIndex === 0 ? '5px' : '0';
-                                
-                                row.forEach((label, index) => {
-                                    const actualIndex = rowIndex * 6 + index;
-                                    const item = document.createElement('div');
-                                    item.className = 'chart-legend-item';
-                                    item.innerHTML = `
-                                        <span style="display: inline-block; width: 20px; height: 20px; background-color: ${chart.data.datasets[0].backgroundColor[actualIndex]}; margin-right: 5px; vertical-align: middle;"></span>
-                                        <span style="color: #000000; font-size: 17px;">${label}</span>
-                                    `;
-                                    item.onclick = () => {
-                                        const meta = chart.getDatasetMeta(0);
-                                        meta.data[actualIndex].hidden = !meta.data[actualIndex].hidden;
-                                        chart.update();
-                                    };
-                                    rowDiv.appendChild(item);
-                                });
-                                
-                                container.appendChild(rowDiv);
-                            });
-                        }
-                    }
-                }
-            };
-
-            Chart.register(twoRowLegendPlugin);
-
-            socket.on('update_alerts_per_month', (data) => {
-                console.log('Received update_alerts_per_month:', data);
-                alertsPerMonthChart.data.datasets[0].data = [
-                    data['January'] || 0,
-                    data['February'] || 0,
-                    data['March'] || 0,
-                    data['April'] || 0,
-                    data['May'] || 0,
-                    data['June'] || 0,
-                    data['July'] || 0,
-                    data['August'] || 0,
-                    data['September'] || 0,
-                    data['October'] || 0,
-                    data['November'] || 0,
-                    data['December'] || 0
-                ];
-                alertsPerMonthChart.update();
-            });
+            }
 
             // Fetch menu.txt for dropdown options
             fetch('/static/menu.txt')
@@ -422,6 +455,7 @@
                 Object.keys(dropdownData).forEach(key => {
                     const select = document.createElement('select');
                     select.name = key.toLowerCase().replace(' ', '_');
+                    select.className = 'dropdown-emergency';
                     const placeholder = document.createElement('option');
                     placeholder.text = `Select ${key}`;
                     placeholder.value = '';
@@ -439,6 +473,7 @@
 
                 const submitButton = document.createElement('button');
                 submitButton.textContent = 'Submit';
+                submitButton.className = 'submit-emergency';
                 submitButton.addEventListener('click', () => {
                     const responseData = {
                         alert_id: data.alert_id,
@@ -460,6 +495,7 @@
 
                 const respondButton = document.createElement('button');
                 respondButton.textContent = 'Respond';
+                submitButton.className = 'submit-emergency';
                 respondButton.addEventListener('click', () => {
                     socket.emit('role_accepted', { alert_id: data.alert_id, role: 'bfp' });
                     responseForm.style.display = 'block';

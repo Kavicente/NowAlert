@@ -172,6 +172,37 @@ main {
     border-radius: 5px;
 }
 
+.dropdown-emergency {
+    width: 100%; 
+    padding: 10px; 
+    margin: 5px 0; 
+    box-sizing: border-box; 
+    background-color: #66c2ff; 
+    border: 1px solid #000000ff; 
+    border-radius: 4px; 
+    text-align: center;
+    cursor: pointer;
+}
+
+.dropdown-emergency:hover {
+    transform: scale(1.05);
+}
+
+.submit-emergency {
+    background-color: #66c2ff;
+    color: #000000;
+    padding: 10px 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px 0;
+}
+
+.submit-emergency:hover {
+    transform: scale(1.05);
+}
+
 canvas {
     max-width: 100%;
     display: block;
