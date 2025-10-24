@@ -148,6 +148,9 @@
             };
             L.control.layers(baseLayers).addTo(cdrrmoMap);
 
+            const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
+            const alertElements = new Map();
+
             const ctx = document.getElementById('alertsPerMonthChart');
             if (!ctx) {
                 console.error('Canvas element #alertsPerMonthChart not found');
