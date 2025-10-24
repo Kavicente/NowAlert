@@ -246,15 +246,7 @@
             });
 
 
-            fetch('/static/menu.txt')
-                .then(response => response.text())
-                .then(text => {
-                    menuData = parseMenuText(text);
-                    console.log('Menu data loaded:', menuData);
-                })
-                .catch(error => console.error('Error loading menu.txt:', error));
-
-
+           
             
 
             socket.on('connect', () => {
