@@ -1173,30 +1173,20 @@ def handle_barangay_response_submitted(data):
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     try:
-        # Map frontend field names (menu.txt) to backend table columns
-        field_mappings = {
-            'Road Accident Cause': {'db_column': 'road_accident_cause', 'default': 'Unknown', 'type': str},
-            'Road Accident Type': {'db_column': 'road_accident_type', 'default': 'Unknown', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Unknown', 'type': str},
-            'Road Conditions': {'db_column': 'road_condition', 'default': 'Unknown', 'type': str},
-            'Vehicle Types': {'db_column': 'vehicle_type', 'default': 'Unknown', 'type': str},
-            'Driver Ages': {'db_column': 'driver_age', 'default': 0, 'type': int},
-            'Driver Gender': {'db_column': 'driver_gender', 'default': 'Unknown', 'type': str},
-            'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
-            'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
-            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'emergency_type': {'db_column': 'emergency_type', 'default': 'Unknown', 'type': str}
-        }
-        
-        # Extract and validate data
-        extracted_data = {
-            mapping['db_column']: mapping['type'](data.get(key, mapping['default'])) 
-            if data.get(key) is not None else mapping['default']
-            for key, mapping in field_mappings.items()
-        }
-        extracted_data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        extracted_data['responded'] = True
+        alert_id = data.get('alert_id', str(uuid.uuid4()))
+        road_accident_cause = data.get('Road Accident Cause', 'Unknown')
+        road_accident_type = data.get('Road Accident Type', 'Unknown')
+        weather = data.get('Weather Conditions', 'Unknown')
+        road_condition = data.get('Road Conditions', 'Unknown')
+        vehicle_type = data.get('Vehicle Types', 'Unknown')
+        driver_age = int(data.get('Driver Ages', 0)) if data.get('Driver Ages') is not None else 0
+        driver_gender = data.get('Driver Gender', 'Unknown')
+        lat = float(data.get('lat', 0.0)) if data.get('lat') is not None else 0.0
+        lon = float(data.get('lon', 0.0)) if data.get('lon') is not None else 0.0
+        barangay = data.get('barangay', 'Unknown')
+        emergency_type = data.get('emergency_type', 'Unknown')
+        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        responded = True
 
         conn = get_db_connection()
         conn.execute('''
@@ -1205,24 +1195,9 @@ def handle_barangay_response_submitted(data):
                 road_condition, vehicle_type, driver_age, driver_gender, 
                 lat, lon, barangay, emergency_type, timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            extracted_data['alert_id'],
-            extracted_data['road_accident_cause'],
-            extracted_data['road_accident_type'],
-            extracted_data['weather'],
-            extracted_data['road_condition'],
-            extracted_data['vehicle_type'],
-            extracted_data['driver_age'],
-            extracted_data['driver_gender'],
-            extracted_data['lat'],
-            extracted_data['lon'],
-            extracted_data['barangay'],
-            extracted_data['emergency_type'],
-            extracted_data['timestamp'],
-            extracted_data['responded']
-        ))
+        ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {extracted_data['alert_id']}")
+        logger.info(f"Stored barangay response for alert_id: {alert_id}")
     except Exception as e:
         logger.error(f"Error storing barangay response: {e}")
         conn.rollback()
@@ -3658,7 +3633,49 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
 
-    
+    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                users TEXT,
+                username TEXT PRIMARY KEY,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL,
+                first_name TEXT,
+                middle_name TEXT,
+                last_name TEXT,
+                age INTEGER,
+                contact_no TEXT,
+                house_no TEXT,
+                street_no TEXT,
+                barangay TEXT,
+                municipality TEXT,
+                province TEXT,
+                position TEXT,
+                synced INTEGER DEFAULT 0
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT NOT NULL,
+                synced INTEGER DEFAULT 0
+            )
+        ''')
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                data TEXT NOT NULL,
+                synced INTEGER DEFAULT 0
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        logger.info("Android database 'AlertNowLocal.db' initialized successfully or already exists.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Android database: {e}")
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
