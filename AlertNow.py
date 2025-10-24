@@ -2575,7 +2575,7 @@ def handle_fire_response_submission(data):
 
         conn = get_db_connection()
         conn.execute('''
-            INSERT INTO fire_response (
+            INSERT INTO bfp_response (
                 alert_id, fire_type, fire_cause, weather, fire_severity, 
                 resident_age, resident_gender, lat, lon, barangay, 
                 emergency_type, timestamp, responded
@@ -2706,7 +2706,7 @@ def handle_fire_response_submission(data):
                 input_df[col] = 0
                 
         if fire_accident_predictor:
-            prediction = fire_accident_predictor.predict(input_df)[:, 1][0] * 100
+            prediction = fire_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
             data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
             logger.info(f"Prediction for bfp response: {data['prediction']}")
         else:
