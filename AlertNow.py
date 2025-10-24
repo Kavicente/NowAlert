@@ -1387,7 +1387,7 @@ def handle_barangay_fire_submitted(data):
             INSERT INTO barangay_fire_response (
                 alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, 
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['fire_type'],
@@ -1660,12 +1660,20 @@ def handle_barangay_crime_submitted(data):
         
         input_df = pd.DataFrame([cleaned_data])
         
-        expected_columns = crime_df.columns
-        for col in expected_columns:
-            if col not in input_df.columns:
-                input_df[col] = 0
-        
-        input_df = input_df[expected_columns]
+        # Ensure all expected columns are present
+        if crime_df is not None and not crime_df.empty:
+            expected_columns = crime_df.columns
+            for col in expected_columns:
+                if col not in input_df.columns:
+                    input_df[col] = 0
+            input_df = input_df[expected_columns]
+        else:
+            logger.warning("crime_df is not initialized or empty, using default columns")
+            expected_columns = ['Crime_Type', 'Crime_Cause', 'Barangay', 'Year', 'Level', 'Suspect_Gender', 'Victim_Gender', 'Suspect_Age', 'Victim_Age']
+            for col in expected_columns:
+                if col not in input_df.columns:
+                    input_df[col] = 0
+            input_df = input_df[expected_columns]
         
         if crime_predictor:
             prediction = crime_predictor.predict_proba(input_df)[:, 1][0] * 100
@@ -1692,7 +1700,7 @@ def handle_barangay_health_response(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Health Emergency Types': {'db_column': 'health_emergency_type', 'default': 'Heart Attack', 'type': str},
+            'Health Emergency Types': {'db_column': 'health_type', 'default': 'Heart Attack', 'type': str},
             'Health Causes': {'db_column': 'health_cause', 'default': 'Chronic Illness', 'type': str},
             'Patient Gender': {'db_column': 'patient_gender', 'default': 'Male', 'type': str},
             'Patient Age': {'db_column': 'patient_age', 'default': '26-35', 'type': str},
@@ -1713,13 +1721,13 @@ def handle_barangay_health_response(data):
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO barangay_health_response (
-                alert_id, health_emergency_type, health_cause, patient_age, 
+                alert_id, health_type, health_cause, patient_age, 
                 patient_gender, lat, lon, barangay, emergency_type, 
                 timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
-            extracted_data['health_emergency_type'],
+            extracted_data['health_type'],
             extracted_data['health_cause'],
             extracted_data['patient_age'],
             extracted_data['patient_gender'],
@@ -1787,7 +1795,7 @@ def handle_barangay_health_response(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Health_Emergency_Type':
+            elif key == 'Health_Type':
                 cleaned_data[key] = health_type_mapping.get(data.get('Health Emergency Types', '').lower(), default_values[key])
             elif key == 'Health_Cause':
                 cleaned_data[key] = health_cause_mapping.get(data.get('Health Causes', '').lower(), default_values[key])
@@ -1796,7 +1804,15 @@ def handle_barangay_health_response(data):
             elif key == 'Patient_Gender':
                 cleaned_data[key] = patient_gender_mapping.get(data.get('Patient Gender', '').lower(), default_values[key])
                 
-        expected_columns = health_emergencies_df.columns
+        input_df = pd.DataFrame([cleaned_data])
+        
+        # Ensure all expected columns are present
+        if health_emergencies_df is not None and not health_emergencies_df.empty:
+            expected_columns = health_emergencies_df.columns
+        else:
+            logger.warning("health_emergencies_df is not initialized or empty, using default columns")
+            expected_columns = ['Health_Emergency_Type', 'Health_Cause', 'Barangay', 'Year', 'Patient_Age', 'Patient_Gender']
+        
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
@@ -2225,7 +2241,7 @@ def handle_pnp_fire_submitted(data):
             INSERT INTO pnp_fire_response (
                 alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, 
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['fire_type'],
@@ -2497,12 +2513,20 @@ def handle_pnp_crime_submitted(data):
         
         input_df = pd.DataFrame([cleaned_data])
         
-        expected_columns = crime_df.columns
-        for col in expected_columns:
-            if col not in input_df.columns:
-                input_df[col] = 0
-        
-        input_df = input_df[expected_columns]
+        # Ensure all expected columns are present
+        if crime_df is not None and not crime_df.empty:
+            expected_columns = crime_df.columns
+            for col in expected_columns:
+                if col not in input_df.columns:
+                    input_df[col] = 0
+            input_df = input_df[expected_columns]
+        else:
+            logger.warning("crime_df is not initialized or empty, using default columns")
+            expected_columns = ['Crime_Type', 'Crime_Cause', 'Barangay', 'Year', 'Level', 'Suspect_Gender', 'Victim_Gender', 'Suspect_Age', 'Victim_Age']
+            for col in expected_columns:
+                if col not in input_df.columns:
+                    input_df[col] = 0
+            input_df = input_df[expected_columns]
         
         if crime_predictor:
             prediction = crime_predictor.predict_proba(input_df)[:, 1][0] * 100
@@ -2707,7 +2731,7 @@ def handle_health_response(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Health Emergency Types': {'db_column': 'health_emergency_type', 'default': 'Heart Attack', 'type': str},
+            'Health Emergency Types': {'db_column': 'health_type', 'default': 'Heart Attack', 'type': str},
             'Health Causes': {'db_column': 'health_cause', 'default': 'Chronic Illness', 'type': str},
             'Patient Gender': {'db_column': 'patient_gender', 'default': 'Male', 'type': str},
             'Patient Age': {'db_column': 'patient_age', 'default': '26-35', 'type': str},
@@ -2728,13 +2752,13 @@ def handle_health_response(data):
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO health_response (
-                alert_id, health_emergency_type, health_cause, patient_age, 
+                alert_id, health_type, health_cause, patient_age, 
                 patient_gender, lat, lon, barangay, emergency_type, 
                 timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
-            extracted_data['health_emergency_type'],
+            extracted_data['health_type'],
             extracted_data['health_cause'],
             extracted_data['patient_age'],
             extracted_data['patient_gender'],
@@ -2802,7 +2826,7 @@ def handle_health_response(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Health_Emergency_Type':
+            elif key == 'Health_Type':
                 cleaned_data[key] = health_type_mapping.get(data.get('Health Emergency Types', '').lower(), default_values[key])
             elif key == 'Health_Cause':
                 cleaned_data[key] = health_cause_mapping.get(data.get('Health Causes', '').lower(), default_values[key])
@@ -2814,12 +2838,16 @@ def handle_health_response(data):
         input_df = pd.DataFrame([cleaned_data])
         
         # Ensure all expected columns are present
-        expected_columns = health_emergencies_df.columns
+        if health_emergencies_df is not None and not health_emergencies_df.empty:
+            expected_columns = health_emergencies_df.columns
+        else:
+            logger.warning("health_emergencies_df is not initialized or empty, using default columns")
+            expected_columns = ['Health_Type', 'Health_Cause', 'Barangay', 'Year', 'Patient_Age', 'Patient_Gender']
+        
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
         
-        # Reorder columns to match training data
         input_df = input_df[expected_columns]
         
         # Make prediction
