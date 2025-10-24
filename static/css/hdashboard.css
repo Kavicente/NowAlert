@@ -20,6 +20,12 @@ header {
 
     margin-bottom: 20px;
 }
+
+.alert-logo {
+    height: 50px; /* Adjust height as needed */
+    width: auto; /* Maintain aspect ratio */
+    margin-left: 15px; /* Space between logo and text */
+}
 .p {
     font-family: Arial, sans-serif;
     color:#000000;
@@ -146,6 +152,50 @@ main {
     
    
 }
+.dropdown-emergency {
+    width: 100%; 
+    padding: 10px; 
+    margin: 5px 0; 
+    box-sizing: border-box; 
+    background-color: #66c2ff; 
+    border: 1px solid #000000ff; 
+    border-radius: 4px; 
+    text-align: center;
+    cursor: pointer;
+}
+
+.dropdown-emergency:hover {
+    transform: scale(1.05);
+}
+.dropdown-hospital {
+    width: 100%; 
+    padding: 10px; 
+    margin: 5px 0; 
+    box-sizing: border-box; 
+    background-color: #66c2ff; 
+    border: 1px solid #000000ff; 
+    border-radius: 4px; 
+    text-align: center;
+    cursor: pointer;
+}
+
+.dropdown-hospital:hover {
+    transform: scale(1.05);
+}
+.submit-emergency {
+    background-color: #66c2ff;
+    color: #000000;
+    padding: 10px 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin: 5px 0;
+}
+
+.submit-emergency:hover {
+    transform: scale(1.05);
+}
 .alert-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -170,37 +220,6 @@ main {
     height: auto;
     margin-top: 10px;
     border-radius: 5px;
-}
-
-.dropdown-emergency {
-    width: 100%; 
-    padding: 10px; 
-    margin: 5px 0; 
-    box-sizing: border-box; 
-    background-color: #66c2ff; 
-    border: 1px solid #000000ff; 
-    border-radius: 4px; 
-    text-align: center;
-    cursor: pointer;
-}
-
-.dropdown-emergency:hover {
-    transform: scale(1.05);
-}
-
-.submit-emergency {
-    background-color: #66c2ff;
-    color: #000000;
-    padding: 10px 20px;
-    font-weight: bold;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    margin: 5px 0;
-}
-
-.submit-emergency:hover {
-    transform: scale(1.05);
 }
 
 canvas {
