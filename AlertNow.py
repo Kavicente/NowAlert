@@ -1172,37 +1172,27 @@ def handle_barangay_response_submitted(data):
     logger.info(f"Barangay response received: {data}")
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
+    conn = get_db_connection()
     try:
-        alert_id = data.get('alert_id', str(uuid.uuid4()))
-        road_accident_cause = data.get('Road Accident Cause', 'Unknown')
-        road_accident_type = data.get('Road Accident Type', 'Unknown')
-        weather = data.get('Weather Conditions', 'Unknown')
-        road_condition = data.get('Road Conditions', 'Unknown')
-        vehicle_type = data.get('Vehicle Types', 'Unknown')
-        driver_age = int(data.get('Driver Ages', 0)) if data.get('Driver Ages') is not None else 0
-        driver_gender = data.get('Driver Gender', 'Unknown')
-        lat = float(data.get('lat', 0.0)) if data.get('lat') is not None else 0.0
-        lon = float(data.get('lon', 0.0)) if data.get('lon') is not None else 0.0
-        barangay = data.get('barangay', 'Unknown')
-        emergency_type = data.get('emergency_type', 'Unknown')
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        responded = True
-
-        conn = get_db_connection()
         conn.execute('''
             INSERT INTO barangay_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data.get('alert_id'), data.get('Road Accident Cause'), data.get('Road Accident Type'),
+            data.get('Weather Conditions'), data.get('Road Conditions'), data.get('Vehicle Types'),
+            data.get('Driver Ages'), data.get('Driver Gender'), data.get('lat'), data.get('lon'),
+            data.get('barangay'), data.get('emergency_type'), datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {alert_id}")
+        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error storing barangay response: {e}")
-        conn.rollback()
     finally:
         conn.close()
+    
     
     # Check if response is today for analytics
     response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
@@ -1216,13 +1206,8 @@ def handle_barangay_response_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
-            'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Road_Condition': data.get('Road Conditions', 'Dry'),
-            'Vehicle_Type': data.get('Vehicle Types', 'Car'),
-            'Driver_Age': data.get('Driver Ages', '26-35'),
-            'Driver_Gender': data.get('Driver Gender', 'Male')
+            'Road_Accident_Type': 'Overspeeding',
+            'Accident_Cause': 'Head-on collision'
         }
         
         # Map input values to dataset categories
@@ -1246,39 +1231,6 @@ def handle_barangay_response_submitted(data):
             'mechanical failure': 'Mechanical Failure',
             'inexperience': 'Inexperience'
         }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        road_condition_mapping = {
-            'dry': 'Dry',
-            'wet': 'Wet',
-            'icy': 'Icy',
-            'potholes': 'Potholes',
-            'gravel': 'Gravel'
-        }
-        vehicle_mapping = {
-            'car': 'Car',
-            'motorcycle': 'Motorcycle',
-            'truck': 'Truck',
-            'bus': 'Bus',
-            'bicycle': 'Bicycle'
-        }
-        driver_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        driver_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
         
         # Validate and clean input data
         cleaned_data = {}
@@ -1288,19 +1240,10 @@ def handle_barangay_response_submitted(data):
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
             elif key == 'Road_Accident_Type':
-                cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
+                cleaned_data[key] = cause_mapping.get(data.get('road_accident_type', '').lower(), default_values[key])
             elif key == 'Accident_Cause':
-                cleaned_data[key] = type_mapping.get(data.get('Road Accident Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Road_Condition':
-                cleaned_data[key] = road_condition_mapping.get(data.get('Road Conditions', '').lower(), default_values[key])
-            elif key == 'Vehicle_Type':
-                cleaned_data[key] = vehicle_mapping.get(data.get('Vehicle Types', '').lower(), default_values[key])
-            elif key == 'Driver_Gender':
-                cleaned_data[key] = driver_gender_mapping.get(data.get('Driver Gender', '').lower(), default_values[key])
-            elif key == 'Driver_Age':
-                cleaned_data[key] = driver_age_mapping.get(str(data.get('Driver Ages', '')).lower(), default_values[key])
+                cleaned_data[key] = type_mapping.get(data.get('cause', '').lower(), default_values[key])
+
         
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
