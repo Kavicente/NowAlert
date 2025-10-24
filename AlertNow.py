@@ -1173,26 +1173,27 @@ def handle_barangay_response_submitted(data):
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     try:
-        fields = {
-            'alert_id': {'default': str(uuid.uuid4()), 'type': str},
-            'road_accident_cause': {'default': 'Unknown', 'type': str},
-            'road_accident_type': {'default': 'Unknown', 'type': str},
-            'weather': {'default': 'Unknown', 'type': str},
-            'road_condition': {'default': 'Unknown', 'type': str},
-            'vehicle_type': {'default': 'Unknown', 'type': str},
-            'driver_age': {'default': 0, 'type': int},
-            'driver_gender': {'default': 'Unknown', 'type': str},
-            'lat': {'default': 0.0, 'type': float},
-            'lon': {'default': 0.0, 'type': float},
-            'barangay': {'default': 'Unknown', 'type': str},
-            'emergency_type': {'default': 'Unknown', 'type': str}
+        # Map frontend field names (menu.txt) to backend table columns
+        field_mappings = {
+            'Road Accident Cause': {'db_column': 'road_accident_cause', 'default': 'Unknown', 'type': str},
+            'Road Accident Type': {'db_column': 'road_accident_type', 'default': 'Unknown', 'type': str},
+            'Weather Conditions': {'db_column': 'weather', 'default': 'Unknown', 'type': str},
+            'Road Conditions': {'db_column': 'road_condition', 'default': 'Unknown', 'type': str},
+            'Vehicle Types': {'db_column': 'vehicle_type', 'default': 'Unknown', 'type': str},
+            'Driver Ages': {'db_column': 'driver_age', 'default': 0, 'type': int},
+            'Driver Gender': {'db_column': 'driver_gender', 'default': 'Unknown', 'type': str},
+            'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
+            'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
+            'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
+            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
+            'emergency_type': {'db_column': 'emergency_type', 'default': 'Unknown', 'type': str}
         }
         
         # Extract and validate data
         extracted_data = {
-            key: fields[key]['type'](data.get(key, fields[key]['default'])) 
-            if data.get(key) is not None else fields[key]['default']
-            for key in fields
+            mapping['db_column']: mapping['type'](data.get(key, mapping['default'])) 
+            if data.get(key) is not None else mapping['default']
+            for key, mapping in field_mappings.items()
         }
         extracted_data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
         extracted_data['responded'] = True
@@ -1221,12 +1222,12 @@ def handle_barangay_response_submitted(data):
             extracted_data['responded']
         ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
+        logger.info(f"Stored barangay response for alert_id: {extracted_data['alert_id']}")
     except Exception as e:
         logger.error(f"Error storing barangay response: {e}")
+        conn.rollback()
     finally:
         conn.close()
-    
     
     # Check if response is today for analytics
     response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
@@ -1240,13 +1241,13 @@ def handle_barangay_response_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Road_Accident_Type': data.get('road_accident_type', 'Overspeeding'),
-            'Accident_Cause': data.get('road_accident_cause', 'Head-on collision'),
-            'Weather_Condition': data.get('weather', 'Sunny'),
-            'Road_Condition': data.get('road_condition', 'Dry'),
-            'Vehicle_Type': data.get('vehicle_type', 'Car'),
-            'Driver_Age': data.get('driver_age', '26-35'),
-            'Driver_Gender': data.get('driver_gender', 'Male')
+            'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
+            'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
+            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
+            'Road_Condition': data.get('Road Conditions', 'Dry'),
+            'Vehicle_Type': data.get('Vehicle Types', 'Car'),
+            'Driver_Age': data.get('Driver Ages', '26-35'),
+            'Driver_Gender': data.get('Driver Gender', 'Male')
         }
         
         # Map input values to dataset categories
@@ -1271,38 +1272,37 @@ def handle_barangay_response_submitted(data):
             'inexperience': 'Inexperience'
         }
         weather_mapping = {
-            'clear': 'Clear',
+            'sunny': 'Sunny',
             'rainy': 'Rainy',
             'foggy': 'Foggy',
-            'stormy': 'Stormy',
-            'snowy': 'Snowy'
+            'cloudy': 'Cloudy',
+            'stormy': 'Stormy'
         }
         road_condition_mapping = {
             'dry': 'Dry',
             'wet': 'Wet',
             'icy': 'Icy',
-            'under construction': 'Under Construction',
-            'potehole': 'Pothole'           
-            
+            'potholes': 'Potholes',
+            'gravel': 'Gravel'
         }
         vehicle_mapping = {
             'car': 'Car',
             'motorcycle': 'Motorcycle',
             'truck': 'Truck',
             'bus': 'Bus',
-            'bicycle': 'Bicycle',
+            'bicycle': 'Bicycle'
         }
         driver_age_mapping = {
+            '0-17': '0-17',
             '18-25': '18-25',
             '26-35': '26-35',
             '36-45': '36-45',
-            '46-55': '46-55',
-            '56+': '56+'
+            '46-60': '46-60',
+            '61+': '61+'
         }
         driver_gender_mapping = {
             'male': 'Male',
             'female': 'Female'
-            
         }
         
         # Validate and clean input data
@@ -1313,19 +1313,19 @@ def handle_barangay_response_submitted(data):
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
             elif key == 'Road_Accident_Type':
-                cleaned_data[key] = cause_mapping.get(data.get('road_accident_type', '').lower(), default_values[key])
+                cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
             elif key == 'Accident_Cause':
-                cleaned_data[key] = type_mapping.get(data.get('cause', '').lower(), default_values[key])
+                cleaned_data[key] = type_mapping.get(data.get('Road Accident Cause', '').lower(), default_values[key])
             elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('weather', '').lower(), default_values[key])
+                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
             elif key == 'Road_Condition':
-                cleaned_data[key] = road_condition_mapping.get(data.get('road_condition', '').lower(), default_values[key])
+                cleaned_data[key] = road_condition_mapping.get(data.get('Road Conditions', '').lower(), default_values[key])
             elif key == 'Vehicle_Type':
-                cleaned_data[key] = vehicle_mapping.get(data.get('vehicle_type', '').lower(), default_values[key])
+                cleaned_data[key] = vehicle_mapping.get(data.get('Vehicle Types', '').lower(), default_values[key])
             elif key == 'Driver_Gender':
-                cleaned_data[key] = driver_gender_mapping.get(data.get('driver_gender', '').lower(), default_values[key])
+                cleaned_data[key] = driver_gender_mapping.get(data.get('Driver Gender', '').lower(), default_values[key])
             elif key == 'Driver_Age':
-                cleaned_data[key] = driver_age_mapping.get(str(data.get('driver_age', '')).lower(), default_values[key])
+                cleaned_data[key] = driver_age_mapping.get(str(data.get('Driver Ages', '')).lower(), default_values[key])
         
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
