@@ -1750,7 +1750,7 @@ def handle_barangay_health_response(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Health_Emergency_Type': data.get('Health Emergency Types', 'Heart Attack'),
+            'Health_Type': data.get('Health Emergency Types', 'Heart Attack'),
             'Health_Cause': data.get('Health Causes', 'Chronic Illness'),
             'Patient_Age': data.get('Patient Age', '26-35'),
             'Patient_Gender': data.get('Patient Gender', 'Male')
@@ -2557,8 +2557,6 @@ def handle_fire_response_submission(data):
             'Fire Cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
             'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
             'Fire Severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
-            'Resident Age': {'db_column': 'resident_age', 'default': '26-35', 'type': str},
-            'Resident Gender': {'db_column': 'resident_gender', 'default': 'Male', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
@@ -2576,18 +2574,15 @@ def handle_fire_response_submission(data):
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO bfp_response (
-                alert_id, fire_type, fire_cause, weather, fire_severity, 
-                resident_age, resident_gender, lat, lon, barangay, 
+                alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, 
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['fire_type'],
             extracted_data['fire_cause'],
             extracted_data['weather'],
             extracted_data['fire_severity'],
-            extracted_data['resident_age'],
-            extracted_data['resident_gender'],
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
@@ -2610,9 +2605,7 @@ def handle_fire_response_submission(data):
             'Fire_Type': data.get('Fire Types', 'Residential Fire'),
             'Fire_Cause': data.get('Fire Cause', 'Unattended Cooking'),
             'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Fire_Severity': data.get('Fire Severity', 'Low'),
-            'Resident_Age': data.get('Resident Age', '26-35'),
-            'Resident_Gender': data.get('Resident Gender', 'Male')
+            'Fire_Severity': data.get('Fire Severity', 'Low')
         }
         ftype_mapping = {
             'residential fire': 'Residential Fire',
@@ -2665,19 +2658,6 @@ def handle_fire_response_submission(data):
             'severe fire': 'Severe Fire',
             'catastrophic fire': 'Catastrophic Fire'
         }
-        resident_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-55': '46-55',
-            '56-65': '56-65',
-            '66+': '66+'
-        }
-        resident_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
         
         cleaned_data = {}
         for key in default_values:
@@ -2693,10 +2673,6 @@ def handle_fire_response_submission(data):
                 cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
             elif key == 'Fire_Severity':
                 cleaned_data[key] = fire_severity_mapping.get(data.get('Fire Severity', '').lower(), default_values[key])
-            elif key == 'Resident_Age':
-                cleaned_data[key] = resident_age_mapping.get(str(data.get('Resident Age', '')).lower(), default_values[key])
-            elif key == 'Resident_Gender':
-                cleaned_data[key] = resident_gender_mapping.get(data.get('Resident Gender', '').lower(), default_values[key])
                 
         input_df = pd.DataFrame([cleaned_data])
         
@@ -2781,7 +2757,7 @@ def handle_health_response(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Health_Emergency_Type': data.get('Health Emergency Types', 'Heart Attack'),
+            'Health_Type': data.get('Health Emergency Types', 'Heart Attack'),
             'Health_Cause': data.get('Health Causes', 'Chronic Illness'),
             'Patient_Age': data.get('Patient Age', '26-35'),
             'Patient_Gender': data.get('Patient Gender', 'Male')
