@@ -5,11 +5,6 @@ import ast
 import os
 import json
 import sqlite3
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from database.config import DATABASE_CONFIG
-import subprocess
-import tempfile
 import joblib
 import cv2
 import numpy as np
@@ -136,9 +131,6 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-def get_connection():
-    conn = psycopg2.connect(**DATABASE_CONFIG, cursor_factory=RealDictCursor)
-    return conn
 
 def get_android_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
@@ -1181,35 +1173,57 @@ def handle_barangay_response_submitted(data):
     data['timestamp'] = datetime.now(pytz.UTC).isoformat()
     
     try:
-        alert_id = data.get('alert_id', str(uuid.uuid4()))
-        road_accident_cause = data.get('road_accident_cause', 'Unknown')
-        road_accident_type = data.get('road_accident_type', 'Unknown')
-        weather = data.get('weather', 'Unknown')
-        road_condition = data.get('road_condition', 'Unknown')
-        vehicle_type = data.get('vehicle_type', 'Unknown')
-        driver_age = int(data.get('driver_age', 0)) if data.get('driver_age') else 0
-        driver_gender = data.get('driver_gender', 'Unknown')
-        lat = float(data.get('lat', 0.0)) if data.get('lat') else 0.0
-        lon = float(data.get('lon', 0.0)) if data.get('lon') else 0.0
-        barangay = data.get('barangay', 'Unknown')
-        emergency_type = data.get('emergency_type', 'Unknown')
-        timestamp = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
-        responded = True
+        fields = {
+            'alert_id': {'default': str(uuid.uuid4()), 'type': str},
+            'road_accident_cause': {'default': 'Unknown', 'type': str},
+            'road_accident_type': {'default': 'Unknown', 'type': str},
+            'weather': {'default': 'Unknown', 'type': str},
+            'road_condition': {'default': 'Unknown', 'type': str},
+            'vehicle_type': {'default': 'Unknown', 'type': str},
+            'driver_age': {'default': 0, 'type': int},
+            'driver_gender': {'default': 'Unknown', 'type': str},
+            'lat': {'default': 0.0, 'type': float},
+            'lon': {'default': 0.0, 'type': float},
+            'barangay': {'default': 'Unknown', 'type': str},
+            'emergency_type': {'default': 'Unknown', 'type': str}
+        }
+        
+        # Extract and validate data
+        extracted_data = {
+            key: fields[key]['type'](data.get(key, fields[key]['default'])) 
+            if data.get(key) is not None else fields[key]['default']
+            for key in fields
+        }
+        extracted_data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        extracted_data['responded'] = True
 
-        conn = get_connection()
-        with conn.cursor() as c:
-            c.execute('''
-                INSERT INTO barangay_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, 
-                    road_condition, vehicle_type, driver_age, driver_gender, 
-                    lat, lon, barangay, emergency_type, timestamp, responded
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+        conn = get_db_connection()
+        conn.execute('''
+            INSERT INTO barangay_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            extracted_data['alert_id'],
+            extracted_data['road_accident_cause'],
+            extracted_data['road_accident_type'],
+            extracted_data['weather'],
+            extracted_data['road_condition'],
+            extracted_data['vehicle_type'],
+            extracted_data['driver_age'],
+            extracted_data['driver_gender'],
+            extracted_data['lat'],
+            extracted_data['lon'],
+            extracted_data['barangay'],
+            extracted_data['emergency_type'],
+            extracted_data['timestamp'],
+            extracted_data['responded']
+        ))
         conn.commit()
         logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error storing barangay response: {e}")
-        conn.rollback()
     finally:
         conn.close()
     
@@ -1604,19 +1618,17 @@ def handle_cdrrmo_response_submitted(data):
         responded = True
 
         conn = get_db_connection()
-        with conn.cursor() as c:
-            c.execute('''
-                INSERT INTO cdrrmo_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, 
-                    road_condition, vehicle_type, driver_age, driver_gender, 
-                    lat, lon, barangay, emergency_type, timestamp, responded
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+        conn.execute('''
+            INSERT INTO cdrrmo_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
         conn.commit()
         logger.info(f"Stored cdrrmo response for alert_id: {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error storing cdrrmo response: {e}")
-        conn.rollback()
     finally:
         conn.close()
     
@@ -1723,19 +1735,17 @@ def handle_pnp_response_submitted(data):
         responded = True
 
         conn = get_db_connection()
-        with conn.cursor() as c:
-            c.execute('''
-                INSERT INTO pnp_response (
-                    alert_id, road_accident_cause, road_accident_type, weather, 
-                    road_condition, vehicle_type, driver_age, driver_gender, 
-                    lat, lon, barangay, emergency_type, timestamp, responded
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
+        conn.execute('''
+            INSERT INTO pnp_response (
+                alert_id, road_accident_cause, road_accident_type, weather, 
+                road_condition, vehicle_type, driver_age, driver_gender, 
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (alert_id, road_accident_cause, road_accident_type, weather, road_condition, vehicle_type, driver_age, driver_gender, lat, lon, barangay, emergency_type, timestamp, responded))
         conn.commit()
         logger.info(f"Stored pnp response for alert_id: {data.get('alert_id')}")
     except Exception as e:
         logger.error(f"Error storing pnp response: {e}")
-        conn.rollback()
     finally:
         conn.close()
     
@@ -2399,36 +2409,6 @@ def download_db():
         return "Database file not found", 404
     logger.debug(f"Serving database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='users_web.db')
-
-@app.route('/db_download', methods=['GET'])
-def db_download():
-    import subprocess
-    from flask import send_file
-    import tempfile
-    try:
-        dump_file = tempfile.NamedTemporaryFile(delete=False, suffix='.sql')
-        dump_path = dump_file.name
-        cmd = [
-            'pg_dump',
-            '-U', DATABASE_CONFIG['user'],
-            '-h', DATABASE_CONFIG['host'],
-            '-p', DATABASE_CONFIG['port'],
-            '--no-owner',
-            '--no-privileges',
-            '-d', DATABASE_CONFIG['dbname'],
-            '-f', dump_path
-        ]
-        env = os.environ.copy()
-        env['PGPASSWORD'] = DATABASE_CONFIG['password']
-        subprocess.run(cmd, env=env, check=True)
-        logger.debug(f"Generated database dump: {dump_path}")
-        return send_file(dump_path, as_attachment=True, download_name='dashboard.sql')
-    except Exception as e:
-        logger.error(f"Error generating database dump: {e}")
-        return "Database dump failed", 500
-    finally:
-        if os.path.exists(dump_path):
-            os.remove(dump_path)
 
 @app.route('/download_android_db', methods=['GET'])
 def download_android_db():
@@ -3677,262 +3657,8 @@ if __name__ == '__main__':
         logger.info("Database 'users_web.db' initialized successfully or already exists.")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
-        
-    try:
-        conn = get_connection()
-        with conn.cursor() as c:
-            # Create alerts table first due to foreign key dependencies
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS alerts (
-                    id SERIAL,
-                    alert_id VARCHAR(36) NOT NULL,
-                    barangay VARCHAR(100) NOT NULL,
-                    emergency_type VARCHAR(100) NOT NULL,
-                    lat REAL NOT NULL,
-                    lon REAL NOT NULL,
-                    timestamp VARCHAR(50) NOT NULL,
-                    status VARCHAR(50) NOT NULL,
-                    image VARCHAR(255),
-                    PRIMARY KEY (alert_id, barangay)
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS barangay_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    road_accident_cause VARCHAR(100) DEFAULT 'Unknown',
-                    road_accident_type VARCHAR(100) DEFAULT 'Unknown',
-                    weather VARCHAR(50) DEFAULT 'Unknown',
-                    road_condition VARCHAR(50) DEFAULT 'Unknown',
-                    vehicle_type VARCHAR(50) DEFAULT 'Unknown',
-                    driver_age INTEGER DEFAULT 0,
-                    driver_gender VARCHAR(20) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS barangay_fire_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    fire_cause VARCHAR(100) DEFAULT 'Unknown',
-                    fire_type VARCHAR(100) DEFAULT 'Unknown',
-                    weather VARCHAR(50) DEFAULT 'Unknown',
-                    building_type VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS barangay_crime_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    crime_type VARCHAR(100) DEFAULT 'Unknown',
-                    weapon_used VARCHAR(100) DEFAULT 'Unknown',
-                    time_of_day VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS barangay_health_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    health_type VARCHAR(100) DEFAULT 'Unknown',
-                    health_cause VARCHAR(100) DEFAULT 'Unknown',
-                    weather VARCHAR(50) DEFAULT 'Unknown',
-                    patient_age INTEGER DEFAULT 0,
-                    patient_gender VARCHAR(20) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS bfp_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    fire_cause VARCHAR(100) DEFAULT 'Unknown',
-                    fire_type VARCHAR(100) DEFAULT 'Unknown',
-                    weather VARCHAR(50) DEFAULT 'Unknown',
-                    building_type VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS cdrrmo_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    disaster_type VARCHAR(100) DEFAULT 'Unknown',
-                    severity VARCHAR(50) DEFAULT 'Unknown',
-                    weather VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS health_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    health_type VARCHAR(100) DEFAULT 'Unknown',
-                    health_cause VARCHAR(100) DEFAULT 'Unknown',
-                    patient_age INTEGER DEFAULT 0,
-                    patient_gender VARCHAR(20) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS helth_responses (
-                    alert_id VARCHAR(36) NOT NULL,
-                    barangay VARCHAR(100) NOT NULL,
-                    emergency_type VARCHAR(100) NOT NULL,
-                    lat REAL NOT NULL,
-                    lon REAL NOT NULL,
-                    timestamp VARCHAR(50) NOT NULL,
-                    status VARCHAR(50) NOT NULL,
-                    image VARCHAR(255),
-                    PRIMARY KEY (alert_id)
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS hospital_alerts (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    barangay VARCHAR(100) NOT NULL,
-                    assigned_hospital VARCHAR(100) NOT NULL,
-                    health_type VARCHAR(100) DEFAULT 'N/A',
-                    health_cause VARCHAR(100) DEFAULT 'N/A',
-                    patient_age VARCHAR(20) DEFAULT 'N/A',
-                    patient_gender VARCHAR(20) DEFAULT 'N/A',
-                    timestamp VARCHAR(50) NOT NULL,
-                    status VARCHAR(50) NOT NULL,
-                    lat REAL,
-                    lon REAL,
-                    image VARCHAR(255),
-                    CONSTRAINT fk_alerts FOREIGN KEY (alert_id, barangay) REFERENCES alerts (alert_id, barangay)
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS hospital_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    barangay VARCHAR(100) NOT NULL,
-                    assigned_hospital VARCHAR(100) NOT NULL,
-                    health_type VARCHAR(100) DEFAULT 'Unknown',
-                    health_cause VARCHAR(100) DEFAULT 'Unknown',
-                    patient_age INTEGER DEFAULT 0,
-                    patient_gender VARCHAR(20) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS pnp_alerts (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    barangay VARCHAR(100) NOT NULL,
-                    crime_type VARCHAR(100) DEFAULT 'N/A',
-                    weapon_used VARCHAR(100) DEFAULT 'N/A',
-                    time_of_day VARCHAR(50) DEFAULT 'N/A',
-                    lat REAL,
-                    lon REAL,
-                    timestamp VARCHAR(50) NOT NULL,
-                    status VARCHAR(50) NOT NULL,
-                    image VARCHAR(255),
-                    CONSTRAINT fk_alerts FOREIGN KEY (alert_id, barangay) REFERENCES alerts (alert_id, barangay)
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS pnp_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    crime_type VARCHAR(100) DEFAULT 'Unknown',
-                    weapon_used VARCHAR(100) DEFAULT 'Unknown',
-                    time_of_day VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS pnp_crime_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    crime_type VARCHAR(100) DEFAULT 'Unknown',
-                    weapon_used VARCHAR(100) DEFAULT 'Unknown',
-                    time_of_day VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS pnp_fire_response (
-                    id SERIAL PRIMARY KEY,
-                    alert_id VARCHAR(36) NOT NULL,
-                    fire_cause VARCHAR(100) DEFAULT 'Unknown',
-                    fire_type VARCHAR(100) DEFAULT 'Unknown',
-                    weather VARCHAR(50) DEFAULT 'Unknown',
-                    building_type VARCHAR(50) DEFAULT 'Unknown',
-                    lat REAL DEFAULT 0.0,
-                    lon REAL DEFAULT 0.0,
-                    barangay VARCHAR(100) DEFAULT 'Unknown',
-                    emergency_type VARCHAR(100) DEFAULT 'Unknown',
-                    timestamp VARCHAR(50) NOT NULL,
-                    responded BOOLEAN DEFAULT TRUE
-                )
-            ''')
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    barangay VARCHAR(100),
-                    role VARCHAR(50) NOT NULL CHECK(role IN ('resident', 'barangay', 'cdrrmo', 'pnp', 'bfp', 'health', 'hospital')),
-                    contact_no VARCHAR(20) UNIQUE NOT NULL,
-                    assigned_municipality VARCHAR(100),
-                    province VARCHAR(100),
-                    password VARCHAR(255) NOT NULL
-                )
-            ''')
-        conn.commit()
-        logger.info("All tables initialized successfully in dashboard database")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-    finally:
-        conn.close()
+
+    
 
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
