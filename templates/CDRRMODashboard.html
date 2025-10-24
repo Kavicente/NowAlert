@@ -112,7 +112,17 @@
     </main>
 
     <script>
-        let menuData = {};
+        let menuData = {
+            'Road Accident': {
+                'Road Accident Cause': ['Head-on Collision', 'Rear-end Collision', 'Side-impact Collision', 'Single Vehicle Accident', 'Pedestrian Accident'],
+                'Road Accident Type': ['Overspeeding', 'Distracted Driving', 'Drunk Driving', 'Reckless Driving', 'Fatigue', 'Inexperience', 'Mechanical Failure', 'Poor Maintenance', 'Overloading'],
+                'Weather Conditions': ['Sunny', 'Rainy', 'Foggy', 'Cloudy', 'Stormy'],
+                'Road Conditions': ['Dry', 'Wet', 'Icy', 'Potholes', 'Gravel'],
+                'Vehicle Types': ['Car', 'Motorcycle', 'Truck', 'Bus', 'Bicycle'],
+                'Driver Ages': ['0-17', '18-25', '26-35', '36-45', '46-60', '61+'],
+                'Driver Gender': ['Male', 'Female']
+            },
+        };
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -305,14 +315,6 @@
                 }
             }
 
-            // Fetch menu.txt for dropdown options
-            fetch('/static/menu.txt')
-                .then(response => response.text())
-                .then(text => {
-                    menuData = parseMenuText(text);
-                    console.log('Menu data loaded:', menuData);
-                })
-                .catch(error => console.error('Error loading menu.txt:', error));
 
             socket.on('connect', () => {
                 console.log('Connected to server');

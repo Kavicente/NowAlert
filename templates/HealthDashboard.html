@@ -86,7 +86,16 @@
     </main>
     
     <script>
-        let menuData = {};
+        let menuData = {
+
+            'Health Emergency': {
+                'Health Emergency Types': ['Heart Attack', 'Stroke', 'Fall', 'Breathing Difficulty', 'Giving Birth', 'Seizure', 'Burn', 'Poisoning', 'Allergic Reaction'],
+                'Health Causes': ['Pregnant', 'Chronic Illness', 'Accident', 'Allergy', 'Infection', 'Overdose', 'Heatstroke'],
+                'Patient Gender': ['Male', 'Female'],
+                'Patient Age': ['0-17', '18-25', '26-35', '36-45', '46-60', '61+']
+            }
+
+        };
         const hospitalOptions = [
             "San Pablo City District Hospital",
             "San Pablo Colleges Medical Center",
@@ -126,13 +135,6 @@
             const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
-            fetch('/static/menu.txt')
-                .then(response => response.text())
-                .then(text => {
-                    menuData = parseMenuText(text);
-                    console.log('Menu data loaded:', menuData);
-                })
-                .catch(error => console.error('Error loading menu.txt:', error));
 
             socket.on('connect', () => {
                 console.log('Connected to server');
