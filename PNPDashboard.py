@@ -84,28 +84,23 @@ def get_pnp_new_alert(municipality):
         logger.error(f"Error fetching latest alert for {municipality}: {e}")
         return None
 
-def get_pnp_emergency_types(municipality=None):
-    if not municipality:
-        logger.warning("No municipality provided for emergency types, returning defaults")
-        return {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0}
+def get_pnp_emergency_types(barangay=None):
+    if not barangay:
+        logger.warning("No barangay provided for emergency types")
+        return {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0, 'Health Emergency': 0}
     try:
         conn = get_db_connection()
-        # Check if 'municipality' column exists
-        cursor = conn.execute("PRAGMA table_info(pnp_response)")
-        columns = [col['name'] for col in cursor.fetchall()]
-        location_column = 'municipality' if 'municipality' in columns else 'barangay'
-        
-        cursor = conn.execute(f'''
+        cursor = conn.execute('''
             SELECT emergency_type, COUNT(*) as count 
             FROM (
-                SELECT emergency_type FROM pnp_response WHERE {location_column} = ? OR {location_column} IS NULL
+                SELECT emergency_type FROM pnp_response WHERE resident_barangay = ?
                 UNION ALL
-                SELECT emergency_type FROM pnp_crime_response WHERE {location_column} = ? OR {location_column} IS NULL
+                SELECT emergency_type FROM pnp_crime_response WHERE resident_barangay = ?
                 UNION ALL
-                SELECT emergency_type FROM pnp_fire_response WHERE {location_column} = ? OR {location_column} IS NULL
+                SELECT emergency_type FROM pnp_fire_response WHERE resident_barangay = ?
             ) AS combined
             GROUP BY emergency_type
-        ''', (municipality, municipality, municipality))
+        ''', (barangay, barangay, barangay))
         emergency_types = {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0}
         for row in cursor:
             if row['emergency_type'] in emergency_types:
@@ -113,7 +108,7 @@ def get_pnp_emergency_types(municipality=None):
         conn.close()
         return emergency_types
     except Exception as e:
-        logger.error(f"Error fetching emergency types for {municipality}: {e}")
+        logger.error(f"Error fetching emergency types for {barangay}: {e}")
         return {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0}
 
 def get_pnp_responded_count(municipality):
