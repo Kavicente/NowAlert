@@ -2027,6 +2027,7 @@ def handle_pnp_response_submitted(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},  # Retain 'Unknown' as per schema
+            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
         }
         
@@ -2043,7 +2044,7 @@ def handle_pnp_response_submitted(data):
             INSERT INTO pnp_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, emergency_type, timestamp
+                lat, lon, barangay, resident_barangay, emergency_type, timestamp
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
@@ -2057,6 +2058,7 @@ def handle_pnp_response_submitted(data):
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
+            extracted_data['resident_barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp']
         ))
@@ -2080,6 +2082,7 @@ def handle_pnp_response_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', ''),
+            'Resident_Barangay': data.get('resident_barangay', ''),
             'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
             'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
             'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
@@ -2151,6 +2154,8 @@ def handle_pnp_response_submitted(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
+            elif key == 'Resident_Barangay':
+                cleaned_data[key] = data.get('resident_barangay', default_values[key])
             elif key == 'Road_Accident_Type':
                 cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
             elif key == 'Accident_Cause':
@@ -2211,6 +2216,7 @@ def handle_pnp_fire_submitted(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
+            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Fire Incident', 'type': str}
         }
         
@@ -2225,7 +2231,7 @@ def handle_pnp_fire_submitted(data):
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO pnp_fire_response (
-                alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, 
+                alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, resident_barangay,
                 emergency_type, timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -2237,6 +2243,7 @@ def handle_pnp_fire_submitted(data):
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
+            extracted_data['resident_barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
             extracted_data['responded']
@@ -2253,6 +2260,7 @@ def handle_pnp_fire_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
+            'Resident_Barangay': data.get('resident_barangay', ''),
             'Fire_Type': data.get('Fire Types', 'Residential Fire'),
             'Fire_Cause': data.get('Fire Cause', 'Unattended Cooking'),
             'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
@@ -2318,6 +2326,8 @@ def handle_pnp_fire_submitted(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
+            elif key == 'Resident_Barangay':
+                cleaned_data[key] = data.get('resident_barangay', default_values[key])
             elif key == 'Fire_Type':
                 cleaned_data[key] = ftype_mapping.get(data.get('Fire Types', '').lower(), default_values[key])
             elif key == 'Fire_Cause':
@@ -2370,6 +2380,7 @@ def handle_pnp_crime_submitted(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
+            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Crime Incident', 'type': str}
         }
         
@@ -2385,7 +2396,7 @@ def handle_pnp_crime_submitted(data):
         conn.execute('''
             INSERT INTO pnp_crime_response (
                 alert_id, crime_type, crime_cause, level, suspect_gender, 
-                victim_gender, suspect_age, victim_age, lat, lon, barangay, 
+                victim_gender, suspect_age, victim_age, lat, lon, barangay, resident_barangay, 
                 emergency_type, timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -2400,6 +2411,7 @@ def handle_pnp_crime_submitted(data):
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
+            extracted_data['resident_barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
             extracted_data['responded']
@@ -2482,6 +2494,8 @@ def handle_pnp_crime_submitted(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
+            elif key == 'Resident_Barangay':
+                cleaned_data[key] = data.get('resident_barangay', default_values[key])
             elif key == 'Crime_Type':
                 cleaned_data[key] = crime_type_mapping.get(data.get('Crime Types', '').lower(), default_values[key])
             elif key == 'Crime_Cause':
