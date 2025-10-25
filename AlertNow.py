@@ -2385,7 +2385,7 @@ def handle_pnp_crime_submitted(data):
         conn.execute('''
             INSERT INTO pnp_crime_response (
                 alert_id, crime_type, crime_cause, level, suspect_gender, 
-                victim_gender, suspect_age, victim_age, lat, lon, barangay,
+                victim_gender, suspect_age, victim_age, lat, lon, barangay, 
                 emergency_type, timestamp, responded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
@@ -2530,6 +2530,7 @@ def handle_pnp_crime_submitted(data):
     pnp_room = f"pnp_{data.get('barangay', 'unknown').lower()}"
     emit('pnp_crime_submitted', data, room=pnp_room)
     logger.info(f"Emitted crime response to room: {pnp_room}")
+
 
 
         
