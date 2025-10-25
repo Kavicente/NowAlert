@@ -2237,7 +2237,6 @@ def handle_pnp_fire_submitted(data):
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
-            extracted_data['resident_barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
             extracted_data['responded']
