@@ -1511,7 +1511,7 @@ def handle_barangay_fire_submitted(data):
     responses.append(data)
     
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-    emit('barangay_fire_response', data, room=barangay_room)
+    emit('barangay_fire_submitted', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
 
 @socketio.on('barangay_crime_submitted')
@@ -1689,7 +1689,7 @@ def handle_barangay_crime_submitted(data):
     responses.append(data)
     
     barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
-    emit('barangay_crime_response', data, room=barangay_room)
+    emit('barangay_crime_submitted', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
 
 @socketio.on('barangay_health_response')
@@ -2364,7 +2364,7 @@ def handle_pnp_fire_submitted(data):
     responses.append(data)
     
     pnp_room = f"pnp_{data.get('municipality', 'unknown').lower()}"
-    emit('pnp_fire_response', data, room=pnp_room)
+    emit('pnp_fire_submitted', data, room=pnp_room)
     logger.info(f"Emitted fire response to room: {pnp_room}")
 
 @socketio.on('pnp_crime_submitted')
@@ -2542,7 +2542,7 @@ def handle_pnp_crime_submitted(data):
     responses.append(data)
     
     pnp_room = f"pnp_{data.get('barangay', 'unknown').lower()}"
-    emit('pnp_crime_response', data, room=pnp_room)
+    emit('pnp_crime_submitted', data, room=pnp_room)
     logger.info(f"Emitted crime response to room: {pnp_room}")
 
 
