@@ -20,7 +20,7 @@ from models import road_accident_predictor, fire_accident_predictor, crime_predi
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update
 from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert, get_the_cdrrmo_stats, get_cdrrmo_new_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
-from PNPDashboard import get_pnp_stats, get_latest_alert, get_the_pnp_stats, get_pnp_new_alert, get_pnp_responded_count, get_pnp_emergency_types
+from PNPDashboard import get_pnp_stats, get_latest_alert, get_the_pnp_stats, get_pnp_new_alert, get_pnp_alerts_per_month, get_pnp_responded_count, emit_pnp_alerts_per_month_update
 from BFPDashboard import get_bfp_stats, get_latest_alert, get_the_stat_bfp, get_bfp_alerts_per_month, get_bfp_responded_count, emit_bfp_alerts_per_month_update
 from HealthDashboard import get_health_stats, get_latest_alert
 from HospitalDashboard import get_hospital_stats, get_latest_alert
@@ -2026,8 +2026,7 @@ def handle_pnp_response_submitted(data):
             'Driver Gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
-            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},  # Retain 'Unknown' as per schema
-            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
+            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str}, 
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
         }
         
@@ -2044,8 +2043,8 @@ def handle_pnp_response_submitted(data):
             INSERT INTO pnp_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, resident_barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                lat, lon, barangay, emergency_type, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['road_accident_cause'],
@@ -2058,7 +2057,6 @@ def handle_pnp_response_submitted(data):
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
-            extracted_data['resident_barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp']
         ))
@@ -2082,7 +2080,6 @@ def handle_pnp_response_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', ''),
-            'Resident_Barangay': data.get('resident_barangay', ''),
             'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
             'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
             'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
@@ -2154,8 +2151,6 @@ def handle_pnp_response_submitted(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Resident_Barangay':
-                cleaned_data[key] = data.get('resident_barangay', default_values[key])
             elif key == 'Road_Accident_Type':
                 cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
             elif key == 'Accident_Cause':
@@ -2216,7 +2211,6 @@ def handle_pnp_fire_submitted(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Fire Incident', 'type': str}
         }
         
@@ -2231,9 +2225,9 @@ def handle_pnp_fire_submitted(data):
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO pnp_fire_response (
-                alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, resident_barangay,
+                alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay,
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['fire_type'],
@@ -2260,7 +2254,6 @@ def handle_pnp_fire_submitted(data):
         default_values = {
             'Year': datetime.now().year,
             'Barangay': data.get('barangay', 'Unknown'),
-            'Resident_Barangay': data.get('resident_barangay', ''),
             'Fire_Type': data.get('Fire Types', 'Residential Fire'),
             'Fire_Cause': data.get('Fire Cause', 'Unattended Cooking'),
             'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
@@ -2326,8 +2319,6 @@ def handle_pnp_fire_submitted(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Resident_Barangay':
-                cleaned_data[key] = data.get('resident_barangay', default_values[key])
             elif key == 'Fire_Type':
                 cleaned_data[key] = ftype_mapping.get(data.get('Fire Types', '').lower(), default_values[key])
             elif key == 'Fire_Cause':
@@ -2380,7 +2371,6 @@ def handle_pnp_crime_submitted(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Crime Incident', 'type': str}
         }
         
@@ -2396,9 +2386,9 @@ def handle_pnp_crime_submitted(data):
         conn.execute('''
             INSERT INTO pnp_crime_response (
                 alert_id, crime_type, crime_cause, level, suspect_gender, 
-                victim_gender, suspect_age, victim_age, lat, lon, barangay, resident_barangay, 
+                victim_gender, suspect_age, victim_age, lat, lon, barangay,
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['crime_type'],
@@ -2411,7 +2401,6 @@ def handle_pnp_crime_submitted(data):
             extracted_data['lat'],
             extracted_data['lon'],
             extracted_data['barangay'],
-            extracted_data['resident_barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
             extracted_data['responded']
@@ -2494,8 +2483,6 @@ def handle_pnp_crime_submitted(data):
                 cleaned_data[key] = default_values[key]
             elif key == 'Barangay':
                 cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Resident_Barangay':
-                cleaned_data[key] = data.get('resident_barangay', default_values[key])
             elif key == 'Crime_Type':
                 cleaned_data[key] = crime_type_mapping.get(data.get('Crime Types', '').lower(), default_values[key])
             elif key == 'Crime_Cause':
@@ -3727,7 +3714,7 @@ def pnp_dashboard():
         session['assigned_barangay'] = assigned_barangay  # Ensure session has barangay
         stats = get_pnp_stats()
         le_pnp_stats = get_the_pnp_stats(assigned_barangay)
-        responded_count = get_pnp_responded_count(assigned_municipality)
+        responded_count = get_pnp_responded_count()
         coords = municipality_coords.get(assigned_municipality, {'lat': 14.5995, 'lon': 120.9842})
         
         try:
@@ -3738,12 +3725,14 @@ def pnp_dashboard():
             lat_coord = 14.5995
             lon_coord = 120.9842
 
+        alerts_per_month = get_pnp_alerts_per_month()
         logger.debug(f"Rendering PNPDashboard for {assigned_municipality}")
         return render_template('PNPDashboard.html', 
                                stats=stats, 
                                municipality=assigned_municipality, 
                                le_pnp_stats=le_pnp_stats,
                                responded_count=responded_count,
+                               alerts_per_month=alerts_per_month,
                                lat_coord=lat_coord, 
                                lon_coord=lon_coord, 
                                google_api_key=GOOGLE_API_KEY)
@@ -3751,32 +3740,9 @@ def pnp_dashboard():
         logger.error(f"Error in pnp_dashboard: {e}")
         return "Internal Server Error", 500
     
-@app.route('/pnp_emergency_types')
-def pnp_emergency_types():
-    if 'role' not in session or session['role'] != 'pnp':
-        logger.warning("Unauthorized access to pnp_emergency_types. Session: %s", session)
-        return jsonify({'error': 'Unauthorized'}), 401
-    barangay = session.get('assigned_barangay')
-    if not barangay:
-        logger.error("No barangay found in session: %s. Using default 'San Pablo City'", session)
-        barangay = "San Pablo City"  # Fallback to default
-    emergency_types = get_pnp_emergency_types(barangay)
-    logger.debug("Fetched emergency types for %s: %s", barangay, emergency_types)
-    return jsonify(emergency_types)
 
-@app.route('/pnp_responded_count')
-def pnp_responded_count():
-    try:
-        barangay = session.get('assigned_barangay')
-        if not barangay:
-            logger.error("No barangay found in session: %s. Using default 'San Pablo City'", session)
-            barangay = "San Pablo City"  # Fallback to default
-        count = get_pnp_responded_count(barangay)
-        logger.debug("Fetched responded count for %s: %s", barangay, count)
-        return jsonify({'responded_count': count})
-    except Exception as e:
-        logger.error(f"Error in pnp_responded_count: {e}")
-        return jsonify({'responded_count': 0}), 500
+
+
 
 @app.route('/bfp_dashboard')
 def bfp_dashboard():
@@ -3980,18 +3946,24 @@ def get_bfp_stats():
         logger.error(f"Error in get_bfp_stats: {e}")
         return Counter()
     
-def get_the_stat_bfp():
+def get_the_pnp_stats(municipality):
     try:
         conn = get_db_connection()
-        cursor = conn.execute('''
+        # Check if 'municipality' column exists
+        cursor = conn.execute("PRAGMA table_info(pnp_response)")
+        columns = [col['name'] for col in cursor.fetchall()]
+        location_column = 'municipality' if 'municipality' in columns else 'barangay'
+        
+        cursor = conn.execute(f'''
             SELECT COUNT(*) as total 
-            FROM bfp_response
-        ''')
+            FROM pnp_response 
+            WHERE {location_column} = ? OR {location_column} IS NULL
+        ''', (municipality,))
         total = cursor.fetchone()['total']
         conn.close()
         return type('Stats', (), {'total': lambda self: total})()
     except Exception as e:
-        logger.error(f"Error fetching CDRRMO stats: {e}")
+        logger.error(f"Error fetching PNP stats for {municipality}: {e}")
         return type('Stats', (), {'total': lambda self: 0})()
     
 def get_health_stats():

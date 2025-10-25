@@ -31,112 +31,84 @@ def get_latest_alert():
         logger.error(f"Error in get_latest_alert: {e}")
         return None
     
-def get_the_pnp_stats(barangay):
+def get_the_pnp_stats():
     try:
         conn = get_db_connection()
-        # Check if 'municipality' column exists in any of the tables
-        cursor = conn.execute("PRAGMA table_info(pnp_response)")
-        columns = [col['name'] for col in cursor.fetchall()]
-        location_column = 'municipality' if 'municipality' in columns else 'barangay'
-        
-        cursor = conn.execute(f'''
+        cursor = conn.execute('''
             SELECT COUNT(*) as total 
-            FROM (
-                SELECT {location_column} FROM pnp_response WHERE {location_column} = ? OR {location_column} IS NULL
-                UNION ALL
-                SELECT {location_column} FROM pnp_crime_response WHERE {location_column} = ? OR {location_column} IS NULL
-                UNION ALL
-                SELECT {location_column} FROM pnp_fire_response WHERE {location_column} = ? OR {location_column} IS NULL
-            ) AS combined
-        ''', (barangay, barangay, barangay))
+            FROM pnp_response
+        ''')
         total = cursor.fetchone()['total']
         conn.close()
         return type('Stats', (), {'total': lambda self: total})()
     except Exception as e:
-        logger.error(f"Error fetching PNP stats for {barangay}: {e}")
+        logger.error(f"Error fetching pnp stats: {e}")
         return type('Stats', (), {'total': lambda self: 0})()
 
-def get_pnp_new_alert(municipality):
+def get_pnp_new_alert():
     try:
         conn = get_db_connection()
-        # Check if 'municipality' column exists
-        cursor = conn.execute("PRAGMA table_info(pnp_response)")
-        columns = [col['name'] for col in cursor.fetchall()]
-        location_column = 'municipality' if 'municipality' in columns else 'barangay'
-        
-        cursor = conn.execute(f'''
-            SELECT * FROM (
-                SELECT alert_id, {location_column}, emergency_type, timestamp 
-                FROM pnp_response WHERE {location_column} = ? OR {location_column} IS NULL
-                UNION ALL
-                SELECT alert_id, {location_column}, emergency_type, timestamp 
-                FROM pnp_crime_response WHERE {location_column} = ? OR {location_column} IS NULL
-                UNION ALL
-                SELECT alert_id, {location_column}, emergency_type, timestamp 
-                FROM pnp_fire_response WHERE {location_column} = ? OR {location_column} IS NULL
-            ) AS combined
+        cursor = conn.execute('''
+            SELECT alert_id, emergency_type, timestamp 
+            FROM pnp_response
             ORDER BY timestamp DESC LIMIT 1
-        ''', (municipality, municipality, municipality))
+        ''')
         alert = cursor.fetchone()
         conn.close()
         return dict(alert) if alert else None
     except Exception as e:
-        logger.error(f"Error fetching latest alert for {municipality}: {e}")
+        logger.error(f"Error fetching latest alert: {e}")
         return None
 
-def get_pnp_emergency_types(barangay=None):
-    if not barangay:
-        logger.warning("No barangay provided for emergency types")
-        return {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0, 'Health Emergency': 0}
+def get_pnp_alerts_per_month():
     try:
         conn = get_db_connection()
         cursor = conn.execute('''
-            SELECT emergency_type, COUNT(*) as count 
-            FROM (
-                SELECT emergency_type FROM pnp_response WHERE resident_barangay = ?
-                UNION ALL
-                SELECT emergency_type FROM pnp_crime_response WHERE resident_barangay = ?
-                UNION ALL
-                SELECT emergency_type FROM pnp_fire_response WHERE resident_barangay = ?
-            ) AS combined
-            GROUP BY emergency_type
-        ''', (barangay, barangay, barangay))
-        emergency_types = {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0}
+            SELECT strftime('%m', datetime(timestamp)) as month, COUNT(*) as count 
+            FROM pnp_response 
+            WHERE timestamp IS NOT NULL AND datetime(timestamp) IS NOT NULL
+            GROUP BY strftime('%m', datetime(timestamp))
+        ''')
+        month_names = {
+            '01': 'January', '02': 'February', '03': 'March', '04': 'April',
+            '05': 'May', '06': 'June', '07': 'July', '08': 'August',
+            '09': 'September', '10': 'October', '11': 'November', '12': 'December'
+        }
+        alerts_per_month = {
+            'January': 0, 'February': 0, 'March': 0, 'April': 0, 'May': 0, 'June': 0,
+            'July': 0, 'August': 0, 'September': 0, 'October': 0, 'November': 0, 'December': 0
+        }
         for row in cursor:
-            if row['emergency_type'] in emergency_types:
-                emergency_types[row['emergency_type']] = row['count']
+            month_num = row['month']
+            if month_num in month_names:
+                alerts_per_month[month_names[month_num]] = row['count']
         conn.close()
-        return emergency_types
+        return alerts_per_month
     except Exception as e:
-        logger.error(f"Error fetching emergency types for {barangay}: {e}")
-        return {'Road Accident': 0, 'Crime Incident': 0, 'Fire Incident': 0}
+        logger.error(f"Error fetching alerts per month: {e}")
+        return {
+            'January': 0, 'February': 0, 'March': 0, 'April': 0, 'May': 0, 'June': 0,
+            'July': 0, 'August': 0, 'September': 0, 'October': 0, 'November': 0, 'December': 0
+        }
 
-def get_pnp_responded_count(municipality):
+def get_pnp_responded_count():
     try:
         conn = get_db_connection()
-        # Check if 'municipality' column exists
-        cursor = conn.execute("PRAGMA table_info(pnp_response)")
-        columns = [col['name'] for col in cursor.fetchall()]
-        location_column = 'municipality' if 'municipality' in columns else 'barangay'
-        
-        cursor = conn.execute(f'''
+        cursor = conn.execute('''
             SELECT COUNT(*) as count 
             FROM pnp_response 
-            WHERE ({location_column} = ? OR {location_column} IS NULL) AND responded = TRUE
-        ''', (municipality,))
+            WHERE responded = TRUE
+        ''')
         count = cursor.fetchone()['count']
         conn.close()
         return count
     except Exception as e:
-        logger.error(f"Error fetching responded count for {municipality}: {e}")
+        logger.error(f"Error fetching responded count: {e}")
         return 0
 
-def emit_pnp_emergency_types_update(socketio, municipality):
-    if not municipality:
-        logger.error("No municipality provided for emitting emergency types update")
-        return
-    emergency_types = get_pnp_emergency_types(municipality)
-    socketio.emit('update_pnp_emergency_types', emergency_types, room=f"pnp_{municipality.lower()}")
+def emit_pnp_alerts_per_month_update(socketio):
+    alerts_per_month = get_pnp_alerts_per_month()
+    socketio.emit('update_alerts_per_month', alerts_per_month, room='pnp')
     
 def get_heatmap_data(municipality):
     db_path = os.path.join(os.path.dirname(__file__), '..', 'database', 'users_web.db')

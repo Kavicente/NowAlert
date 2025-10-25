@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PNP Dashboard</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboards.css') }}">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
@@ -94,8 +94,8 @@
                     </div>
                 </div>
                 <div class="chart-container">
-                    <h4>Emergency Types</h4>
-                    <canvas id="emergencyTypeChart"></canvas>
+                    <h4>Alerts Received Per Month</h4>
+                    <canvas id="alertsPerMonthChart"></canvas>
                 </div>
             </section>
         </div>
@@ -175,61 +175,159 @@
             const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
 
-            const ctx = document.getElementById('emergencyTypeChart').getContext('2d');
-            let emergencyTypeChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Road Accident', 'Crime Incident', 'Fire Incident'],
-                    datasets: [{
-                        label: 'Emergency Types',
-                        data: [0, 0, 0, 0], // Initial placeholder data
-                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'],
-                        borderColor: ['#000000ff', '#000000ff', '#000000ff', '#000000ff'],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false, // Allow custom sizing
-                    aspectRatio: 1.5, // Adjust this value (e.g., 1 for square, 1.5 for wider, 0.5 for taller)
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                                color: '#000000',
-                                font: {
-                                    size: 17
+            const ctx = document.getElementById('alertsPerMonthChart');
+            if (!ctx) {
+                console.error('Canvas element #alertsPerMonthChart not found');
+            } else {
+                const chartCtx = ctx.getContext('2d');
+                if (!chartCtx) {
+                    console.error('Failed to get 2D context for #alertsPerMonthChart');
+                } else {
+                    let alertsPerMonthChart = new Chart(chartCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+                            datasets: [{
+                                label: 'Alerts Per Month',
+                                data: [
+                                    {{ alerts_per_month['January']|default(0) }},
+                                    {{ alerts_per_month['February']|default(0) }},
+                                    {{ alerts_per_month['March']|default(0) }},
+                                    {{ alerts_per_month['April']|default(0) }},
+                                    {{ alerts_per_month['May']|default(0) }},
+                                    {{ alerts_per_month['June']|default(0) }},
+                                    {{ alerts_per_month['July']|default(0) }},
+                                    {{ alerts_per_month['August']|default(0) }},
+                                    {{ alerts_per_month['September']|default(0) }},
+                                    {{ alerts_per_month['October']|default(0) }},
+                                    {{ alerts_per_month['November']|default(0) }},
+                                    {{ alerts_per_month['December']|default(0) }}
+                                ],
+                                backgroundColor: [
+                                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40',
+                                    '#FF6F61', '#6B7280', '#F4A261', '#2A9D8F', '#E76F51', '#D00000'
+                                ],
+                                borderColor: ['#080808ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff', '#000000ff'],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            aspectRatio: 1.5,
+                            plugins: {
+                                legend: {
+                                    display: false, // Removed vertical legend display
+                                    position: 'bottom',
+                                    labels: {
+                                        color: '#000000',
+                                        font: { size: 17 },
+                                        generateLabels: function(chart) {
+                                            const labels = chart.data.labels;
+                                            return labels.map((label, index) => ({
+                                                text: label,
+                                                fillStyle: chart.data.datasets[0].backgroundColor[index],
+                                                strokeStyle: chart.data.datasets[0].borderColor[index],
+                                                lineWidth: chart.data.datasets[0].borderWidth,
+                                                hidden: false,
+                                                index: index,
+                                                datasetIndex: 0
+                                            }));
+                                        },
+                                        boxWidth: 20,
+                                        padding: 10,
+                                        usePointStyle: true
+                                    },
+                                    onClick: function(e, legendItem, legend) {
+                                        const index = legendItem.index;
+                                        const ci = legend.chart;
+                                        const meta = ci.getDatasetMeta(0);
+                                        meta.data[index].hidden = !meta.data[index].hidden;
+                                        ci.update();
+                                    }
+                                },
+                                layout: {
+                                    padding: {
+                                        bottom: 20
+                                    }
                                 }
                             }
-                        },
-                        
+                        }
+                    });
+
+                    const twoRowLegendPlugin = {
+                        id: 'twoRowLegend',
+                        afterUpdate(chart) {
+                            const legend = chart.options.plugins.legend;
+                            if (legend && legend.position === 'bottom') {
+                                const legendElement = document.querySelector(`#${chart.canvas.id}-legend`);
+                                if (!legendElement) {
+                                    const container = document.createElement('div');
+                                    container.id = `${chart.canvas.id}-legend`;
+                                    container.className = 'chart-legend-two-rows';
+                                    chart.canvas.parentNode.appendChild(container);
+                                    
+                                    const labels = chart.data.labels;
+                                    const firstRow = labels.slice(0, 6); // January to June
+                                    const secondRow = labels.slice(6, 12); // July to December
+                                    
+                                    [firstRow, secondRow].forEach((row, rowIndex) => {
+                                        const rowDiv = document.createElement('div');
+                                        rowDiv.style.display = 'flex';
+                                        rowDiv.style.justifyContent = 'center';
+                                        rowDiv.style.marginBottom = rowIndex === 0 ? '10px' : '20px';
+                                        rowDiv.style.gap = '15px'; 
+                                        
+                                        row.forEach((label, index) => {
+                                            const actualIndex = rowIndex * 6 + index;
+                                            const item = document.createElement('div');
+                                            item.className = 'chart-legend-item';
+                                            item.innerHTML = `
+                                                <span style="display: inline-block; width: 20px; height: 20px; background-color: ${chart.data.datasets[0].backgroundColor[actualIndex]}; margin-right: 5px; vertical-align: middle;"></span>
+                                                <span style="color: #000000; font-size: 17px;">${label}</span>
+                                            `;
+                                            item.onclick = () => {
+                                                const meta = chart.getDatasetMeta(0);
+                                                meta.data[actualIndex].hidden = !meta.data[actualIndex].hidden;
+                                                chart.update();
+                                            };
+                                            rowDiv.appendChild(item);
+                                        });
+                                        
+                                        container.appendChild(rowDiv);
+                                    });
+                                }
+                            }
+                        }
+                    };
+
+                    Chart.register(twoRowLegendPlugin);
+
+                    // Fallback if data is empty
+                    if (alertsPerMonthChart.data.datasets[0].data.every(value => value === 0)) {
+                        console.warn('Chart initialized with zero data. Check database or server logs.');
                     }
+
+                    socket.on('update_alerts_per_month', (data) => {
+                        console.log('Received update_alerts_per_month:', data);
+                        alertsPerMonthChart.data.datasets[0].data = [
+                            data['January'] || 0,
+                            data['February'] || 0,
+                            data['March'] || 0,
+                            data['April'] || 0,
+                            data['May'] || 0,
+                            data['June'] || 0,
+                            data['July'] || 0,
+                            data['August'] || 0,
+                            data['September'] || 0,
+                            data['October'] || 0,
+                            data['November'] || 0,
+                            data['December'] || 0
+                        ];
+                        alertsPerMonthChart.update();
+                    });
                 }
-            });
-
-            // Fetch initial emergency type data
-            fetch('/pnp_emergency_types')
-                .then(response => response.json())
-                .then(data => {
-                    emergencyTypeChart.data.datasets[0].data = [
-                        data['Road Accident'] || 0,
-                        data['Crime Incident'] || 0,
-                        data['Fire Incident'] || 0
-                    ];
-                    emergencyTypeChart.update();
-                })
-                .catch(error => console.error('Error fetching emergency types:', error));
-
-            // Listen for real-time updates
-            socket.on('update_pnp_emergency_types', (data) => {
-                emergencyTypeChart.data.datasets[0].data = [
-                    data['Road Accident'] || 0,
-                    data['Crime Incident'] || 0,
-                    data['Fire Incident'] || 0
-                ];
-                emergencyTypeChart.update();
-            });
+            }
 
 
 
