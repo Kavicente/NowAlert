@@ -530,4 +530,16 @@ canvas {
             transition: transform 0.3s ease;
             
         }
+    #alertsPerMonthChart {
+        width: 30% !important;
+        height: 40% !important;
+        
+        
+    }
+    #alertsPerMonthChart:hoover {
+        background-color: #66c2ff;
+        cursor: pointer;
+        transform: scale(1.05); /* Slight zoom in on hover (5% scale up) */
+
+    }
 }
