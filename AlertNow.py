@@ -1804,37 +1804,23 @@ def handle_barangay_health_response(data):
             elif key == 'Patient_Gender':
                 cleaned_data[key] = patient_gender_mapping.get(data.get('Patient Gender', '').lower(), default_values[key])
                 
-        input_df = pd.DataFrame([cleaned_data])
-        
-        # Ensure all expected columns are present
-        if health_emergencies_df is not None and not health_emergencies_df.empty:
-            expected_columns = health_emergencies_df.columns
-        else:
-            logger.warning("health_emergencies_df is not initialized or empty, using default columns")
-            expected_columns = ['Health_Emergency_Type', 'Health_Cause', 'Barangay', 'Year', 'Patient_Age', 'Patient_Gender']
-        
-        for col in expected_columns:
-            if col not in input_df.columns:
-                input_df[col] = 0
-        
-        input_df = input_df[expected_columns]
-        
+        features = pd.DataFrame([[cleaned_data['Health_Type'], cleaned_data['Health_Cause'], 
+                                 cleaned_data['Barangay'], cleaned_data['Year']]], columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
         if health_predictor:
-            prediction = health_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for barangay health response: {data['prediction']}")
+            probability = health_predictor.predict_proba(features)[0][1]*100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
         else:
             data['prediction'] = 'prediction_error'
-            logger.error("Health predictor not loaded")
     except Exception as e:
+        logger.error(f"Error in health_predictor: (e)")
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for barangay health response: {e}")
         
     responses.append(data)
     today_responses.append(data)
-    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+    barangay_room= f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
     emit('barangay_health_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted to room {barangay_room}")
+
 
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
@@ -2811,38 +2797,23 @@ def handle_health_response(data):
             elif key == 'Patient_Gender':
                 cleaned_data[key] = patient_gender_mapping.get(data.get('Patient Gender', '').lower(), default_values[key])
                 
-        input_df = pd.DataFrame([cleaned_data])
-        
-        # Ensure all expected columns are present
-        if health_emergencies_df is not None and not health_emergencies_df.empty:
-            expected_columns = health_emergencies_df.columns
-        else:
-            logger.warning("health_emergencies_df is not initialized or empty, using default columns")
-            expected_columns = ['Health_Type', 'Health_Cause', 'Barangay', 'Year', 'Patient_Age', 'Patient_Gender']
-        
-        for col in expected_columns:
-            if col not in input_df.columns:
-                input_df[col] = 0
-        
-        input_df = input_df[expected_columns]
-        
-        # Make prediction
+        features = pd.DataFrame([[cleaned_data['Health_Type'], cleaned_data['Health_Cause'], 
+                                 cleaned_data['Barangay'], cleaned_data['Year']]], columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
         if health_predictor:
-            prediction = health_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for health response: {data['prediction']}")
+            probability = health_predictor.predict_proba(features)[0][1]*100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
         else:
             data['prediction'] = 'prediction_error'
-            logger.error("Health emergency predictor not loaded")
     except Exception as e:
+        logger.error(f"Error in health_predictor: (e)")
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for health response: {e}")
-    
+        
     responses.append(data)
-    
+    today_responses.append(data)
     health_room = f"health_{(data.get('municipality') or 'unknown').lower()}"
     emit('health_response', data, room=health_room)
     logger.info(f"City Health response emitted to room {health_room}")
+
 
 
 @socketio.on('hospital_response')
