@@ -145,7 +145,10 @@
                 'Health Causes': ['Pregnant', 'Chronic Illness', 'Accident', 'Allergy', 'Infection', 'Overdose', 'Heatstroke'],
                 'Patient Gender': ['Male', 'Female'],
                 'Patient Age': ['0-17', '18-25', '26-35', '36-45', '46-60', '61+']
-            }
+            }.
+            'Unknown': {
+                'Emergency Details': ['Not Specified'] // Minimal fallback option
+    }
         };
 
         function toggleSidebar() {
@@ -279,7 +282,7 @@
                     typeDiv.style.display = 'block';
                     const responseForm = alertItem.querySelector('.response-form');
                     let emergencyType = data.emergency_type || 'Unknown';
-                    let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
+                    let dropdownData = menuData[emergencyType] || menuData['Unknown'];
                     responseForm.innerHTML = '';
                     Object.keys(dropdownData).forEach(key => {
                         const select = document.createElement('select');
@@ -302,7 +305,7 @@
                             formData[select.name] = select.value;
                         });
                         formData.alert_id = data.alert_id;
-                        formData.emergency_type = data.emergency_type;
+                        formData.emergency_type = data.emergency_type || 'Unknown';
                         formData.barangay = '{{ barangay }}';
                         const socketEvent = data.emergency_type === 'Fire Incident' ? 'barangay_fire_submitted' :
                                             data.emergency_type === 'Crime Incident' ? 'barangay_crime_submitted' :
@@ -317,7 +320,6 @@
                     responseForm.style.display = 'block';
                 }
             });
-
 
             socket.on('hospital_alert_barangay', (data) => {
                 console.log('Hospital admission notification received:', data);
