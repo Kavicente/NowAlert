@@ -2045,7 +2045,7 @@ def handle_pnp_response_submitted(data):
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
                 lat, lon, barangay, resident_barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['road_accident_cause'],
@@ -2233,7 +2233,7 @@ def handle_pnp_fire_submitted(data):
             INSERT INTO pnp_fire_response (
                 alert_id, fire_type, fire_cause, weather, fire_severity, lat, lon, barangay, resident_barangay,
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['fire_type'],
@@ -2398,7 +2398,7 @@ def handle_pnp_crime_submitted(data):
                 alert_id, crime_type, crime_cause, level, suspect_gender, 
                 victim_gender, suspect_age, victim_age, lat, lon, barangay, resident_barangay, 
                 emergency_type, timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['crime_type'],
