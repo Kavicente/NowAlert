@@ -352,6 +352,8 @@
                 console.log('PNP redirect alert received:', data);
                 updateUIWithAlert(data);
                 notifyAlert(data);
+
+                
             });
 
             socket.on('update_dashboard_emergency_type', (data) => {
@@ -515,6 +517,17 @@
             document.getElementById('image-modal').querySelector('.close-btn').onclick = () => {
                 document.getElementById('image-modal').style.display = 'none';
             };
+
+            socket.on('update_map', (data) => {
+                console.log('Update map received:', data);
+                const lat = data.lat || {{ lat_coord|default(14.0549) }};
+                const lon = data.lon || {{ lon_coord|default(121.3013) }};
+                cdrrmoMap.setView([lat, lon], 16);
+                L.marker([lat, lon]).addTo(cdrrmoMap).bindPopup(
+                    `${data.emergency_type || 'Alert'} at ${data.barangay || 'Unknown'}`
+                ).openPopup();
+                document.getElementById('map-coordinates').textContent = `${lat}, ${lon}`;
+            });
 
             function parseMenuText(text) {
                 const menuData = {};
