@@ -454,7 +454,7 @@
                 }
             });
 
-            socket.on('pnp_crime_response', (data) => {
+            socket.on('pnp_crime_submitted', (data) => {
                 console.log('PNP crime response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
