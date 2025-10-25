@@ -279,7 +279,7 @@
                     typeDiv.style.display = 'block';
                     const responseForm = alertItem.querySelector('.response-form');
                     let emergencyType = data.emergency_type || 'Unknown';
-                    let dropdownData = menuData[emergencyType] || menuData['Road Accident']; 
+                    let dropdownData = menuData[emergencyType] || menuData['Unknown'] || {};
                     responseForm.innerHTML = '';
                     Object.keys(dropdownData).forEach(key => {
                         const select = document.createElement('select');
@@ -317,6 +317,7 @@
                     responseForm.style.display = 'block';
                 }
             });
+
 
             socket.on('hospital_alert_barangay', (data) => {
                 console.log('Hospital admission notification received:', data);

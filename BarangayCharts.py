@@ -83,7 +83,7 @@ def get_barangay_fire_chart_data(time_filter, barangay=None):
     base_time = now.strftime('%Y-%m-%d')
     query = '''
         SELECT fire_cause, fire_type, weather, fire_severity, barangay
-        FROM bfp_response
+        FROM barangay_fire_response
         WHERE barangay = ?
     '''
     params = [barangay]
@@ -130,14 +130,14 @@ def get_barangay_health_chart_data(time_filter, barangay=None):
     now = datetime.now(manila)
     base_time = now.strftime('%Y-%m-%d')
     query = '''
-        SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital
+        SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender
         FROM (
-            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, NULL as assigned_hospital, timestamp
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender,timestamp
             FROM health_response
             WHERE barangay = ?
             UNION ALL
-            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender, assigned_hospital, timestamp
-            FROM hospital_response
+            SELECT barangay, health_type, health_cause, weather, patient_age, patient_gender,  timestamp
+            FROM barangay_health_response
             WHERE barangay = ?
         )
     '''
@@ -170,7 +170,6 @@ def get_barangay_health_chart_data(time_filter, barangay=None):
         weathers[row[3]] = weathers.get(row[3], 0) + 1
         ages[row[4]] = ages.get(row[4], 0) + 1
         genders[row[5]] = genders.get(row[5], 0) + 1
-        responders[row[6] or 'Unknown'] = responders.get(row[6] or 'Unknown', 0) + 1
 
     return {
         'barangay': {'labels': list(barangays.keys()) if barangays else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(barangays.values()) if barangays else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
@@ -178,8 +177,7 @@ def get_barangay_health_chart_data(time_filter, barangay=None):
         'health_cause': {'labels': list(health_causes.keys()) if health_causes else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(health_causes.values()) if health_causes else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']}]},
         'weather': {'labels': list(weathers.keys()) if weathers else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(weathers.values()) if weathers else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
         'patient_age': {'labels': list(ages.keys()) if ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(ages.values()) if ages else [0], 'backgroundColor': ['#36A2EB', '#FF6384', '#FFCE56', '#4BC0C0', '#9966FF'], 'borderColor': '#FF6384', 'fill': False}]},
-        'patient_gender': {'labels': list(genders.keys()) if genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(genders.values()) if genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
-        'responder': {'labels': list(responders.keys()) if responders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(responders.values()) if responders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]}
+        'patient_gender': {'labels': list(genders.keys()) if genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(genders.values()) if genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]}
     }
     
 def get_barangay_crime_chart_data(time_filter, barangay=None):
