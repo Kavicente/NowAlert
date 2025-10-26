@@ -395,7 +395,7 @@
                         formData.municipality = '{{ municipality }}';
                         const socketEvent = data.emergency_type === 'Road Accident' ? 'pnp_response' :
                                             data.emergency_type === 'Fire Incident' ? 'pnp_fire_submitted' :
-                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_response' :
+                                            data.emergency_type === 'Crime Incident' ? 'pnp_crime_submitted' :
                                             'pnp_response';
                         socket.emit(socketEvent, formData);
                         responseForm.style.display = 'none';
