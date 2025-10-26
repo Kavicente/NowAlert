@@ -1028,6 +1028,17 @@ def handle_hospital_alert_barangay(data):
 def handle_update_dashboard_emergency_type(data):
     logger.info(f"Received update dashboard emergency type: {data}")
     
+    alert_id = data.get('alert_id')
+    emergency_type = data.get('emergency_type')
+    barangay = data.get('barangay')
+    
+    if not barangay:
+        logger.error(f"Missing or None barangay in data: {data}")
+        return
+    if not alert_id or not emergency_type:
+        logger.error(f"Missing alert_id or emergency_type in data: {data}")
+        return
+    
     barangay_room = f"barangay_{data.get('barangay').lower()}"
     pnp_room = f"pnp_{data.get('barangay').lower()}"
     
