@@ -65,8 +65,11 @@ def get_pnp_alerts_per_month():
         conn = get_db_connection()
         cursor = conn.execute('''
             SELECT strftime('%m', datetime(timestamp)) as month, COUNT(*) as count 
-            FROM pnp_response 
-            WHERE timestamp IS NOT NULL AND datetime(timestamp) IS NOT NULL
+            FROM pnp_response WHERE timestamp IS NOT NULL AND datetime(timestamp) IS NOT NULL
+            UNION ALL
+            FROM pnp_fire_response WHERE timestamp IS NOT NULL AND datetime(timestamp) IS NOT NULL
+            UNION ALL
+            FROM pnp_crime_response WHERE timestamp IS NOT NULL AND datetime(timestamp) IS NOT NULL
             GROUP BY strftime('%m', datetime(timestamp))
         ''')
         month_names = {
@@ -96,8 +99,13 @@ def get_pnp_responded_count():
         conn = get_db_connection()
         cursor = conn.execute('''
             SELECT COUNT(*) as count 
-            FROM pnp_response 
-            WHERE responded = TRUE
+            FROM pnp_response WHERE responded = TRUE
+            UNION ALL
+            From pnp_fire_response WHERE responded = TRUE
+            UNION ALL
+            From pnp_crime_response WHERE responded = TRUE
+            AS combined
+            
         ''')
         count = cursor.fetchone()['count']
         conn.close()
