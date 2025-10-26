@@ -2528,7 +2528,7 @@ def handle_pnp_crime_submitted(data):
     responses.append(data)
     
     pnp_room = f"pnp_{data.get('municipality', 'unknown').lower()}"
-    emit('pnp_fire_submitted', data, room=pnp_room)
+    emit('pnp_crime_submitted', data, room=pnp_room)
     logger.info(f"Emitted fire response to room: {pnp_room}")
 
 
