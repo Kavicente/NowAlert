@@ -820,7 +820,7 @@ def handle_redirect_alert(data):
     logger.debug(f"Redirected alert received: {data}")
     try:
         target_role = data.get('target_role').lower()
-        municipality = data.get('municipality', '').lower()
+        municipality = {data.get('municipality').lower() if data.get('municipality') else ''}
         if target_role in ['bfp', 'cdrrmo', 'health', 'hospital']:
             emit('redirected_alert', data, room=f"{target_role}_{municipality}")
             # Emit update_map to pin alert on target dashboard
@@ -1033,28 +1033,37 @@ def handle_update_dashboard_emergency_type(data):
     barangay = data.get('barangay')
     
     if not barangay:
-        logger.error(f"Missing or None barangay in data: {data}. Check client-side or backend emissions for alert_id {alert_id}.")
+        logger.error(f"Missing or None barangay in data: {data}")
         return
     if not alert_id or not emergency_type:
         logger.error(f"Missing alert_id or emergency_type in data: {data}")
         return
     
-    barangay_room = f"barangay_{barangay.lower()}"
-    pnp_room = f"pnp_{barangay.lower()}"
+    barangay_room = f"barangay_{data.get('barangay').lower()}"
+    pnp_room = f"pnp_{data.get('barangay').lower()}"
     
-    socketio.emit('update_dashboard_emergency_type', {
-        'alert_id': alert_id,
-        'emergency_type': emergency_type,
-        'barangay': barangay
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        
+        'barangay': data.get('barangay')
     }, room=barangay_room)
     
-    socketio.emit('update_dashboard_emergency_type', {
-        'alert_id': alert_id,
-        'emergency_type': emergency_type,
-        'barangay': barangay
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        'barangay': data.get('barangay')
     }, room=pnp_room)
     
     logger.info(f"Emergency type update emitted to rooms {barangay_room} and {pnp_room}")
+    
+    pnp_room = f"pnp_{data.get('barangay').lower()}"
+    emit('update_dashboard_emergency_type', {
+        'alert_id': data.get('alert_id'),
+        'emergency_type': data.get('emergency_type'),
+        'barangay': data.get('barangay')
+    }, room=pnp_room)
+    logger.info(f"Emergency type update emitted to room {pnp_room}")
 
 # After @socketio.on('response_update')
 
