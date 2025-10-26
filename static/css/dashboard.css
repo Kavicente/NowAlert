@@ -362,14 +362,17 @@ canvas {
 
 .alert-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    width: 70%;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    width: 142%;
+    margin-right: -160px;
     color: #000000;
-    row-gap: 5px; /* Vertical spacing */
-    column-gap: 8px;
+    background-color: #f7f7f7;
+    border-left: 4px solid #3498db;
+    row-gap: 75px; /* Vertical spacing */
+    column-gap: 88px;
 }
 
-.alert-container p {
+.alert-container .p6 {
     display: block;
     margin-left: auto;
     margin-right: auto;
