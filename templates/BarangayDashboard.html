@@ -20,6 +20,17 @@
         .response-form select, .response-form button { margin: 5px; padding: 5px; border-radius: 4px; }
         .clickable-img { cursor: pointer; max-width: 200px; border-radius: 5px; }
         .prediction { margin-top: 10px; font-weight: bold; color: #fff; display: none; }
+        .alert-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            width: 142%;
+            margin-right: -160px;
+            color: #000000;
+            background-color: #f7f7f7;
+            border-left: 4px solid #3498db;
+            row-gap: 75px; /* Vertical spacing */
+            column-gap: 88px;
+        }
         .image-modal {
             display: none;
             position: fixed;
@@ -105,6 +116,8 @@
         <section id="alerts" class="alerts">
             <h2 class="h2">Live Alerts</h2>
             <div id="alert-container" class="alert-grid"></div>
+
+            
             
         </section>
         <div id="notification"></div>
