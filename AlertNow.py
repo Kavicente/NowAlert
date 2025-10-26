@@ -820,7 +820,7 @@ def handle_redirect_alert(data):
     logger.debug(f"Redirected alert received: {data}")
     try:
         target_role = data.get('target_role').lower()
-        municipality = {data.get('municipality').lower() if data.get('municipality') else ''}
+        municipality = data.get('municipality', '').lower()
         if target_role in ['bfp', 'cdrrmo', 'health', 'hospital']:
             emit('redirected_alert', data, room=f"{target_role}_{municipality}")
             # Emit update_map to pin alert on target dashboard
@@ -1028,16 +1028,7 @@ def handle_hospital_alert_barangay(data):
 def handle_update_dashboard_emergency_type(data):
     logger.info(f"Received update dashboard emergency type: {data}")
     
-    alert_id = data.get('alert_id')
-    emergency_type = data.get('emergency_type')
-    barangay = data.get('barangay')
     
-    if not barangay:
-        logger.error(f"Missing or None barangay in data: {data}")
-        return
-    if not alert_id or not emergency_type:
-        logger.error(f"Missing alert_id or emergency_type in data: {data}")
-        return
     
     barangay_room = f"barangay_{data.get('barangay').lower()}"
     pnp_room = f"pnp_{data.get('barangay').lower()}"
@@ -1045,7 +1036,6 @@ def handle_update_dashboard_emergency_type(data):
     emit('update_dashboard_emergency_type', {
         'alert_id': data.get('alert_id'),
         'emergency_type': data.get('emergency_type'),
-        
         'barangay': data.get('barangay')
     }, room=barangay_room)
     
