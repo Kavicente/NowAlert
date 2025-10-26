@@ -1033,36 +1033,28 @@ def handle_update_dashboard_emergency_type(data):
     barangay = data.get('barangay')
     
     if not barangay:
-        logger.error(f"Missing or None barangay in data: {data}")
+        logger.error(f"Missing or None barangay in data: {data}. Check client-side or backend emissions for alert_id {alert_id}.")
         return
     if not alert_id or not emergency_type:
         logger.error(f"Missing alert_id or emergency_type in data: {data}")
         return
     
-    barangay_room = f"barangay_{data.get('barangay').lower()}"
-    pnp_room = f"pnp_{data.get('barangay').lower()}"
+    barangay_room = f"barangay_{barangay.lower()}"
+    pnp_room = f"pnp_{barangay.lower()}"
     
-    emit('update_dashboard_emergency_type', {
-        'alert_id': data.get('alert_id'),
-        'emergency_type': data.get('emergency_type'),
-        'barangay': data.get('barangay')
+    socketio.emit('update_dashboard_emergency_type', {
+        'alert_id': alert_id,
+        'emergency_type': emergency_type,
+        'barangay': barangay
     }, room=barangay_room)
     
-    emit('update_dashboard_emergency_type', {
-        'alert_id': data.get('alert_id'),
-        'emergency_type': data.get('emergency_type'),
-        'barangay': data.get('barangay')
+    socketio.emit('update_dashboard_emergency_type', {
+        'alert_id': alert_id,
+        'emergency_type': emergency_type,
+        'barangay': barangay
     }, room=pnp_room)
     
     logger.info(f"Emergency type update emitted to rooms {barangay_room} and {pnp_room}")
-    
-    pnp_room = f"pnp_{data.get('barangay').lower()}"
-    emit('update_dashboard_emergency_type', {
-        'alert_id': data.get('alert_id'),
-        'emergency_type': data.get('emergency_type'),
-        'barangay': data.get('barangay')
-    }, room=pnp_room)
-    logger.info(f"Emergency type update emitted to room {pnp_room}")
 
 # After @socketio.on('response_update')
 
