@@ -103,14 +103,20 @@ def get_pnp_responded_count():
     try:
         conn = get_db_connection()
         cursor = conn.execute('''
-            SELECT COUNT(*) as count 
-            FROM pnp_response WHERE responded = TRUE
-            UNION ALL
-            FROM pnp_fire_response WHERE responded = TRUE
-            UNION ALL
-            FROM pnp_crime_response WHERE responded = TRUE
-            AS combined
-            
+            SELECT SUM(count) as count
+            FROM (
+                SELECT COUNT(*) as count 
+                FROM pnp_response 
+                WHERE responded = TRUE
+                UNION ALL
+                SELECT COUNT(*) as count 
+                FROM pnp_fire_response 
+                WHERE responded = TRUE
+                UNION ALL
+                SELECT COUNT(*) as count 
+                FROM pnp_crime_response 
+                WHERE responded = TRUE
+            )
         ''')
         count = cursor.fetchone()['count']
         conn.close()

@@ -235,7 +235,7 @@ main {
 .chart-container {
     background: #ffffff; 
     border-right: 4px solid #3498db; 
-    margin-left: 35px;
+    margin-left: 30px;
     margin-top: 10px; /* Remove extra margins */
     width: 90%; /* Full width within stat-item */
     height: 420px; /* As provided, adjusted to max-height */
@@ -288,13 +288,15 @@ main {
 }
 .submit-emergency {
     background-color: #66c2ff;
+    border-color: 1px solid #000000ff;
     color: #000000;
     padding: 10px 20px;
-    font-weight: bold;
-    border: none;
     border-radius: 4px;
     cursor: pointer;
     margin: 5px 0;
+    width: 100%; 
+    box-sizing: border-box;
+    font-size: 17px;
 }
 
 .submit-emergency:hover {
@@ -355,10 +357,8 @@ canvas {
     max-width: 60%; 
     overflow-y: auto; 
     position: relative;
-    left: -20px;
+    left: -10px;
     top: 20px;
-    background-color: #0a7aeb;
-    border-left: 4px solid #3498db;
     border-radius: 20px;
     border: 1px solid #000000;
     color: #000000;
@@ -368,13 +368,14 @@ canvas {
 .alert-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    width: 70%;
+    width: 132%;
+    margin-right: -160px;
     color: #000000;
-    row-gap: 5px; /* Vertical spacing */
-    column-gap: 8px;
+    row-gap: 75px; /* Vertical spacing */
+    column-gap: 88px;
 }
 
-.alert-container p {
+.alert-container .p6 {
     display: block;
     margin-left: auto;
     margin-right: auto;
