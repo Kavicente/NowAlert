@@ -461,142 +461,117 @@
                         document.getElementById('modal-image').src = data.image;
                         document.getElementById('image-modal').style.display = 'flex';
                     });
+                    alertItem.appendChild(img);
                 }
-                alertElements.set(data.alert_id, alertItem);
-                alertContainer.prepend(alertItem);
-                
+
+                // Add Accept and Decline buttons
                 const acceptButton = document.createElement('button');
                 acceptButton.textContent = 'Accept';
                 acceptButton.className = 'submit-emergency';
-                acceptButton.style.marginRight = '5px';
                 const declineButton = document.createElement('button');
                 declineButton.textContent = 'Decline';
                 declineButton.className = 'submit-emergency';
-                alertItem.appendChild(acceptButton);
-                alertItem.appendChild(declineButton);
+                const roleButtonsContainer = document.createElement('div');
+                roleButtonsContainer.className = 'response-form';
+                roleButtonsContainer.style.display = 'none';
 
-                // Container for redirect buttons
-                const redirectButtons = document.createElement('div');
-                redirectButtons.className = 'redirect-buttons';
-                redirectButtons.style.display = 'none';
-                alertItem.appendChild(redirectButtons);
+                // Add role buttons (Send to CDRRMO, PNP, BFP, City Health)
+                const roles = ['CDRRMO', 'PNP', 'BFP', 'City Health'];
+                roles.forEach(role => {
+                    const roleButton = document.createElement('button');
+                    roleButton.textContent = `Send to ${role}`;
+                    roleButton.className = 'submit-emergency';
+                    roleButton.addEventListener('click', () => {
+                        if (role === 'PNP') {
+                            // Show PNP emergency type buttons
+                            pnpEmergencyTypeContainer.style.display = 'block';
+                            roleButtonsContainer.style.display = 'none';
+                        } else {
+                            const emergencyType = determineEmergencyType(role);
+                            const redirectData = {
+                                alert_id: data.alert_id,
+                                target_role: role.toLowerCase(),
+                                emergency_type: emergencyType,
+                                municipality: 'San Pablo City',
+                                barangay: '{{ barangay }}',
+                                lat: data.lat,
+                                lon: data.lon
+                            };
+                            socket.emit('redirect_alert', redirectData);
+                            socket.emit('update_dashboard_emergency_type', {
+                                alert_id: data.alert_id,
+                                emergency_type: emergencyType,
+                                barangay: '{{ barangay }}'.toLowerCase(),
+                                municipality: 'San Pablo City'
+                            });
+                            roleButtonsContainer.style.display = 'none';
+                            const typeDiv = alertItem.querySelector('div:nth-child(3)');
+                            typeDiv.textContent = `Type: ${emergencyType}`;
+                            typeDiv.style.display = 'block';
+                        }
+                    });
+                    roleButtonsContainer.appendChild(roleButton);
+                });
 
-                // Accept button logic
+                // Add PNP emergency type buttons (Road Accident, Fire Incident, Crime Incident)
+                const pnpEmergencyTypeContainer = document.createElement('div');
+                pnpEmergencyTypeContainer.className = 'response-form';
+                pnpEmergencyTypeContainer.style.display = 'none';
+                const pnpEmergencyTypes = ['Road Accident', 'Fire Incident', 'Crime Incident'];
+                pnpEmergencyTypes.forEach(emergencyType => {
+                    const pnpButton = document.createElement('button');
+                    pnpButton.textContent = emergencyType;
+                    pnpButton.className = 'submit-emergency';
+                    pnpButton.addEventListener('click', () => {
+                        const redirectData = {
+                            alert_id: data.alert_id,
+                            target_role: 'pnp',
+                            emergency_type: emergencyType,
+                            municipality: 'San Pablo City',
+                            barangay: '{{ barangay }}',
+                            lat: data.lat,
+                            lon: data.lon
+                        };
+                        socket.emit('pnp_redirect_alert', redirectData);
+                        socket.emit('update_dashboard_emergency_type', {
+                            alert_id: data.alert_id,
+                            emergency_type: emergencyType,
+                            barangay: '{{ barangay }}'.toLowerCase(),
+                            municipality: 'San Pablo City'
+                        });
+                        pnpEmergencyTypeContainer.style.display = 'none';
+                        const typeDiv = alertItem.querySelector('div:nth-child(3)');
+                        typeDiv.textContent = `Type: ${emergencyType}`;
+                        typeDiv.style.display = 'block';
+                    });
+                    pnpEmergencyTypeContainer.appendChild(pnpButton);
+                });
+
                 acceptButton.addEventListener('click', () => {
-                    socket.emit('role_accepted', { role: 'barangay', alert_id: data.alert_id });
+                    socket.emit('role_accepted', { alert_id: data.alert_id, role: 'barangay' });
+                    roleButtonsContainer.style.display = 'block';
                     acceptButton.style.display = 'none';
                     declineButton.style.display = 'none';
-                    redirectButtons.style.display = 'block';
-
-                    // Add redirect buttons
-                    const roles = ['CDRRMO', 'PNP', 'BFP', 'City Health'];
-                    roles.forEach(role => {
-                        const button = document.createElement('button');
-                        button.textContent = `Send to ${role}`;
-                        button.className = 'submit-emergency';
-                        button.style.margin = '5px';
-                        redirectButtons.appendChild(button);
-
-                        // Container for PNP sub-buttons
-                        const pnpSubButtons = document.createElement('div');
-                        pnpSubButtons.className = 'pnp-sub-buttons';
-                        pnpSubButtons.style.display = 'none';
-                        redirectButtons.appendChild(pnpSubButtons);
-
-                        button.addEventListener('click', () => {
-                            if (role === 'PNP') {
-                                pnpSubButtons.style.display = 'block';
-                                button.style.display = 'none';
-                                const pnpTypes = ['Road Accident', 'Fire Incident', 'Crime Incident'];
-                                pnpTypes.forEach(type => {
-                                    const typeButton = document.createElement('button');
-                                    typeButton.textContent = type;
-                                    typeButton.className = 'submit-emergency';
-                                    typeButton.style.margin = '5px';
-                                    pnpSubButtons.appendChild(typeButton);
-                                    typeButton.addEventListener('click', () => {
-                                        if (!data.alert_id || !data.municipality || !data.lat || !data.lon || !data.barangay) {
-                                            console.error('Missing required fields for PNP redirect');
-                                            return;
-                                        }
-                                        const redirectData = {
-                                            target_role: 'pnp',
-                                            municipality: data.municipality,
-                                            alert_id: data.alert_id,
-                                            emergency_type: type,
-                                            lat: data.lat,
-                                            lon: data.lon,
-                                            barangay: data.barangay,
-                                            resident_barangay: data.resident_barangay || data.barangay
-                                        };
-                                        socket.emit('pnp_redirect_alert', redirectData);
-                                        socket.emit('update_dashboard_emergency_type', {
-                                            alert_id: data.alert_id,
-                                            emergency_type: type,
-                                            barangay: data.barangay,
-                                            municipality: data.municipality
-                                        });
-                                        pnpSubButtons.style.display = 'none';
-                                        redirectButtons.style.display = 'none';
-                                        alertItem.querySelector('.response-form').style.display = 'block';
-                                    });
-                                });
-                            } else {
-                                if (!data.alert_id || !data.municipality || !data.lat || !data.lon || !data.barangay) {
-                                    console.error(`Missing required fields for ${role} redirect`);
-                                    return;
-                                }
-                                const emergencyType = role === 'CDRRMO' ? 'Road Accident' :
-                                                    role === 'BFP' ? 'Fire Incident' :
-                                                    role === 'City Health' ? 'Health Emergency' : 'Unknown';
-                                const redirectData = {
-                                    target_role: role.toLowerCase().replace('city health', 'health'),
-                                    municipality: data.municipality,
-                                    alert_id: data.alert_id,
-                                    emergency_type: emergencyType,
-                                    lat: data.lat,
-                                    lon: data.lon,
-                                    barangay: data.barangay,
-                                    resident_barangay: data.resident_barangay || data.barangay
-                                };
-                                const socketEvent = role === 'City Health' ? 'health_redirected_alert' : 'redirect_alert';
-                                socket.emit(socketEvent, redirectData);
-                                socket.emit('update_dashboard_emergency_type', {
-                                    alert_id: data.alert_id,
-                                    emergency_type: emergencyType,
-                                    barangay: data.barangay,
-                                    municipality: data.municipality
-                                });
-                                redirectButtons.style.display = 'none';
-                                alertItem.querySelector('.response-form').style.display = 'block';
-                            }
-                        });
-                    });
                 });
 
-                // Decline button logic
                 declineButton.addEventListener('click', () => {
-                    socket.emit('role_declined', { role: 'barangay', alert_id: data.alert_id });
-                    alertContainer.removeChild(alertItem);
+                    socket.emit('role_declined', { alert_id: data.alert_id, role: 'barangay' });
                     alertElements.delete(data.alert_id);
+                    alertItem.remove();
                 });
 
-                // Image modal logic (unchanged)
-                const img = alertItem.querySelector('.clickable-img');
-                if (img) {
-                    img.addEventListener('click', () => {
-                        const modal = document.getElementById('image-modal');
-                        const modalImg = document.getElementById('modal-image');
-                        modalImg.src = img.src;
-                        modal.style.display = 'flex';
-                    });
-                }
+                alertItem.appendChild(acceptButton);
+                alertItem.appendChild(declineButton);
+                alertItem.appendChild(roleButtonsContainer);
+                alertItem.appendChild(pnpEmergencyTypeContainer);
+                alertElements.set(data.alert_id, alertItem);
+                alertContainer.insertBefore(alertItem, alertContainer.firstChild);
+
                 const closeBtn = document.querySelector('.close-btn');
                 closeBtn.addEventListener('click', () => {
                     document.getElementById('image-modal').style.display = 'none';
                 });
             }
-
 
             function notifyAlert(data) {
                 const notification = document.getElementById('notification');
@@ -618,6 +593,19 @@
                     menuData[sectionName] = sectionData;
                 });
                 return menuData;
+            }
+
+            function determineEmergencyType(role) {
+                switch (role.toLowerCase()) {
+                    case 'cdrrmo':
+                        return 'Road Accident';
+                    case 'bfp':
+                        return 'Fire Incident';
+                    case 'city health':
+                        return 'Health Emergency';
+                    default:
+                        return 'Unknown';
+                }
             }
         });
     </script>
