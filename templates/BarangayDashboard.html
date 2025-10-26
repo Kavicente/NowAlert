@@ -464,7 +464,7 @@
                 }
                 alertElements.set(data.alert_id, alertItem);
                 alertContainer.prepend(alertItem);
-
+                
                 const acceptButton = document.createElement('button');
                 acceptButton.textContent = 'Accept';
                 acceptButton.className = 'submit-emergency';
@@ -580,15 +580,23 @@
                     alertContainer.removeChild(alertItem);
                     alertElements.delete(data.alert_id);
                 });
+
+                // Image modal logic (unchanged)
+                const img = alertItem.querySelector('.clickable-img');
+                if (img) {
+                    img.addEventListener('click', () => {
+                        const modal = document.getElementById('image-modal');
+                        const modalImg = document.getElementById('modal-image');
+                        modalImg.src = img.src;
+                        modal.style.display = 'flex';
+                    });
+                }
                 const closeBtn = document.querySelector('.close-btn');
                 closeBtn.addEventListener('click', () => {
                     document.getElementById('image-modal').style.display = 'none';
                 });
             }
 
-            document.querySelector('.image-modal .close-btn').addEventListener('click', () => {
-                document.getElementById('image-modal').style.display = 'none';
-            });
 
             function notifyAlert(data) {
                 const notification = document.getElementById('notification');
