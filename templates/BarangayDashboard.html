@@ -451,7 +451,22 @@
                     <div style="display: none;">Type: ${data.emergency_type || 'N/A'}</div>
                     <div>Time: ${new Date().toLocaleTimeString()}</div>
                     ${data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : ''}
-                    <div class="response-form"></div>
+                    <div class="action-buttons">
+                    <button class="accept-button submit-emergency">Accept</button>
+                    <button class="decline-button submit-emergency">Decline</button>
+                    <div class="send-buttons" style="display: none;">
+                        <button class="send-cdrrmo submit-emergency">Send to CDRRMO</button>
+                        <button class="send-pnp submit-emergency">Send to PNP</button>
+                        <button class="send-bfp submit-emergency">Send to BFP</button>
+                        <button class="send-health submit-emergency">Send to City Health</button>
+                        <div class="pnp-buttons" style="display: none;">
+                            <button class="pnp-road-accident submit-emergency">Road Accident</button>
+                            <button class="pnp-fire-incident submit-emergency">Fire Incident</button>
+                            <button class="pnp-crime-incident submit-emergency">Crime Incident</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="response-form"></div>
                     <div class="prediction" style="display: none;">Prediction: N/A</div>
                 `;
                 if (data.image) {
@@ -463,6 +478,139 @@
                     });
                 }
                 alertElements.set(data.alert_id, alertItem);
+
+
+                const acceptButton = alertItem.querySelector('.accept-button');
+                acceptButton.addEventListener('click', () => {
+                    acceptButton.style.display = 'none';
+                    alertItem.querySelector('.decline-button').style.display = 'none';
+                    alertItem.querySelector('.send-buttons').style.display = 'block';
+                    socket.emit('accept_alert', { alert_id: data.alert_id, barangay: '{{ barangay }}' });
+                });
+
+                // Decline button logic
+                const declineButton = alertItem.querySelector('.decline-button');
+                declineButton.addEventListener('click', () => {
+                    socket.emit('decline_alert', { alert_id: data.alert_id, barangay: '{{ barangay }}' });
+                    alertContainer.removeChild(alertItem);
+                    alertElements.delete(data.alert_id);
+                });
+
+                // Send to CDRRMO button logic
+                const sendCDRRMObutton = alertItem.querySelector('.send-cdrrmo');
+                sendCDRRMObutton.addEventListener('click', () => {
+                    socket.emit('redirect_alert', {
+                        alert_id: data.alert_id,
+                        target_role: 'cdrrmo',
+                        emergency_type: 'Road Accident',
+                        barangay: '{{ barangay }}',
+                        municipality: data.municipality
+                    });
+                    socket.emit('update_dashboard_emergency_type', {
+                        alert_id: data.alert_id,
+                        emergency_type: 'Road Accident'
+                    });
+                    alertItem.querySelector('.send-buttons').style.display = 'none';
+                });
+
+                // Send to BFP button logic
+                const sendBFPbutton = alertItem.querySelector('.send-bfp');
+                sendBFPbutton.addEventListener('click', () => {
+                    socket.emit('redirect_alert', {
+                        alert_id: data.alert_id,
+                        target_role: 'bfp',
+                        emergency_type: 'Fire Incident',
+                        barangay: '{{ barangay }}',
+                        municipality: data.municipality
+                    });
+                    socket.emit('update_dashboard_emergency_type', {
+                        alert_id: data.alert_id,
+                        emergency_type: 'Fire Incident'
+                    });
+                    alertItem.querySelector('.send-buttons').style.display = 'none';
+                });
+
+                // Send to City Health button logic
+                const sendHealthButton = alertItem.querySelector('.send-health');
+                sendHealthButton.addEventListener('click', () => {
+                    socket.emit('redirect_alert', {
+                        alert_id: data.alert_id,
+                        target_role: 'health',
+                        emergency_type: 'Health Emergency',
+                        barangay: '{{ barangay }}',
+                        municipality: data.municipality
+                    });
+                    socket.emit('update_dashboard_emergency_type', {
+                        alert_id: data.alert_id,
+                        emergency_type: 'Health Emergency'
+                    });
+                    alertItem.querySelector('.send-buttons').style.display = 'none';
+                });
+
+                // Send to PNP button logic
+                const sendPNPbutton = alertItem.querySelector('.send-pnp');
+                sendPNPbutton.addEventListener('click', () => {
+                    alertItem.querySelector('.send-cdrrmo').style.display = 'none';
+                    alertItem.querySelector('.send-bfp').style.display = 'none';
+                    alertItem.querySelector('.send-health').style.display = 'none';
+                    sendPNPbutton.style.display = 'none';
+                    alertItem.querySelector('.pnp-buttons').style.display = 'block';
+                });
+
+                // PNP Road Accident button logic
+                const pnpRoadAccidentButton = alertItem.querySelector('.pnp-road-accident');
+                pnpRoadAccidentButton.addEventListener('click', () => {
+                    socket.emit('pnp_redirect_alert', {
+                        alert_id: data.alert_id,
+                        target_role: 'pnp',
+                        emergency_type: 'Road Accident',
+                        barangay: '{{ barangay }}',
+                        municipality: data.municipality
+                    });
+                    socket.emit('update_dashboard_emergency_type', {
+                        alert_id: data.alert_id,
+                        emergency_type: 'Road Accident'
+                    });
+                    alertItem.querySelector('.send-buttons').style.display = 'none';
+                    alertItem.querySelector('.pnp-buttons').style.display = 'none';
+                });
+
+                // PNP Fire Incident button logic
+                const pnpFireIncidentButton = alertItem.querySelector('.pnp-fire-incident');
+                pnpFireIncidentButton.addEventListener('click', () => {
+                    socket.emit('pnp_redirect_alert', {
+                        alert_id: data.alert_id,
+                        target_role: 'pnp',
+                        emergency_type: 'Fire Incident',
+                        barangay: '{{ barangay }}',
+                        municipality: data.municipality
+                    });
+                    socket.emit('update_dashboard_emergency_type', {
+                        alert_id: data.alert_id,
+                        emergency_type: 'Fire Incident'
+                    });
+                    alertItem.querySelector('.send-buttons').style.display = 'none';
+                    alertItem.querySelector('.pnp-buttons').style.display = 'none';
+                });
+
+                // PNP Crime Incident button logic
+                const pnpCrimeIncidentButton = alertItem.querySelector('.pnp-crime-incident');
+                pnpCrimeIncidentButton.addEventListener('click', () => {
+                    socket.emit('pnp_redirect_alert', {
+                        alert_id: data.alert_id,
+                        target_role: 'pnp',
+                        emergency_type: 'Crime Incident',
+                        barangay: '{{ barangay }}',
+                        municipality: data.municipality
+                    });
+                    socket.emit('update_dashboard_emergency_type', {
+                        alert_id: data.alert_id,
+                        emergency_type: 'Crime Incident'
+                    });
+                    alertItem.querySelector('.send-buttons').style.display = 'none';
+                    alertItem.querySelector('.pnp-buttons').style.display = 'none';
+                });
+
                 alertContainer.prepend(alertItem);
             }
 
