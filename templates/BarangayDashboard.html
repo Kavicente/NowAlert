@@ -486,6 +486,29 @@
                             // Show PNP emergency type buttons
                             pnpEmergencyTypeContainer.style.display = 'block';
                             roleButtonsContainer.style.display = 'none';
+                        } else if (role === 'Health') {
+                            const redirectData = {
+                                alert_id: data.alert_id,
+                                target_role: 'health',
+                                emergency_type: 'Health Emergency',
+                                municipality: 'San Pablo City',
+                                barangay: '{{ barangay }}',
+                                lat: data.lat,
+                                lon: data.lon,
+                                resident_barangay: data.resident_barangay || '{{ barangay }}',
+                                image: data.image
+                            };
+                            socket.emit('health_redirected_alert', redirectData);
+                            socket.emit('update_dashboard_emergency_type', {
+                                alert_id: data.alert_id,
+                                emergency_type: 'Health Emergency',
+                                barangay: '{{ barangay }}'.toLowerCase(),
+                                municipality: 'San Pablo City'
+                            });
+                            roleButtonsContainer.style.display = 'none';
+                            const typeDiv = alertItem.querySelector('div:nth-child(3)');
+                            typeDiv.textContent = `Type: Health Emergency`;
+                            typeDiv.style.display = 'block';
                         } else {
                             const emergencyType = determineEmergencyType(role);
                             const redirectData = {
