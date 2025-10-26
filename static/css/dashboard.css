@@ -283,13 +283,15 @@ main {
 
 .submit-emergency {
     background-color: #66c2ff;
+    border-color: 1px solid #000000ff;
     color: #000000;
     padding: 10px 20px;
-    font-weight: bold;
-    border: none;
     border-radius: 4px;
     cursor: pointer;
     margin: 5px 0;
+    width: 100%; 
+    box-sizing: border-box;
+    font-size: 17px;
 }
 
 .submit-emergency:hover {
@@ -352,8 +354,7 @@ canvas {
     position: relative;
     left: -20px;
     top: 20px;
-    background-color: #0a7aeb;
-    border-left: 4px solid #3498db;
+    background-color: #ffffff;
     border-radius: 20px;
     border: 1px solid #000000;
     color: #000000;
@@ -362,12 +363,10 @@ canvas {
 
 .alert-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     width: 142%;
     margin-right: -160px;
     color: #000000;
-    background-color: #f7f7f7;
-    border-left: 4px solid #3498db;
     row-gap: 75px; /* Vertical spacing */
     column-gap: 88px;
 }
