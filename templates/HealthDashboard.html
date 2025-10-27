@@ -182,6 +182,7 @@
                     // Health Emergency Type dropdown
                     const healthTypeSelect = document.createElement('select');
                     healthTypeSelect.name = 'health_type';
+                    healthTypeSelect.className = 'dropdown-emergency';
                     (dropdownData['Health Emergency Types'] || []).forEach(option => {
                         const opt = document.createElement('option');
                         opt.value = option;
@@ -193,6 +194,7 @@
                     // Health Cause dropdown
                     const healthCauseSelect = document.createElement('select');
                     healthCauseSelect.name = 'health_cause';
+                    healthCauseSelect.className = 'dropdown-emergency';
                     (dropdownData['Health Causes'] || []).forEach(option => {
                         const opt = document.createElement('option');
                         opt.value = option;
@@ -204,6 +206,7 @@
                     // Patient Gender dropdown
                     const patientGenderSelect = document.createElement('select');
                     patientGenderSelect.name = 'patient_gender';
+                    patientGenderSelect.className = 'dropdown-emergency';
                     (dropdownData['Patient Gender'] || []).forEach(option => {
                         const opt = document.createElement('option');
                         opt.value = option;
@@ -215,6 +218,7 @@
                     // Patient Age dropdown
                     const patientAgeSelect = document.createElement('select');
                     patientAgeSelect.name = 'patient_age';
+                    patientAgeSelect.className = 'dropdown-emergency';
                     (dropdownData['Patient Age'] || []).forEach(option => {
                         const opt = document.createElement('option');
                         opt.value = option;
@@ -226,6 +230,7 @@
                     // Submit button for health response
                     const submitButton = document.createElement('button');
                     submitButton.textContent = 'Submit';
+                    submitButton.className = 'submit-emergency';
                     submitButton.addEventListener('click', () => {
                         const formData = {
                             alert_id: data.alert_id,
@@ -256,6 +261,7 @@
                     hospitalForm.innerHTML = '';
                     const hospitalSelect = document.createElement('select');
                     hospitalSelect.name = 'hospital_name';
+                    hospitalSelect.className = 'dropdown-hospital';
                     hospitalOptions.forEach(hospital => {
                         const opt = document.createElement('option');
                         opt.value = hospital;
@@ -267,6 +273,7 @@
                     // Submit button for hospital selection
                     const hospitalSubmitButton = document.createElement('button');
                     hospitalSubmitButton.textContent = 'Send to Hospital';
+                    hospitalSubmitButton.className = 'submit-emergency';
                     hospitalSubmitButton.addEventListener('click', () => {
                         const hospitalData = {
                             alert_id: data.alert_id,
