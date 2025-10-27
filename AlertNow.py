@@ -1172,22 +1172,22 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
     logger.info(f"Barangay response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
     
     try:
-        # Map frontend field names (menu.txt) to backend table columns
+        # Map frontend field names (menuData) to backend table columns
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Road Accident Cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
-            'Road Accident Type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'Road Conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
-            'Vehicle Types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
-            'Driver Ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},  # Changed to str to match schema
-            'Driver Gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
+            'road_accident_cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
+            'road_accident_type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
+            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+            'road_conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
+            'vehicle_types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
+            'driver_ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},
+            'driver_gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
-            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},  # Retain 'Unknown' as per schema
+            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
         }
         
@@ -1198,14 +1198,15 @@ def handle_barangay_response_submitted(data):
             for key, mapping in field_mappings.items()
         }
         extracted_data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        extracted_data['responded'] = True
 
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO barangay_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['road_accident_cause'],
@@ -1219,114 +1220,36 @@ def handle_barangay_response_submitted(data):
             extracted_data['lon'],
             extracted_data['barangay'],
             extracted_data['emergency_type'],
-            extracted_data['timestamp']
+            extracted_data['timestamp'],
+            extracted_data['responded']
         ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {extracted_data['alert_id']}")
+        logger.info(f"Stored barangay road accident response for alert_id: {extracted_data['alert_id']}")
     except Exception as e:
-        logger.error(f"Error storing barangay response: {e}")
+        logger.error(f"Error storing barangay road accident response: {e}")
         conn.rollback()
     finally:
         conn.close()
     
     # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
+    response_time = datetime.now(pytz.timezone('Asia/Manila'))
+    today = response_time.date()
     if response_time.date() == today:
         today_responses.append(data)
     
     # Compute prediction using ML model on form data
     try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', ''),
-            'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
-            'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Road_Condition': data.get('Road Conditions', 'Dry'),
-            'Vehicle_Type': data.get('Vehicle Types', 'Car'),
-            'Driver_Age': data.get('Driver Ages', '26-35'),
-            'Driver_Gender': data.get('Driver Gender', 'Male')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Road_Accident_Type': extracted_data['road_accident_type'],
+            'Accident_Cause': extracted_data['road_accident_cause'],
+            'Weather_Condition': extracted_data['weather'],
+            'Road_Condition': extracted_data['road_condition'],
+            'Vehicle_Type': extracted_data['vehicle_type'],
+            'Driver_Age': extracted_data['driver_age'],
+            'Driver_Gender': extracted_data['driver_gender']
         }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'collision': 'Head-on collision',
-            'head-on collision': 'Head-on collision',
-            'rear-end collision': 'Rear-end collision',
-            'side-impact collision': 'Side-impact collision',
-            'single vehicle accident': 'Single vehicle accident',
-            'pedestrian accident': 'Pedestrian accident'
-        }
-        cause_mapping = {
-            'speeding': 'Overspeeding',
-            'overspeeding': 'Overspeeding',
-            'drunk driving': 'Drunk Driving',
-            'reckless driving': 'Reckless Driving',
-            'overloading': 'Overloading',
-            'fatigue': 'Fatigue',
-            'distracted driving': 'Distracted Driving',
-            'poor maintenance': 'Poor Maintenance',
-            'mechanical failure': 'Mechanical Failure',
-            'inexperience': 'Inexperience'
-        }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        road_condition_mapping = {
-            'dry': 'Dry',
-            'wet': 'Wet',
-            'icy': 'Icy',
-            'potholes': 'Potholes',
-            'gravel': 'Gravel'
-        }
-        vehicle_mapping = {
-            'car': 'Car',
-            'motorcycle': 'Motorcycle',
-            'truck': 'Truck',
-            'bus': 'Bus',
-            'bicycle': 'Bicycle'
-        }
-        driver_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        driver_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Road_Accident_Type':
-                cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
-            elif key == 'Accident_Cause':
-                cleaned_data[key] = type_mapping.get(data.get('Road Accident Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Road_Condition':
-                cleaned_data[key] = road_condition_mapping.get(data.get('Road Conditions', '').lower(), default_values[key])
-            elif key == 'Vehicle_Type':
-                cleaned_data[key] = vehicle_mapping.get(data.get('Vehicle Types', '').lower(), default_values[key])
-            elif key == 'Driver_Gender':
-                cleaned_data[key] = driver_gender_mapping.get(data.get('Driver Gender', '').lower(), default_values[key])
-            elif key == 'Driver_Age':
-                cleaned_data[key] = driver_age_mapping.get(str(data.get('Driver Ages', '')).lower(), default_values[key])
-
         
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
@@ -1336,28 +1259,26 @@ def handle_barangay_response_submitted(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        
-        # Reorder columns to match training data
         input_df = input_df[expected_columns]
         
         # Make prediction
         if road_accident_predictor:
             prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for barangay response: {data['prediction']}")
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
+            logger.info(f"Prediction for barangay road accident response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
             logger.error("Road accident predictor not loaded")
     except Exception as e:
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for barangay response: {e}")
+        logger.error(f"Error in prediction for barangay road accident response: {e}")
     
     responses.append(data)
     
     # Emit response to barangay room
-    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+    barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
-    logger.info(f"Barangay response emitted to room {barangay_room}")
+    logger.info(f"Barangay road accident response emitted to room: {barangay_room}")
  
 @socketio.on('barangay_fire_submitted')
 def handle_barangay_fire_submitted(data):
@@ -1366,10 +1287,10 @@ def handle_barangay_fire_submitted(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Fire Types': {'db_column': 'fire_type', 'default': 'Residential Fire', 'type': str},
-            'Fire Cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'Fire Severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
+            'fire_types': {'db_column': 'fire_type', 'default': 'Residential Fire', 'type': str},
+            'fire_cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
+            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+            'fire_severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
@@ -1412,83 +1333,14 @@ def handle_barangay_fire_submitted(data):
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': data.get('Fire Types', 'Residential Fire'),
-            'Fire_Cause': data.get('Fire Cause', 'Unattended Cooking'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Fire_Severity': data.get('Fire Severity', 'Low'),
-            'Resident_Age': data.get('Resident Age', '26-35'),
-            'Resident_Gender': data.get('Resident Gender', 'Male')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Fire_Type': extracted_data['fire_type'],
+            'Fire_Cause': extracted_data['fire_cause'],
+            'Weather_Condition': extracted_data['weather'],
+            'Fire_Severity': extracted_data['fire_severity']
         }
-        ftype_mapping = {
-            'residential fire': 'Residential Fire',
-            'structural fire': 'Structural Fire',
-            'commercial/industrial fire': 'Commercial/Industrial Fire',
-            'electrical fire': 'Electrical Fire',
-            'vehicular fire': 'Vehicular Fire',
-            'grass fire': 'Grass Fire',
-            'forest/wildfire': 'Forest/Wildfire',
-            'rubbish/garbage fire': 'Rubbish/Garbage Fire',
-            'kitchen/grease fire': 'Kitchen/Grease Fire',
-            'gas/lpg fire': 'Gas/LPG Fire',
-            'explosion/blast-related fire': 'Explosion/Blast-related Fire',
-            'post fire': 'Post Fire'
-        }
-        fcause_mapping = {
-            'unattended cooking': 'Unattended Cooking',
-            'electrical short circuit': 'Electrical Short Circuit',
-            'candles left burning': 'Candles Left Burning',
-            'overloaded extension cords': 'Overloaded Extension Cords',
-            'smoking materials': 'Smoking Materials',
-            'lpg/gas leak': 'LPG/Gas Leak',
-            'faulty wiring or electrical systems': 'Faulty Wiring or Electrical Systems',
-            'flammable materials stored improperly': 'Flammable Materials Stored Improperly',
-            'welding or construction sparks': 'Welding or Construction Sparks',
-            'arson': 'Arson',
-            'machinery/equipment overheating': 'Machinery/Equipment Overheating',
-            'chemical reactions or spills': 'Chemical Reactions or Spills',
-            'boiler or furnace failure': 'Boiler or Furnace Failure',
-            'improper disposal of flammable waste': 'Improper Disposal of Flammable Waste',
-            'exposed or damaged wiring': 'Exposed or Damaged Wiring',
-            'lightning strike': 'Lightning Strike',
-            'engine overheating': 'Engine Overheating',
-            'fuel leak': 'Fuel Leak'
-        }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        fire_severity_mapping = {
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High',
-            'minor fire': 'Minor Fire',
-            'moderate fire': 'Moderate Fire',
-            'major fire': 'Major Fire',
-            'severe fire': 'Severe Fire',
-            'catastrophic fire': 'Catastrophic Fire'
-        }
-        
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Fire_Type':
-                cleaned_data[key] = ftype_mapping.get(data.get('Fire Types', '').lower(), default_values[key])
-            elif key == 'Fire_Cause':
-                cleaned_data[key] = fcause_mapping.get(data.get('Fire Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Fire_Severity':
-                cleaned_data[key] = fire_severity_mapping.get(data.get('Fire Severity', '').lower(), default_values[key])
-            
         
         input_df = pd.DataFrame([cleaned_data])
         
@@ -1496,12 +1348,11 @@ def handle_barangay_fire_submitted(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        
         input_df = input_df[expected_columns]
         
         if fire_accident_predictor:
             prediction = fire_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
             logger.info(f"Prediction for barangay fire response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
@@ -1512,9 +1363,9 @@ def handle_barangay_fire_submitted(data):
         
     responses.append(data)
     
-    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+    barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_fire_submitted', data, room=barangay_room)
-    logger.info(f"Barangay response emitted to room {barangay_room}")
+    logger.info(f"Barangay fire response emitted to room: {barangay_room}")
 
 @socketio.on('barangay_crime_submitted')
 def handle_barangay_crime_submitted(data):
@@ -1523,13 +1374,13 @@ def handle_barangay_crime_submitted(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Crime Types': {'db_column': 'crime_type', 'default': 'Theft', 'type': str},
-            'Crime Causes': {'db_column': 'crime_cause', 'default': 'Poverty', 'type': str},
-            'Levels': {'db_column': 'level', 'default': 'Low', 'type': str},
-            'Suspect Gender': {'db_column': 'suspect_gender', 'default': 'Male', 'type': str},
-            'Victim Gender': {'db_column': 'victim_gender', 'default': 'Female', 'type': str},
-            'Suspect Age': {'db_column': 'suspect_age', 'default': '26-35', 'type': str},
-            'Victim Age': {'db_column': 'victim_age', 'default': '18-25', 'type': str},
+            'crime_types': {'db_column': 'crime_type', 'default': 'Theft', 'type': str},
+            'crime_causes': {'db_column': 'crime_cause', 'default': 'Poverty', 'type': str},
+            'levels': {'db_column': 'level', 'default': 'Low', 'type': str},
+            'suspect_gender': {'db_column': 'suspect_gender', 'default': 'Male', 'type': str},
+            'victim_gender': {'db_column': 'victim_gender', 'default': 'Female', 'type': str},
+            'suspect_age': {'db_column': 'suspect_age', 'default': '26-35', 'type': str},
+            'victim_age': {'db_column': 'victim_age', 'default': '18-25', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
@@ -1576,93 +1427,20 @@ def handle_barangay_crime_submitted(data):
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Crime_Type': data.get('Crime Types', 'Theft'),
-            'Crime_Cause': data.get('Crime Causes', 'Poverty'),
-            'Level': data.get('Levels', 'Low'),
-            'Suspect_Gender': data.get('Suspect Gender', 'Male'),
-            'Victim_Gender': data.get('Victim Gender', 'Female'),
-            'Suspect_Age': data.get('Suspect Age', '26-35'),
-            'Victim_Age': data.get('Victim Age', '18-25')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Crime_Type': extracted_data['crime_type'],
+            'Crime_Cause': extracted_data['crime_cause'],
+            'Level': extracted_data['level'],
+            'Suspect_Gender': extracted_data['suspect_gender'],
+            'Victim_Gender': extracted_data['victim_gender'],
+            'Suspect_Age': extracted_data['suspect_age'],
+            'Victim_Age': extracted_data['victim_age']
         }
-        crime_type_mapping = {
-            'theft': 'Theft',
-            'assault': 'Assault',
-            'burglary': 'Burglary',
-            'robbery': 'Robbery',
-            'vandalism': 'Vandalism',
-            'harassment': 'Harassment',
-            'domestic violence': 'Domestic Violence',
-            'drug-related': 'Drug-Related',
-            'fraud': 'Fraud'
-        }
-        crime_cause_mapping = {
-            'poverty': 'Poverty',
-            'unemployment': 'Unemployment',
-            'alcohol': 'Alcohol',
-            'drugs': 'Drugs',
-            'personal dispute': 'Personal Dispute',
-            'gang activity': 'Gang Activity',
-            'opportunistic': 'Opportunistic',
-            'domestic issue': 'Domestic Issue',
-            'mental health': 'Mental Health'
-        }
-        level_mapping = {
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High'
-        }
-        suspect_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        victim_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        suspect_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        victim_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Crime_Type':
-                cleaned_data[key] = crime_type_mapping.get(data.get('Crime Types', '').lower(), default_values[key])
-            elif key == 'Crime_Cause':
-                cleaned_data[key] = crime_cause_mapping.get(data.get('Crime Causes', '').lower(), default_values[key])
-            elif key == 'Level':
-                cleaned_data[key] = level_mapping.get(data.get('Levels', '').lower(), default_values[key])
-            elif key == 'Suspect_Gender':
-                cleaned_data[key] = suspect_gender_mapping.get(data.get('Suspect Gender', '').lower(), default_values[key])
-            elif key == 'Victim_Gender':
-                cleaned_data[key] = victim_gender_mapping.get(data.get('Victim Gender', '').lower(), default_values[key])
-            elif key == 'Suspect_Age':
-                cleaned_data[key] = suspect_age_mapping.get(str(data.get('Suspect Age', '')).lower(), default_values[key])
-            elif key == 'Victim_Age':
-                cleaned_data[key] = victim_age_mapping.get(str(data.get('Victim Age', '')).lower(), default_values[key])
         
         input_df = pd.DataFrame([cleaned_data])
         
-        # Ensure all expected columns are present
         if crime_df is not None and not crime_df.empty:
             expected_columns = crime_df.columns
             for col in expected_columns:
@@ -1679,7 +1457,7 @@ def handle_barangay_crime_submitted(data):
         
         if crime_predictor:
             prediction = crime_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
             logger.info(f"Prediction for barangay crime response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
@@ -1690,9 +1468,9 @@ def handle_barangay_crime_submitted(data):
         
     responses.append(data)
     
-    barangay_room = f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+    barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_crime_submitted', data, room=barangay_room)
-    logger.info(f"Barangay response emitted to room {barangay_room}")
+    logger.info(f"Barangay crime response emitted to room: {barangay_room}")
 
 @socketio.on('barangay_health_response')
 def handle_barangay_health_response(data):
@@ -1702,14 +1480,16 @@ def handle_barangay_health_response(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Health Emergency Types': {'db_column': 'health_type', 'default': 'Heart Attack', 'type': str},
-            'Health Causes': {'db_column': 'health_cause', 'default': 'Chronic Illness', 'type': str},
-            'Patient Gender': {'db_column': 'patient_gender', 'default': 'Male', 'type': str},
-            'Patient Age': {'db_column': 'patient_age', 'default': '26-35', 'type': str},
+            'health_emergency_types': {'db_column': 'health_type', 'default': 'Heart Attack', 'type': str},
+            'health_causes': {'db_column': 'health_cause', 'default': 'Chronic Illness', 'type': str},
+            'patient_gender': {'db_column': 'patient_gender', 'default': 'Male', 'type': str},
+            'patient_age': {'db_column': 'patient_age', 'default': '26-35', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str}
+            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str},
+            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
+            'image': {'db_column': 'image', 'default': '', 'type': str}
         }
         
         extracted_data = {
@@ -1725,8 +1505,8 @@ def handle_barangay_health_response(data):
             INSERT INTO barangay_health_response (
                 alert_id, health_type, health_cause, patient_age, 
                 patient_gender, lat, lon, barangay, emergency_type, 
-                timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                timestamp, responded, resident_barangay, image
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['health_type'],
@@ -1738,110 +1518,67 @@ def handle_barangay_health_response(data):
             extracted_data['barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
-            extracted_data['responded']
+            extracted_data['responded'],
+            extracted_data['resident_barangay'],
+            extracted_data['image']
         ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {data.get('alert_id')}")
+        logger.info(f"Stored barangay health response for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error storing barangay response: {e}")
+        logger.error(f"Error storing barangay health response: {e}")
         conn.rollback()
     finally:
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Health_Type': data.get('Health Emergency Types', 'Heart Attack'),
-            'Health_Cause': data.get('Health Causes', 'Chronic Illness'),
-            'Patient_Age': data.get('Patient Age', '26-35'),
-            'Patient_Gender': data.get('Patient Gender', 'Male')
-        }
-        health_type_mapping = {
-            'heart attack': 'Heart Attack',
-            'stroke': 'Stroke',
-            'fall': 'Fall',
-            'breathing difficulty': 'Breathing Difficulty',
-            'giving birth': 'Giving Birth',
-            'seizure': 'Seizure',
-            'burn': 'Burn',
-            'poisoning': 'Poisoning',
-            'allergic reaction': 'Allergic Reaction'
-        }
-        health_cause_mapping = {
-            'chronic illness': 'Chronic Illness',
-            'illness': 'Illness',
-            'accident': 'Accident',
-            'allergy': 'Allergy',
-            'infection': 'Infection',
-            'pregnant': 'Pregnant',
-            'overdose': 'Overdose',
-            'heatstroke': 'Heatstroke'
-        }
-        patient_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        patient_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Health_Type': extracted_data['health_type'],
+            'Health_Cause': extracted_data['health_cause'],
+            'Patient_Age': extracted_data['patient_age'],
+            'Patient_Gender': extracted_data['patient_gender']
         }
         
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Health_Type':
-                cleaned_data[key] = health_type_mapping.get(data.get('Health Emergency Types', '').lower(), default_values[key])
-            elif key == 'Health_Cause':
-                cleaned_data[key] = health_cause_mapping.get(data.get('Health Causes', '').lower(), default_values[key])
-            elif key == 'Patient_Age':
-                cleaned_data[key] = patient_age_mapping.get(str(data.get('Patient Age', '')).lower(), default_values[key])
-            elif key == 'Patient_Gender':
-                cleaned_data[key] = patient_gender_mapping.get(data.get('Patient Gender', '').lower(), default_values[key])
-                
         features = pd.DataFrame([[cleaned_data['Health_Type'], cleaned_data['Health_Cause'], 
-                                 cleaned_data['Barangay'], cleaned_data['Year']]], columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
+                                 cleaned_data['Barangay'], cleaned_data['Year']]],
+                               columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
         if health_predictor:
-            probability = health_predictor.predict_proba(features)[0][1]*100
-            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+            probability = health_predictor.predict_proba(features)[0][1] * 100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
+            logger.info(f"Prediction for barangay health response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
+            logger.error("Health predictor not loaded")
     except Exception as e:
-        logger.error(f"Error in health_predictor: (e)")
         data['prediction'] = 'prediction_error'
+        logger.error(f"Error in prediction for barangay health response: {e}")
         
     responses.append(data)
     today_responses.append(data)
-    barangay_room= f"barangay_{data.get('barangay').lower() if data.get('barangay') else ''}"
+    barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_health_response', data, room=barangay_room)
-    logger.info(f"Barangay response emitted to room {barangay_room}")
+    logger.info(f"Barangay health response emitted to room: {barangay_room}")
 
 
 @socketio.on('cdrrmo_response')
 def handle_cdrrmo_response_submitted(data):
     logger.info(f"CDRRMO response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
     
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Road Accident Cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
-            'Road Accident Type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'Road Conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
-            'Vehicle Types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
-            'Driver Ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},  # Changed to str to match schema
-            'Driver Gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
+            'road_accident_cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
+            'road_accident_type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
+            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+            'road_conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
+            'vehicle_types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
+            'driver_ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},
+            'driver_gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
-            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},  # Retain 'Unknown' as per schema
+            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
         }
         
@@ -1852,14 +1589,15 @@ def handle_cdrrmo_response_submitted(data):
             for key, mapping in field_mappings.items()
         }
         extracted_data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        extracted_data['responded'] = True
 
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO cdrrmo_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['road_accident_cause'],
@@ -1873,113 +1611,36 @@ def handle_cdrrmo_response_submitted(data):
             extracted_data['lon'],
             extracted_data['barangay'],
             extracted_data['emergency_type'],
-            extracted_data['timestamp']
+            extracted_data['timestamp'],
+            extracted_data['responded']
         ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {extracted_data['alert_id']}")
+        logger.info(f"Stored CDRRMO road accident response for alert_id: {extracted_data['alert_id']}")
     except Exception as e:
-        logger.error(f"Error storing barangay response: {e}")
+        logger.error(f"Error storing CDRRMO road accident response: {e}")
         conn.rollback()
     finally:
         conn.close()
     
     # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
+    response_time = datetime.now(pytz.timezone('Asia/Manila'))
+    today = response_time.date()
     if response_time.date() == today:
         today_responses.append(data)
     
     # Compute prediction using ML model on form data
     try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', ''),
-            'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
-            'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Road_Condition': data.get('Road Conditions', 'Dry'),
-            'Vehicle_Type': data.get('Vehicle Types', 'Car'),
-            'Driver_Age': data.get('Driver Ages', '26-35'),
-            'Driver_Gender': data.get('Driver Gender', 'Male')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Road_Accident_Type': extracted_data['road_accident_type'],
+            'Accident_Cause': extracted_data['road_accident_cause'],
+            'Weather_Condition': extracted_data['weather'],
+            'Road_Condition': extracted_data['road_condition'],
+            'Vehicle_Type': extracted_data['vehicle_type'],
+            'Driver_Age': extracted_data['driver_age'],
+            'Driver_Gender': extracted_data['driver_gender']
         }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'collision': 'Head-on collision',
-            'head-on collision': 'Head-on collision',
-            'rear-end collision': 'Rear-end collision',
-            'side-impact collision': 'Side-impact collision',
-            'single vehicle accident': 'Single vehicle accident',
-            'pedestrian accident': 'Pedestrian accident'
-        }
-        cause_mapping = {
-            'speeding': 'Overspeeding',
-            'overspeeding': 'Overspeeding',
-            'drunk driving': 'Drunk Driving',
-            'reckless driving': 'Reckless Driving',
-            'overloading': 'Overloading',
-            'fatigue': 'Fatigue',
-            'distracted driving': 'Distracted Driving',
-            'poor maintenance': 'Poor Maintenance',
-            'mechanical failure': 'Mechanical Failure',
-            'inexperience': 'Inexperience'
-        }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        road_condition_mapping = {
-            'dry': 'Dry',
-            'wet': 'Wet',
-            'icy': 'Icy',
-            'potholes': 'Potholes',
-            'gravel': 'Gravel'
-        }
-        vehicle_mapping = {
-            'car': 'Car',
-            'motorcycle': 'Motorcycle',
-            'truck': 'Truck',
-            'bus': 'Bus',
-            'bicycle': 'Bicycle'
-        }
-        driver_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        driver_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Road_Accident_Type':
-                cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
-            elif key == 'Accident_Cause':
-                cleaned_data[key] = type_mapping.get(data.get('Road Accident Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Road_Condition':
-                cleaned_data[key] = road_condition_mapping.get(data.get('Road Conditions', '').lower(), default_values[key])
-            elif key == 'Vehicle_Type':
-                cleaned_data[key] = vehicle_mapping.get(data.get('Vehicle Types', '').lower(), default_values[key])
-            elif key == 'Driver_Gender':
-                cleaned_data[key] = driver_gender_mapping.get(data.get('Driver Gender', '').lower(), default_values[key])
-            elif key == 'Driver_Age':
-                cleaned_data[key] = driver_age_mapping.get(str(data.get('Driver Ages', '')).lower(), default_values[key])
         
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
@@ -1989,46 +1650,44 @@ def handle_cdrrmo_response_submitted(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        
-        # Reorder columns to match training data
         input_df = input_df[expected_columns]
         
         # Make prediction
         if road_accident_predictor:
             prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for cdrrmo response: {data['prediction']}")
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
+            logger.info(f"Prediction for CDRRMO road accident response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
             logger.error("Road accident predictor not loaded")
     except Exception as e:
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for cdrrmo response: {e}")
+        logger.error(f"Error in prediction for CDRRMO road accident response: {e}")
     
     responses.append(data)
     
     # Emit response to cdrrmo room
-    cdrrmo_room = f"cdrrmo_{data.get('municipality').lower() if data.get('municipality') else ''}"
+    cdrrmo_room = f"cdrrmo_{data.get('municipality', 'unknown').lower()}"
     emit('cdrrmo_response', data, room=cdrrmo_room)
-    logger.info(f"CDRRMO response emitted to room {cdrrmo_room}")
+    logger.info(f"CDRRMO road accident response emitted to room: {cdrrmo_room}")
 
 @socketio.on('pnp_response')
 def handle_pnp_response_submitted(data):
     logger.info(f"PNP response received: {data}")
-    data['timestamp'] = datetime.now(pytz.UTC).isoformat()
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Road Accident Cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
-            'Road Accident Type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'Road Conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
-            'Vehicle Types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
-            'Driver Ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},  # Changed to str to match schema
-            'Driver Gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
+            'road_accident_cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
+            'road_accident_type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
+            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+            'road_conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
+            'vehicle_types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
+            'driver_ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},
+            'driver_gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
-            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str}, 
+            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
             'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
         }
         
@@ -2039,14 +1698,15 @@ def handle_pnp_response_submitted(data):
             for key, mapping in field_mappings.items()
         }
         extracted_data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+        extracted_data['responded'] = True
 
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO pnp_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
-                lat, lon, barangay, emergency_type, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                lat, lon, barangay, emergency_type, timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['road_accident_cause'],
@@ -2060,113 +1720,36 @@ def handle_pnp_response_submitted(data):
             extracted_data['lon'],
             extracted_data['barangay'],
             extracted_data['emergency_type'],
-            extracted_data['timestamp']
+            extracted_data['timestamp'],
+            extracted_data['responded']
         ))
         conn.commit()
-        logger.info(f"Stored barangay response for alert_id: {extracted_data['alert_id']}")
+        logger.info(f"Stored pnp response for alert_id: {extracted_data['alert_id']}")
     except Exception as e:
-        logger.error(f"Error storing barangay response: {e}")
+        logger.error(f"Error storing pnp response: {e}")
         conn.rollback()
     finally:
         conn.close()
     
     # Check if response is today for analytics
-    response_time = datetime.fromisoformat(data['timestamp'].replace('Z', '+00:00')).astimezone(pytz.timezone('Asia/Manila'))
-    today = datetime.now(pytz.timezone('Asia/Manila')).date()
+    response_time = datetime.now(pytz.timezone('Asia/Manila'))
+    today = response_time.date()
     if response_time.date() == today:
         today_responses.append(data)
     
     # Compute prediction using ML model on form data
     try:
-        # Default values for expected model features
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', ''),
-            'Road_Accident_Type': data.get('Road Accident Type', 'Overspeeding'),
-            'Accident_Cause': data.get('Road Accident Cause', 'Head-on collision'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Road_Condition': data.get('Road Conditions', 'Dry'),
-            'Vehicle_Type': data.get('Vehicle Types', 'Car'),
-            'Driver_Age': data.get('Driver Ages', '26-35'),
-            'Driver_Gender': data.get('Driver Gender', 'Male')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Road_Accident_Type': extracted_data['road_accident_type'],
+            'Accident_Cause': extracted_data['road_accident_cause'],
+            'Weather_Condition': extracted_data['weather'],
+            'Road_Condition': extracted_data['road_condition'],
+            'Vehicle_Type': extracted_data['vehicle_type'],
+            'Driver_Age': extracted_data['driver_age'],
+            'Driver_Gender': extracted_data['driver_gender']
         }
-        
-        # Map input values to dataset categories
-        type_mapping = {
-            'collision': 'Head-on collision',
-            'head-on collision': 'Head-on collision',
-            'rear-end collision': 'Rear-end collision',
-            'side-impact collision': 'Side-impact collision',
-            'single vehicle accident': 'Single vehicle accident',
-            'pedestrian accident': 'Pedestrian accident'
-        }
-        cause_mapping = {
-            'speeding': 'Overspeeding',
-            'overspeeding': 'Overspeeding',
-            'drunk driving': 'Drunk Driving',
-            'reckless driving': 'Reckless Driving',
-            'overloading': 'Overloading',
-            'fatigue': 'Fatigue',
-            'distracted driving': 'Distracted Driving',
-            'poor maintenance': 'Poor Maintenance',
-            'mechanical failure': 'Mechanical Failure',
-            'inexperience': 'Inexperience'
-        }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        road_condition_mapping = {
-            'dry': 'Dry',
-            'wet': 'Wet',
-            'icy': 'Icy',
-            'potholes': 'Potholes',
-            'gravel': 'Gravel'
-        }
-        vehicle_mapping = {
-            'car': 'Car',
-            'motorcycle': 'Motorcycle',
-            'truck': 'Truck',
-            'bus': 'Bus',
-            'bicycle': 'Bicycle'
-        }
-        driver_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        driver_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        
-        # Validate and clean input data
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Road_Accident_Type':
-                cleaned_data[key] = cause_mapping.get(data.get('Road Accident Type', '').lower(), default_values[key])
-            elif key == 'Accident_Cause':
-                cleaned_data[key] = type_mapping.get(data.get('Road Accident Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Road_Condition':
-                cleaned_data[key] = road_condition_mapping.get(data.get('Road Conditions', '').lower(), default_values[key])
-            elif key == 'Vehicle_Type':
-                cleaned_data[key] = vehicle_mapping.get(data.get('Vehicle Types', '').lower(), default_values[key])
-            elif key == 'Driver_Gender':
-                cleaned_data[key] = driver_gender_mapping.get(data.get('Driver Gender', '').lower(), default_values[key])
-            elif key == 'Driver_Age':
-                cleaned_data[key] = driver_age_mapping.get(str(data.get('Driver Ages', '')).lower(), default_values[key])
         
         # Prepare DataFrame for prediction
         input_df = pd.DataFrame([cleaned_data])
@@ -2176,14 +1759,12 @@ def handle_pnp_response_submitted(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        
-        # Reorder columns to match training data
         input_df = input_df[expected_columns]
         
         # Make prediction
         if road_accident_predictor:
             prediction = road_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
             logger.info(f"Prediction for pnp response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
@@ -2195,7 +1776,7 @@ def handle_pnp_response_submitted(data):
     responses.append(data)
     
     # Emit response to pnp room
-    pnp_room = f"pnp_{data.get('municipality').lower() if data.get('municipality') else ''}"
+    pnp_room = f"pnp_{data.get('municipality', 'unknown').lower()}"
     emit('pnp_response', data, room=pnp_room)
     logger.info(f"PNP response emitted to room {pnp_room}")
 
@@ -2206,10 +1787,10 @@ def handle_pnp_fire_submitted(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Fire Types': {'db_column': 'fire_type', 'default': 'Residential Fire', 'type': str},
-            'Fire Cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'Fire Severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
+            'fire_types': {'db_column': 'fire_type', 'default': 'Residential Fire', 'type': str},
+            'fire_cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
+            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+            'fire_severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
@@ -2252,82 +1833,14 @@ def handle_pnp_fire_submitted(data):
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': data.get('Fire Types', 'Residential Fire'),
-            'Fire_Cause': data.get('Fire Cause', 'Unattended Cooking'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Fire_Severity': data.get('Fire Severity', 'Low'),
-            'Resident_Age': data.get('Resident Age', '26-35'),
-            'Resident_Gender': data.get('Resident Gender', 'Male')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Fire_Type': extracted_data['fire_type'],
+            'Fire_Cause': extracted_data['fire_cause'],
+            'Weather_Condition': extracted_data['weather'],
+            'Fire_Severity': extracted_data['fire_severity']
         }
-        ftype_mapping = {
-            'residential fire': 'Residential Fire',
-            'structural fire': 'Structural Fire',
-            'commercial/industrial fire': 'Commercial/Industrial Fire',
-            'electrical fire': 'Electrical Fire',
-            'vehicular fire': 'Vehicular Fire',
-            'grass fire': 'Grass Fire',
-            'forest/wildfire': 'Forest/Wildfire',
-            'rubbish/garbage fire': 'Rubbish/Garbage Fire',
-            'kitchen/grease fire': 'Kitchen/Grease Fire',
-            'gas/lpg fire': 'Gas/LPG Fire',
-            'explosion/blast-related fire': 'Explosion/Blast-related Fire',
-            'post fire': 'Post Fire'
-        }
-        fcause_mapping = {
-            'unattended cooking': 'Unattended Cooking',
-            'electrical short circuit': 'Electrical Short Circuit',
-            'candles left burning': 'Candles Left Burning',
-            'overloaded extension cords': 'Overloaded Extension Cords',
-            'smoking materials': 'Smoking Materials',
-            'lpg/gas leak': 'LPG/Gas Leak',
-            'faulty wiring or electrical systems': 'Faulty Wiring or Electrical Systems',
-            'flammable materials stored improperly': 'Flammable Materials Stored Improperly',
-            'welding or construction sparks': 'Welding or Construction Sparks',
-            'arson': 'Arson',
-            'machinery/equipment overheating': 'Machinery/Equipment Overheating',
-            'chemical reactions or spills': 'Chemical Reactions or Spills',
-            'boiler or furnace failure': 'Boiler or Furnace Failure',
-            'improper disposal of flammable waste': 'Improper Disposal of Flammable Waste',
-            'exposed or damaged wiring': 'Exposed or Damaged Wiring',
-            'lightning strike': 'Lightning Strike',
-            'engine overheating': 'Engine Overheating',
-            'fuel leak': 'Fuel Leak'
-        }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        fire_severity_mapping = {
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High',
-            'minor fire': 'Minor Fire',
-            'moderate fire': 'Moderate Fire',
-            'major fire': 'Major Fire',
-            'severe fire': 'Severe Fire',
-            'catastrophic fire': 'Catastrophic Fire'
-        }
-        
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Fire_Type':
-                cleaned_data[key] = ftype_mapping.get(data.get('Fire Types', '').lower(), default_values[key])
-            elif key == 'Fire_Cause':
-                cleaned_data[key] = fcause_mapping.get(data.get('Fire Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Fire_Severity':
-                cleaned_data[key] = fire_severity_mapping.get(data.get('Fire Severity', '').lower(), default_values[key])
         
         input_df = pd.DataFrame([cleaned_data])
         
@@ -2335,12 +1848,11 @@ def handle_pnp_fire_submitted(data):
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-        
         input_df = input_df[expected_columns]
         
         if fire_accident_predictor:
             prediction = fire_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
             logger.info(f"Prediction for PNP fire response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
@@ -2353,7 +1865,7 @@ def handle_pnp_fire_submitted(data):
     
     pnp_room = f"pnp_{data.get('municipality', 'unknown').lower()}"
     emit('pnp_fire_submitted', data, room=pnp_room)
-    logger.info(f"Emitted fire response to room: {pnp_room}")
+    logger.info(f"PNP fire response emitted to room: {pnp_room}")
 
 @socketio.on('pnp_crime_submitted')
 def handle_pnp_crime_submitted(data):
@@ -2467,13 +1979,16 @@ def handle_pnp_crime_submitted(data):
 @socketio.on('fire_response_submitted')
 def handle_fire_response_submission(data):
     """Handle fire response submission from barangay dashboard."""
+    logger.info(f"BFP response received: {data}")
+    data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
+    
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Fire Types': {'db_column': 'fire_type', 'default': 'Residential Fire', 'type': str},
-            'Fire Cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
-            'Weather Conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'Fire Severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
+            'fire_types': {'db_column': 'fire_type', 'default': 'Residential Fire', 'type': str},
+            'fire_cause': {'db_column': 'fire_cause', 'default': 'Unattended Cooking', 'type': str},
+            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+            'fire_severity': {'db_column': 'fire_severity', 'default': 'Low', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
@@ -2508,112 +2023,47 @@ def handle_fire_response_submission(data):
             extracted_data['responded']
         ))
         conn.commit()
-        logger.info(f"Stored fire response for alert_id: {data.get('alert_id')}")
+        logger.info(f"Stored BFP fire response for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error storing fire response: {e}")
+        logger.error(f"Error storing BFP fire response: {e}")
         conn.rollback()
     finally:
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Fire_Type': data.get('Fire Types', 'Residential Fire'),
-            'Fire_Cause': data.get('Fire Cause', 'Unattended Cooking'),
-            'Weather_Condition': data.get('Weather Conditions', 'Sunny'),
-            'Fire_Severity': data.get('Fire Severity', 'Low')
-        }
-        ftype_mapping = {
-            'residential fire': 'Residential Fire',
-            'structural fire': 'Structural Fire',
-            'commercial/industrial fire': 'Commercial/Industrial Fire',
-            'electrical fire': 'Electrical Fire',
-            'vehicular fire': 'Vehicular Fire',
-            'grass fire': 'Grass Fire',
-            'forest/wildfire': 'Forest/Wildfire',
-            'rubbish/garbage fire': 'Rubbish/Garbage Fire',
-            'kitchen/grease fire': 'Kitchen/Grease Fire',
-            'gas/lpg fire': 'Gas/LPG Fire',
-            'explosion/blast-related fire': 'Explosion/Blast-related Fire',
-            'post fire': 'Post Fire'
-        }
-        fcause_mapping = {
-            'unattended cooking': 'Unattended Cooking',
-            'electrical short circuit': 'Electrical Short Circuit',
-            'candles left burning': 'Candles Left Burning',
-            'overloaded extension cords': 'Overloaded Extension Cords',
-            'smoking materials': 'Smoking Materials',
-            'lpg/gas leak': 'LPG/Gas Leak',
-            'faulty wiring or electrical systems': 'Faulty Wiring or Electrical Systems',
-            'flammable materials stored improperly': 'Flammable Materials Stored Improperly',
-            'welding or construction sparks': 'Welding or Construction Sparks',
-            'arson': 'Arson',
-            'machinery/equipment overheating': 'Machinery/Equipment Overheating',
-            'chemical reactions or spills': 'Chemical Reactions or Spills',
-            'boiler or furnace failure': 'Boiler or Furnace Failure',
-            'improper disposal of flammable waste': 'Improper Disposal of Flammable Waste',
-            'exposed or damaged wiring': 'Exposed or Damaged Wiring',
-            'lightning strike': 'Lightning Strike',
-            'engine overheating': 'Engine Overheating',
-            'fuel leak': 'Fuel Leak'
-        }
-        weather_mapping = {
-            'sunny': 'Sunny',
-            'rainy': 'Rainy',
-            'foggy': 'Foggy',
-            'cloudy': 'Cloudy',
-            'stormy': 'Stormy'
-        }
-        fire_severity_mapping = {
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High',
-            'minor fire': 'Minor Fire',
-            'moderate fire': 'Moderate Fire',
-            'major fire': 'Major Fire',
-            'severe fire': 'Severe Fire',
-            'catastrophic fire': 'Catastrophic Fire'
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Fire_Type': extracted_data['fire_type'],
+            'Fire_Cause': extracted_data['fire_cause'],
+            'Weather_Condition': extracted_data['weather'],
+            'Fire_Severity': extracted_data['fire_severity']
         }
         
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Fire_Type':
-                cleaned_data[key] = ftype_mapping.get(data.get('Fire Types', '').lower(), default_values[key])
-            elif key == 'Fire_Cause':
-                cleaned_data[key] = fcause_mapping.get(data.get('Fire Cause', '').lower(), default_values[key])
-            elif key == 'Weather_Condition':
-                cleaned_data[key] = weather_mapping.get(data.get('Weather Conditions', '').lower(), default_values[key])
-            elif key == 'Fire_Severity':
-                cleaned_data[key] = fire_severity_mapping.get(data.get('Fire Severity', '').lower(), default_values[key])
-                
         input_df = pd.DataFrame([cleaned_data])
         
         expected_columns = fire_incident_df.columns
         for col in expected_columns:
             if col not in input_df.columns:
                 input_df[col] = 0
-                
+        input_df = input_df[expected_columns]
+        
         if fire_accident_predictor:
             prediction = fire_accident_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
-            logger.info(f"Prediction for bfp response: {data['prediction']}")
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
+            logger.info(f"Prediction for BFP fire response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
             logger.error("Fire accident predictor not loaded")
     except Exception as e:
         data['prediction'] = 'prediction_error'
-        logger.error(f"Error in prediction for bfp response: {e}")
+        logger.error(f"Error in prediction for BFP fire response: {e}")
         
     responses.append(data)
     
-    bfp_room = f"bfp_{data.get('municipality').lower() if data.get('municipality') else ''}"
+    bfp_room = f"bfp_{data.get('municipality', 'unknown').lower()}"
     emit('fire_response_submitted', data, room=bfp_room)
-    logger.info(f"Emitted fire response to room: {bfp_room}")
+    logger.info(f"BFP fire response emitted to room: {bfp_room}")
     
 
 @socketio.on('health_response')
@@ -2624,14 +2074,16 @@ def handle_health_response(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Health Emergency Types': {'db_column': 'health_type', 'default': 'Heart Attack', 'type': str},
-            'Health Causes': {'db_column': 'health_cause', 'default': 'Chronic Illness', 'type': str},
-            'Patient Gender': {'db_column': 'patient_gender', 'default': 'Male', 'type': str},
-            'Patient Age': {'db_column': 'patient_age', 'default': '26-35', 'type': str},
+            'health_emergency_types': {'db_column': 'health_type', 'default': 'Heart Attack', 'type': str},
+            'health_causes': {'db_column': 'health_cause', 'default': 'Chronic Illness', 'type': str},
+            'patient_gender': {'db_column': 'patient_gender', 'default': 'Male', 'type': str},
+            'patient_age': {'db_column': 'patient_age', 'default': '26-35', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str}
+            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str},
+            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
+            'image': {'db_column': 'image', 'default': '', 'type': str}
         }
         
         extracted_data = {
@@ -2647,8 +2099,8 @@ def handle_health_response(data):
             INSERT INTO health_response (
                 alert_id, health_type, health_cause, patient_age, 
                 patient_gender, lat, lon, barangay, emergency_type, 
-                timestamp, responded
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                timestamp, responded, resident_barangay, image
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['health_type'],
@@ -2660,90 +2112,47 @@ def handle_health_response(data):
             extracted_data['barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
-            extracted_data['responded']
+            extracted_data['responded'],
+            extracted_data['resident_barangay'],
+            extracted_data['image']
         ))
         conn.commit()
-        logger.info(f"Stored health response for alert_id: {data.get('alert_id')}")
+        logger.info(f"Stored city health response for alert_id: {data.get('alert_id')}")
     except Exception as e:
-        logger.error(f"Error storing health response: {e}")
+        logger.error(f"Error storing city health response: {e}")
         conn.rollback()
     finally:
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Health_Type': data.get('Health Emergency Types', 'Heart Attack'),
-            'Health_Cause': data.get('Health Causes', 'Chronic Illness'),
-            'Patient_Age': data.get('Patient Age', '26-35'),
-            'Patient_Gender': data.get('Patient Gender', 'Male')
-        }
-        health_type_mapping = {
-            'heart attack': 'Heart Attack',
-            'stroke': 'Stroke',
-            'fall': 'Fall',
-            'breathing difficulty': 'Breathing Difficulty',
-            'giving birth': 'Giving Birth',
-            'seizure': 'Seizure',
-            'burn': 'Burn',
-            'poisoning': 'Poisoning',
-            'allergic reaction': 'Allergic Reaction'
-        }
-        health_cause_mapping = {
-            'chronic illness': 'Chronic Illness',
-            'illness': 'Illness',
-            'accident': 'Accident',
-            'allergy': 'Allergy',
-            'infection': 'Infection',
-            'pregnant': 'Pregnant',
-            'overdose': 'Overdose',
-            'heatstroke': 'Heatstroke'
-        }
-        patient_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        patient_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Health_Type': extracted_data['health_type'],
+            'Health_Cause': extracted_data['health_cause'],
+            'Patient_Age': extracted_data['patient_age'],
+            'Patient_Gender': extracted_data['patient_gender']
         }
         
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Health_Type':
-                cleaned_data[key] = health_type_mapping.get(data.get('Health Emergency Types', '').lower(), default_values[key])
-            elif key == 'Health_Cause':
-                cleaned_data[key] = health_cause_mapping.get(data.get('Health Causes', '').lower(), default_values[key])
-            elif key == 'Patient_Age':
-                cleaned_data[key] = patient_age_mapping.get(str(data.get('Patient Age', '')).lower(), default_values[key])
-            elif key == 'Patient_Gender':
-                cleaned_data[key] = patient_gender_mapping.get(data.get('Patient Gender', '').lower(), default_values[key])
-                
         features = pd.DataFrame([[cleaned_data['Health_Type'], cleaned_data['Health_Cause'], 
-                                 cleaned_data['Barangay'], cleaned_data['Year']]], columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
+                                 cleaned_data['Barangay'], cleaned_data['Year']]],
+                               columns=['Health_Type', 'Health_Cause', 'Barangay', 'Year'])
         if health_predictor:
-            probability = health_predictor.predict_proba(features)[0][1]*100
-            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now().year + 1}"
+            probability = health_predictor.predict_proba(features)[0][1] * 100
+            data['prediction'] = f"{probability:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
+            logger.info(f"Prediction for city health response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
+            logger.error("Health predictor not loaded")
     except Exception as e:
-        logger.error(f"Error in health_predictor: (e)")
         data['prediction'] = 'prediction_error'
+        logger.error(f"Error in prediction for city health response: {e}")
         
     responses.append(data)
     today_responses.append(data)
-    health_room = f"health_{(data.get('municipality') or 'unknown').lower()}"
+    health_room = f"health_{data.get('municipality', 'unknown').lower()}"
     emit('health_response', data, room=health_room)
-    logger.info(f"City Health response emitted to room {health_room}")
+    logger.info(f"City health response emitted to room: {health_room}")
 
 
 
