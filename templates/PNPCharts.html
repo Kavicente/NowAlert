@@ -119,29 +119,29 @@
 
         function initRoadCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
-            charts[`${safeBarangay}-roadCauseChart`] = new Chart(document.getElementById(`roadCauseChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-roadCauseChart`] = new Chart(document.getElementById(`roadCauseChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-roadTypeChart`] = new Chart(document.getElementById(`roadTypeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-roadGenderChart`] = new Chart(document.getElementById(`roadGenderChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-roadVehicleChart`] = new Chart(document.getElementById(`roadVehicleChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.vehicle, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-roadVehicleChart`] = new Chart(document.getElementById(`roadVehicleChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.vehicle, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-roadAgeChart`] = new Chart(document.getElementById(`roadAgeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-roadConditionChart`] = new Chart(document.getElementById(`roadConditionChart-${safeBarangay}`).getContext('2d'), { type: 'polarArea', data: data.condition, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-roadConditionChart`] = new Chart(document.getElementById(`roadConditionChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.condition, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
         function initFireCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
-            charts[`${safeBarangay}-fireTypeChart`] = new Chart(document.getElementById(`fireTypeChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.fire_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-fireTypeChart`] = new Chart(document.getElementById(`fireTypeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.fire_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-fireCauseChart`] = new Chart(document.getElementById(`fireCauseChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.fire_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-fireSeverityChart`] = new Chart(document.getElementById(`fireSeverityChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.fire_severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
         function initCrimeCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
-            charts[`${safeBarangay}-crimeTypeChart`] = new Chart(document.getElementById(`crimeTypeChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.crime_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-crimeTypeChart`] = new Chart(document.getElementById(`crimeTypeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.crime_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-crimeCauseChart`] = new Chart(document.getElementById(`crimeCauseChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.crime_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-crimeLevelChart`] = new Chart(document.getElementById(`crimeLevelChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.level, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-suspectGenderChart`] = new Chart(document.getElementById(`suspectGenderChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.suspect_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-victimGenderChart`] = new Chart(document.getElementById(`victimGenderChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.victim_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-suspectAgeChart`] = new Chart(document.getElementById(`suspectAgeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.suspect_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-suspectGenderChart`] = new Chart(document.getElementById(`suspectGenderChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.suspect_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-victimGenderChart`] = new Chart(document.getElementById(`victimGenderChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.victim_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-suspectAgeChart`] = new Chart(document.getElementById(`suspectAgeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.suspect_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-victimAgeChart`] = new Chart(document.getElementById(`victimAgeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.victim_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 

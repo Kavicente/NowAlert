@@ -70,7 +70,7 @@ def get_barangay_chart_data(time_filter):
         'type': {'labels': list(types.keys()), 'datasets': [{'label': 'Count', 'data': list(types.values()), 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
         'gender': {'labels': list(genders.keys()), 'datasets': [{'label': 'Count', 'data': list(genders.values()), 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
         'vehicle': {'labels': list(vehicles.keys()), 'datasets': [{'label': 'Count', 'data': list(vehicles.values()), 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]},
-        'age': {'labels': list(ages.keys()), 'datasets': [{'label': 'Count', 'data': list(ages.values()), 'backgroundColor': '#36A2EB', 'borderColor': '#FF6384', 'fill': False}]},
+        'age': {'labels': list(ages.keys()), 'datasets': [{'label': 'Count', 'data': list(ages.values()), 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
         'condition': {'labels': list(conditions.keys()), 'datasets': [{'label': 'Count', 'data': list(conditions.values()), 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]}
     }
 
@@ -230,8 +230,8 @@ def get_barangay_crime_chart_data(time_filter, barangay=None):
         'level': {'labels': list(levels.keys()) if levels else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(levels.values()) if levels else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0']}]},
         'suspect_gender': {'labels': list(suspect_genders.keys()) if suspect_genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(suspect_genders.values()) if suspect_genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
         'victim_gender': {'labels': list(victim_genders.keys()) if victim_genders else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(victim_genders.values()) if victim_genders else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},
-        'suspect_age': {'labels': list(suspect_ages.keys()) if suspect_ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(suspect_ages.values()) if suspect_ages else [0], 'backgroundColor': '#36A2EB', 'borderColor': '#FF6384', 'fill': False}]},
-        'victim_age': {'labels': list(victim_ages.keys()) if victim_ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(victim_ages.values()) if victim_ages else [0], 'backgroundColor': '#36A2EB', 'borderColor': '#FF6384', 'fill': False}]}
+        'suspect_age': {'labels': list(suspect_ages.keys()) if suspect_ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(suspect_ages.values()) if suspect_ages else [0], 'backgroundColor':['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        'victim_age': {'labels': list(victim_ages.keys()) if victim_ages else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(victim_ages.values()) if victim_ages else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]}
     }
         
 def barangay_charts():
