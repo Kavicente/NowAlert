@@ -39,7 +39,7 @@ def get_bfp_chart_data(time_filter, barangay=None):
     query = '''
         SELECT fire_cause, fire_type, weather, fire_severity, barangay, timestamp
         FROM bfp_response
-        WHERE emergency_type = ?
+        WHERE barangay = ?
     '''
     params = [barangay]
     if time_filter == 'today':
@@ -62,16 +62,15 @@ def get_bfp_chart_data(time_filter, barangay=None):
     rows = c.fetchall()
     conn.close()
 
-    causes = {}; types = {}; weathers = {}; severities = {}; barangays = {}
+    causes = {}; types = {}; weathers = {}; severities = {}
     for row in rows:
         causes[row[0]] = causes.get(row[0], 0) + 1
         types[row[1]] = types.get(row[1], 0) + 1
         weathers[row[2]] = weathers.get(row[2], 0) + 1
         severities[row[3]] = severities.get(row[3], 0) + 1
-        barangays[row[4]] = barangays.get(row[4], 0) + 1
 
     return {
-        'barangay': {'labels': list(barangays.keys()) if barangays else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(barangays.values()) if barangays else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
+        
         'cause': {'labels': list(causes.keys()) if causes else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(causes.values()) if causes else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']}]},
         'type': {'labels': list(types.keys()) if types else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(types.values()) if types else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']}]},
         'weather': {'labels': list(weathers.keys()) if weathers else ['No Data'], 'datasets': [{'label': 'Count', 'data': list(weathers.values()) if weathers else [0], 'backgroundColor': ['#FF6384', '#36A2EB', '#FFCE56']}]},

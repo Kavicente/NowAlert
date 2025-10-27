@@ -85,10 +85,10 @@
 
         function initFireCharts(barangay, data) {
             const safeBarangay = barangay.replace(/\s+/g, '-');
-            charts[`${safeBarangay}-fireCauseChart`] = new Chart(document.getElementById(`fireCauseChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-fireCauseChart`] = new Chart(document.getElementById(`fireCauseChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-fireTypeChart`] = new Chart(document.getElementById(`fireTypeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
             charts[`${safeBarangay}-fireWeatherChart`] = new Chart(document.getElementById(`fireWeatherChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
-            charts[`${safeBarangay}-fireSeverityChart`] = new Chart(document.getElementById(`fireSeverityChart-${safeBarangay}`).getContext('2d'), { type: 'bar', data: data.severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-fireSeverityChart`] = new Chart(document.getElementById(`fireSeverityChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
         }
 
         function updateFireCharts(barangay, data) {
