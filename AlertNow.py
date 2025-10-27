@@ -2362,13 +2362,13 @@ def handle_pnp_crime_submitted(data):
     try:
         field_mappings = {
             'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'Crime Types': {'db_column': 'crime_type', 'default': 'Theft', 'type': str},
-            'Crime Causes': {'db_column': 'crime_cause', 'default': 'Poverty', 'type': str},
-            'Levels': {'db_column': 'level', 'default': 'Low', 'type': str},
-            'Suspect Gender': {'db_column': 'suspect_gender', 'default': 'Male', 'type': str},
-            'Victim Gender': {'db_column': 'victim_gender', 'default': 'Female', 'type': str},
-            'Suspect Age': {'db_column': 'suspect_age', 'default': '26-35', 'type': str},
-            'Victim Age': {'db_column': 'victim_age', 'default': '18-25', 'type': str},
+            'crime_types': {'db_column': 'crime_type', 'default': 'Theft', 'type': str},
+            'crime_causes': {'db_column': 'crime_cause', 'default': 'Poverty', 'type': str},
+            'levels': {'db_column': 'level', 'default': 'Low', 'type': str},
+            'suspect_gender': {'db_column': 'suspect_gender', 'default': 'Male', 'type': str},
+            'victim_gender': {'db_column': 'victim_gender', 'default': 'Female', 'type': str},
+            'suspect_age': {'db_column': 'suspect_age', 'default': '26-35', 'type': str},
+            'victim_age': {'db_column': 'victim_age', 'default': '18-25', 'type': str},
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
@@ -2415,89 +2415,17 @@ def handle_pnp_crime_submitted(data):
         conn.close()
         
     try:
-        default_values = {
-            'Year': datetime.now().year,
-            'Barangay': data.get('barangay', 'Unknown'),
-            'Crime_Type': data.get('Crime Types', 'Theft'),
-            'Crime_Cause': data.get('Crime Causes', 'Poverty'),
-            'Level': data.get('Levels', 'Low'),
-            'Suspect_Gender': data.get('Suspect Gender', 'Male'),
-            'Victim_Gender': data.get('Victim Gender', 'Female'),
-            'Suspect_Age': data.get('Suspect Age', '26-35'),
-            'Victim_Age': data.get('Victim Age', '18-25')
+        cleaned_data = {
+            'Year': datetime.now(pytz.timezone('Asia/Manila')).year,
+            'Barangay': extracted_data['barangay'],
+            'Crime_Type': extracted_data['crime_type'],
+            'Crime_Cause': extracted_data['crime_cause'],
+            'Level': extracted_data['level'],
+            'Suspect_Gender': extracted_data['suspect_gender'],
+            'Victim_Gender': extracted_data['victim_gender'],
+            'Suspect_Age': extracted_data['suspect_age'],
+            'Victim_Age': extracted_data['victim_age']
         }
-        crime_type_mapping = {
-            'theft': 'Theft',
-            'assault': 'Assault',
-            'burglary': 'Burglary',
-            'robbery': 'Robbery',
-            'vandalism': 'Vandalism',
-            'harassment': 'Harassment',
-            'domestic violence': 'Domestic Violence',
-            'drug-related': 'Drug-Related',
-            'fraud': 'Fraud'
-        }
-        crime_cause_mapping = {
-            'poverty': 'Poverty',
-            'unemployment': 'Unemployment',
-            'alcohol': 'Alcohol',
-            'drugs': 'Drugs',
-            'personal dispute': 'Personal Dispute',
-            'gang activity': 'Gang Activity',
-            'opportunistic': 'Opportunistic',
-            'domestic issue': 'Domestic Issue',
-            'mental health': 'Mental Health'
-        }
-        level_mapping = {
-            'low': 'Low',
-            'medium': 'Medium',
-            'high': 'High'
-        }
-        suspect_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        victim_gender_mapping = {
-            'male': 'Male',
-            'female': 'Female'
-        }
-        suspect_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        victim_age_mapping = {
-            '0-17': '0-17',
-            '18-25': '18-25',
-            '26-35': '26-35',
-            '36-45': '36-45',
-            '46-60': '46-60',
-            '61+': '61+'
-        }
-        
-        cleaned_data = {}
-        for key in default_values:
-            if key == 'Year':
-                cleaned_data[key] = default_values[key]
-            elif key == 'Barangay':
-                cleaned_data[key] = data.get('barangay', default_values[key])
-            elif key == 'Crime_Type':
-                cleaned_data[key] = crime_type_mapping.get(data.get('Crime Types', '').lower(), default_values[key])
-            elif key == 'Crime_Cause':
-                cleaned_data[key] = crime_cause_mapping.get(data.get('Crime Causes', '').lower(), default_values[key])
-            elif key == 'Level':
-                cleaned_data[key] = level_mapping.get(data.get('Levels', '').lower(), default_values[key])
-            elif key == 'Suspect_Gender':
-                cleaned_data[key] = suspect_gender_mapping.get(data.get('Suspect Gender', '').lower(), default_values[key])
-            elif key == 'Victim_Gender':
-                cleaned_data[key] = victim_gender_mapping.get(data.get('Victim Gender', '').lower(), default_values[key])
-            elif key == 'Suspect_Age':
-                cleaned_data[key] = suspect_age_mapping.get(str(data.get('Suspect Age', '')).lower(), default_values[key])
-            elif key == 'Victim_Age':
-                cleaned_data[key] = victim_age_mapping.get(str(data.get('Victim Age', '')).lower(), default_values[key])
         
         input_df = pd.DataFrame([cleaned_data])
         
@@ -2518,7 +2446,7 @@ def handle_pnp_crime_submitted(data):
         
         if crime_predictor:
             prediction = crime_predictor.predict_proba(input_df)[:, 1][0] * 100
-            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now().year}"
+            data['prediction'] = f"{prediction:.2f}% chance in year {datetime.now(pytz.timezone('Asia/Manila')).year}"
             logger.info(f"Prediction for PNP crime response: {data['prediction']}")
         else:
             data['prediction'] = 'prediction_error'
@@ -2531,7 +2459,7 @@ def handle_pnp_crime_submitted(data):
     
     pnp_room = f"pnp_{data.get('municipality', 'unknown').lower()}"
     emit('pnp_crime_submitted', data, room=pnp_room)
-    logger.info(f"Emitted fire response to room: {pnp_room}")
+    logger.info(f"Emitted pnp crime response to room: {pnp_room}")
 
 
 
