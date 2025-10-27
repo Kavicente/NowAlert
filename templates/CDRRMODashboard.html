@@ -499,6 +499,7 @@
 
                 const respondButton = document.createElement('button');
                 respondButton.textContent = 'Respond';
+                respondButton.className = 'submit-emergency';
                 respondButton.addEventListener('click', () => {
                     socket.emit('role_accepted', { alert_id: data.alert_id, role: 'cdrrmo' });
                     responseForm.style.display = 'block';
@@ -507,6 +508,7 @@
 
                 const declineButton = document.createElement('button');
                 declineButton.textContent = 'Decline';
+                declineButton.className = 'submit-emergency';
                 declineButton.addEventListener('click', () => {
                     socket.emit('role_declined', { alert_id: data.alert_id, role: 'cdrrmo' });
                     alertItem.remove();
