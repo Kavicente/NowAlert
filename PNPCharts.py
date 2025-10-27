@@ -156,7 +156,7 @@ def get_pnp_crime_chart_data(time_filter, barangay=None):
             UNION ALL
             SELECT crime_type, crime_cause, level, suspect_gender, victim_gender, suspect_age, victim_age, barangay, timestamp
             FROM pnp_crime_response
-            WHERE barangay = ?
+            WHERE emergency_type = ?
         )
     '''
     params = [barangay, barangay]

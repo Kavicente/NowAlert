@@ -39,7 +39,7 @@ def get_bfp_chart_data(time_filter, barangay=None):
     query = '''
         SELECT fire_cause, fire_type, weather, fire_severity, barangay, timestamp
         FROM bfp_response
-        WHERE barangay = ?
+        WHERE emergency_type = ?
     '''
     params = [barangay]
     if time_filter == 'today':
