@@ -466,12 +466,11 @@
                 `;
                 if (data.image) {
                     const img = alertItem.querySelector('img');
-                    img.style.display = 'block';
                     img.addEventListener('click', () => {
-                        document.getElementById('modal-image').src = data.image;
+                        const modalImg = document.getElementById('modal-image');
+                        modalImg.src = `data:image/jpeg;base64,${data.image}`;  // ← FIXED: Full data URL
                         document.getElementById('image-modal').style.display = 'flex';
                     });
-                    alertItem.appendChild(img);
                 }
 
                 // Add Accept and Decline buttons

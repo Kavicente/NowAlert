@@ -505,12 +505,13 @@
                     <div class="prediction"></div>
                 `;
                 if (data.image) {
-                const img = alertItem.querySelector('img');
-                img.addEventListener('click', () => {
-                    document.getElementById('modal-image').src = `data:image/jpeg;base64,${data.image}`;
-                    document.getElementById('image-modal').style.display = 'flex';
-                });
-            }
+                    const img = alertItem.querySelector('img');
+                    img.addEventListener('click', () => {
+                        const modalImg = document.getElementById('modal-image');
+                        modalImg.src = `data:image/jpeg;base64,${data.image}`;  // ← FIXED: Full data URL
+                        document.getElementById('image-modal').style.display = 'flex';
+                    });
+                }
                 alertContainer.appendChild(alertItem);
                 alertElements.set(data.alert_id, alertItem);
                 L.marker([data.lat, data.lon]).addTo(pnpMap)
