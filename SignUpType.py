@@ -25,7 +25,7 @@ def generate_qr():
         box_size=10,
         border=4,
     )
-    qr.add_data('http://alertnow-wi0n.onrender.com/static/Alert Now.zip')  # Use local URL for testing
+    qr.add_data('https://alertnow-wi0n.onrender.com/static/Alert Now.zip')  # Use local URL for testing
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     img.save(os.path.join(os.path.dirname(__file__), 'static', 'qrcode.png'))
