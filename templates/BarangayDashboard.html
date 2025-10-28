@@ -528,7 +528,8 @@
                                 municipality: 'San Pablo City',
                                 barangay: '{{ barangay }}',
                                 lat: data.lat,
-                                lon: data.lon
+                                lon: data.lon,
+                                image: data.image
                             };
                             socket.emit('redirect_alert', redirectData);
                             socket.emit('update_dashboard_emergency_type', {
@@ -563,7 +564,8 @@
                             municipality: 'San Pablo City',
                             barangay: '{{ barangay }}',
                             lat: data.lat,
-                            lon: data.lon
+                            lon: data.lon,
+                            image: data.image
                         };
                         socket.emit('pnp_redirect_alert', redirectData);
                         socket.emit('update_dashboard_emergency_type', {

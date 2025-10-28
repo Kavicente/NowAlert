@@ -206,11 +206,16 @@
                 patientGenderDiv.style.fontSize = '16px';
                 alertItem.appendChild(patientGenderDiv);
 
-                const imageHtml = data.image ? `<img src="data:image/jpeg;base64,${data.image}" class="clickable-img" />` : '';
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = imageHtml;
-                const imageDiv = tempDiv.firstChild;
-                if (imageDiv) {
+                let imageDiv = null;
+                if (data.image) {
+                    imageDiv = document.createElement('img');
+                    imageDiv.src = `data:image/jpeg;base64,${data.image}`;
+                    imageDiv.className = 'clickable-img';
+                    imageDiv.style.display = 'block';
+                    imageDiv.style.margin = '10px auto';
+                    imageDiv.style.maxWidth = '200px';
+                    imageDiv.style.borderRadius = '5px';
+                    imageDiv.style.cursor = 'pointer';
                     imageDiv.addEventListener('click', () => {
                         const modal = document.getElementById('image-modal');
                         const modalImg = document.getElementById('modal-image');
@@ -218,7 +223,6 @@
                         modal.style.display = 'flex';
                     });
                 }
-                alertItem.appendChild(imageDiv || document.createElement('div'));
 
                 alertContainer.prepend(alertItem);
 
