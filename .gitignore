@@ -1,0 +1,33 @@
+# Android Build Files - NEVER COMMIT
+/build/
+/app/build/
+/gradle/
+/gradlew
+/gradlew.bat
+/local.properties
+*.iml
+.gradle
+.idea/
+*.apk
+*.aab
+
+# Intermediates - GENERATED, DO NOT TRACK
+**/intermediates/
+/**/merged-not-compiled-resources/
+/**/generated/
+/**/tmp/
+/**/outputs/
+/**/incremental/
+/**/lint/
+/**/R-def.txt
+**/manifest-merger-*.txt
+**/merger.xml
+**/aapt_rules.txt
+**/app-metadata.properties
+
+# Node / Web
+/node_modules/
+/dist/
+
+# Static Android App (DO NOT TRACK ENTIRE FOLDER)
+/static/Alert Now/
