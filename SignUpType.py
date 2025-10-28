@@ -12,9 +12,9 @@ def choose_login_type():
     return render_template('LoginType.html')
 
 def download_apk_folder():
-    zip_path = os.path.join(os.path.dirname(__file__), 'static', 'AlertNow.zip')
+    zip_path = os.path.join(os.path.dirname(__file__), 'static', 'Alert Now.zip')
     if os.path.exists(zip_path):
-        return send_file(zip_path, as_attachment=True, download_name='AlertNow.zip')
+        return send_file(zip_path, as_attachment=True, download_name='Alert Now.zip')
     else:
         return "File not found", 404
 
@@ -25,7 +25,7 @@ def generate_qr():
         box_size=10,
         border=4,
     )
-    qr.add_data('http://alertnow-cgre.onrender.com/static/AlertNow.zip')  # Use local URL for testing
+    qr.add_data('http://alertnow-wi0n.onrender.com/static/Alert Now.zip')  # Use local URL for testing
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white")
     img.save(os.path.join(os.path.dirname(__file__), 'static', 'qrcode.png'))
