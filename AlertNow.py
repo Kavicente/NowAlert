@@ -1487,9 +1487,7 @@ def handle_barangay_health_response(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str},
-            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
-            'image': {'db_column': 'image', 'default': '', 'type': str}
+            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str}
         }
         
         extracted_data = {
@@ -1505,8 +1503,8 @@ def handle_barangay_health_response(data):
             INSERT INTO barangay_health_response (
                 alert_id, health_type, health_cause, patient_age, 
                 patient_gender, lat, lon, barangay, emergency_type, 
-                timestamp, responded, resident_barangay, image
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['health_type'],
@@ -1518,9 +1516,7 @@ def handle_barangay_health_response(data):
             extracted_data['barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
-            extracted_data['responded'],
-            extracted_data['resident_barangay'],
-            extracted_data['image']
+            extracted_data['responded']
         ))
         conn.commit()
         logger.info(f"Stored barangay health response for alert_id: {data.get('alert_id')}")
