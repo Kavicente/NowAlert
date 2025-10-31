@@ -3,97 +3,135 @@
 <head>
     <title>Log In Agency</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/agenin.css') }}">
 </head>
 <body>
-    
-    <form class="form2" action="/login_agency" method="post">
-        <h1 class="h1">Select Agency To Log In</h1>
-        <label>Role: 
-            <select name="role" id="role" required class="select-role">
-                <option value="cdrrmo">CDRRMO</option>
-                <option value="pnp">PNP</option>
-                <option value="bfp">BFP</option>
-                <option value="health">City Health</option>
-                <option value="hospital">Hospital</option>
-            </select>
-        </label><br>
-        <label id="hospital-label" style="display: none;">Assigned Hospital: 
-            <select name="assigned_hospital" id="assigned_hospital" class="dropdown-role">
-                <option value="SPC District Hospital">SPC District Hospital</option>
-                <option value="San Pablo Colleges Medical Center">San Pablo Colleges Medical Center</option>
-                <option value="Community General Hospital">Community General Hospital</option>
-                <option value="Immaculate Conception Hospital">Immaculate Conception Hospital</option>
-                <option value="SPC General Hospital">SPC General Hospital</option>
-                <option value="San Pablo Doctors Hospital">San Pablo Doctors Hospital</option>
-                <option value="St. Francis and Paul General Hospital">St. Francis and Paul General Hospital</option>
-            </select>
-        </label><br>
-        <label>Assigned Municipality: <input type="text" name="municipality" required></label><br>
-        <label>Contact Number: <input type="tel" name="contact_no" required></label><br>
-        <label>Password: <input type="password" name="password" required></label><br>
-        <button class="button3" type="submit">Log In</button>
-        <button class="button4" onclick="window.location.href='/signup_muna'">Sign Up</button>
-        <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
-    </form>
-    <form class="form3" action="/auto_role" method="post">
-        {% if cdrrmo_pnp_bfp_users %}
-            {% for user in cdrrmo_pnp_bfp_users %}
-                <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}', '{{ user.assigned_hospital }}')">
-                    {% if user.role == 'hospital' %}
-                        {{ user.assigned_hospital|upper }} {{ user.assigned_municipality }}
+    <div class="container">
+
+        <!-- LEFT: App Info + Auto-Login Profiles -->
+        <div class="left-panel">
+            <img src="{{ url_for('static', filename='logo/app_icon.png') }}" alt="Alert Logo" class="alert-logo">
+            <h1>Agency Login</h1>
+            <h3>Quick access with saved profiles</h3>
+
+            <div class="auto-login-container">
+                <h3>Saved Accounts</h3>
+                <div class="auto-login-list">
+                    <form action="/auto_role" method="post" id="auto-role-form"></form>
+                    {% if cdrrmo_pnp_bfp_users %}
+                        {% for user in cdrrmo_pnp_bfp_users %}
+                            <div class="role-item" onclick="autoRole('{{ user.role }}', '{{ user.assigned_municipality }}', '{{ user.contact_no }}', '{{ user.password }}', '{{ user.assigned_hospital }}')">
+                                {% if user.role == 'hospital' %}
+                                    <strong>{{ user.assigned_hospital|upper }}</strong><br>
+                                    {{ user.assigned_municipality }}
+                                {% else %}
+                                    <strong>{{ user.role|upper }}</strong><br>
+                                    {{ user.assigned_municipality }}
+                                {% endif %}
+                            </div>
+                        {% endfor %}
                     {% else %}
-                        {{ user.role|upper }} {{ user.assigned_municipality }}
+                        <div class="role-item empty">No saved accounts</div>
                     {% endif %}
                 </div>
-            {% endfor %}
-        {% else %}
-            <div class="role-item">No CDRRMO/PNP/BFP/City Health/Hospital users found.</div>
-        {% endif %}
-    </form>
+            </div>
+        </div>
+
+        <!-- RIGHT: Login Form -->
+        <div class="right-panel">
+            <form action="/login_agency" method="post" class="signup-form">
+                <h1>Select Agency To Log In</h1>
+
+                <label>Role:
+                    <select name="role" id="role" required class="select-role">
+                        <option value="cdrrmo">CDRRMO</option>
+                        <option value="pnp">PNP</option>
+                        <option value="bfp">BFP</option>
+                        <option value="health">City Health</option>
+                        <option value="hospital">Hospital</option>
+                    </select>
+                </label>
+
+                <label id="hospital-label" style="display: none;">Assigned Hospital:
+                    <select name="assigned_hospital" id="assigned_hospital" class="dropdown-role">
+                        <option value="SPC District Hospital">SPC District Hospital</option>
+                        <option value="San Pablo Colleges Medical Center">San Pablo Colleges Medical Center</option>
+                        <option value="Community General Hospital">Community General Hospital</option>
+                        <option value="Immaculate Conception Hospital">Immaculate Conception Hospital</option>
+                        <option value="SPC General Hospital">SPC General Hospital</option>
+                        <option value="San Pablo Doctors Hospital">San Pablo Doctors Hospital</option>
+                        <option value="St. Francis and Paul General Hospital">St. Francis and Paul General Hospital</option>
+                    </select>
+                </label>
+
+                <label>Assigned Municipality:
+                    <input type="text" name="municipality" required>
+                </label>
+
+                <label>Contact Number:
+                    <input type="tel" name="contact_no" required>
+                </label>
+
+                <label class="password-label">Password:
+                    <div class="password-wrapper">
+                        <input type="password" name="password" id="password" required>
+                        <span class="toggle-password" onclick="togglePassword()">Show</span>
+                    </div>
+                </label>
+                <a href="/pass_reset" class="forgot-link">Forgot Password? Click Here to Reset</a><br>
+
+                <button type="submit">Log In</button>
+                <button type="button" class="button2" onclick="window.location.href='/signup_muna'">Sign Up</button>
+                <button type="button" class="button3" onclick="window.location.href='/choose_login_type'">Choose Account</button>
+            </form>
+        </div>
+    </div>
+
     <script>
-
-
-        
-
         function autoRole(role, municipality, contact_no, password, assigned_hospital) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = '/auto_role';
-            const roleInput = document.createElement('input');
-            roleInput.type = 'hidden';
-            roleInput.name = 'role';
-            roleInput.value = role;
-            const municipalityInput = document.createElement('input');
-            municipalityInput.type = 'hidden';
-            municipalityInput.name = 'municipality';
-            municipalityInput.value = municipality;
-            const contactInput = document.createElement('input');
-            contactInput.type = 'hidden';
-            contactInput.name = 'contact_no';
-            contactInput.value = contact_no;
-            const passwordInput = document.createElement('input');
-            passwordInput.type = 'hidden';
-            passwordInput.name = 'password';
-            passwordInput.value = password;
-            
-            form.appendChild(roleInput);
-            form.appendChild(municipalityInput);
-            form.appendChild(contactInput);
-            form.appendChild(passwordInput);
-            
+
+            const inputs = [
+                { name: 'role', value: role },
+                { name: 'municipality', value: municipality },
+                { name: 'contact_no', value: contact_no },
+                { name: 'password', value: password }
+            ];
+
+            if (assigned_hospital) {
+                inputs.push({ name: 'assigned_hospital', value: assigned_hospital });
+            }
+
+            inputs.forEach(i => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = i.name;
+                input.value = i.value;
+                form.appendChild(input);
+            });
+
             document.body.appendChild(form);
             form.submit();
         }
 
         document.getElementById('role').addEventListener('change', function() {
             const hospitalLabel = document.getElementById('hospital-label');
-            if (this.value === 'hospital') {
-                hospitalLabel.style.display = 'block';
-            } else {
-                hospitalLabel.style.display = 'none';
-            }
+            hospitalLabel.style.display = this.value === 'hospital' ? 'block' : 'none';
         });
+
+        function togglePassword() {
+            const input = document.getElementById('password');
+            const toggle = document.querySelector('.toggle-password');
+            if (input.type === 'password') {
+                input.type = 'text';
+                toggle.textContent = 'Hide';
+            } else {
+                input.type = 'password';
+                toggle.textContent = 'Show';
+            }
+        }
     </script>
 </body>
 </html>

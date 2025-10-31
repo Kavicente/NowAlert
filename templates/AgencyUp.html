@@ -3,11 +3,25 @@
 <head>
     <title>Sign Up Agencies</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/asignup.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
 </head>
 <body>
     
-    <form action="/signup_agency" method="post">
+
+    <div class="container">
+
+        <div class="left-panel">
+            <h2>Agency Registration</h2>
+            <img src="{{ url_for('static', filename='logo/app_icon.png') }}" alt="Alert Logo" class="alert-logo">
+            <h3>Have an Account?</h3>
+            <button class="button" onclick="window.location.href='/login_agency'">Log In</button>
+            <h3>Or</h3>
+            <button class="button2" onclick="window.location.href='/choose_login_type'">Choose Account</button>
+
+        </div>
+
+    <div class="right-panel">
+    <form action="/signup_agency" method="post" class="signup-form">
         <h1 class="h1">Select Agency To Sign Up</h1>
         <label>Role: 
             <select name="role" id="role" class="select-role">
@@ -31,12 +45,34 @@
         </label><br>
         <label>Assigned Municipality: <input type="text" name="municipality" required></label><br>
         <label>Contact Number: <input type="tel" name="contact_no" required></label><br>
-        <label>Password: <input type="password" name="password" required></label><br>
+        <label class="password-label">
+                    Password: 
+                    <div class="password-wrapper">
+                        <input type="password" name="password" id="password" required>
+                        <span class="toggle-password" onclick="togglePassword()">Show</span>
+                    </div>
+                </label>
         <button type="submit">Sign Up</button>
-        <button class="button2" onclick="window.location.href='/login_agency'">Log In</button>
-        <button class="button3" onclick="window.location.href='/choose_login_type'">Choose Account</button>
+        
+        
     </form>
+</div>
+</div>
     <script>
+
+        function togglePassword() {
+                const passwordInput = document.getElementById('password');
+                const toggleText = document.querySelector('.toggle-password');
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    toggleText.textContent = 'Hide';
+                } else {
+                    passwordInput.type = 'password';
+                    toggleText.textContent = 'Show';
+                }
+            }
+
         document.getElementById('role').addEventListener('change', function() {
             const hospitalLabel = document.getElementById('hospital-label');
             if (this.value === 'hospital') {
