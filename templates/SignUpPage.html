@@ -6,16 +6,53 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/signup.css') }}">
 </head>
 <body>
-    <form action="/signup_barangay" method="post">
-        <h1 class="h1">Sign Up Barangay</h1>
-        <label>Barangay: <input type="text" name="barangay" required></label><br>
-        <label>Municipality: <input type="text" name="municipality" required></label><br>
-        <label>Province: <input type="text" name="province" required></label><br>
-        <label>Contact Number: <input type="tel" name="contact_no" required></label><br>
-        <label>Password: <input type="password" name="password" required></label><br>
-        <button type="submit">Sign Up</button>
-        <button class="button2" onclick="window.location.href='/go_to_login_page'">Log In</button>
-        <button class="button3" onclick="window.location.href='/choose_login_type'">Choose Account</button>
-    </form>
+    <div class="container">
+
+        <!-- LEFT: Empty (or add logo later) -->
+        <div class="left-panel" >
+            <h2>Barangay Registration</h2>
+            <img src="{{ url_for('static', filename='logo/app_icon.png') }}" alt="Alert Logo" class="alert-logo">
+            <h3>Have an Account?</h3>
+            <button type="button" onclick="window.location.href='/go_to_login_page'">Log In</button>
+            <h3>Or</h3>
+                <button type="button" class="button2"onclick="window.location.href='/choose_login_type'">Choose Account</button>
+        </div>
+
+        <!-- RIGHT: Form -->
+        <div class="right-panel">
+            <form action="/signup_barangay" method="post" class="signup-form">
+                <h1 class="h1">Sign Up Barangay</h1>
+
+                <label>Barangay: <input type="text" name="barangay" required></label>
+                <label>Municipality: <input type="text" name="municipality" required></label>
+                <label>Province: <input type="text" name="province" required></label>
+                <label>Contact Number: <input type="tel" name="contact_no" required></label>
+                <label class="password-label">
+                    Password: 
+                    <div class="password-wrapper">
+                        <input type="password" name="password" id="password" required>
+                        <span class="toggle-password" onclick="togglePassword()">Show</span>
+                    </div>
+                </label>
+
+                <button type="submit">Sign Up</button>
+                
+            </form>
+        </div>
+    </div>
+        <script>
+            function togglePassword() {
+                const passwordInput = document.getElementById('password');
+                const toggleText = document.querySelector('.toggle-password');
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    toggleText.textContent = 'Hide';
+                } else {
+                    passwordInput.type = 'password';
+                    toggleText.textContent = 'Show';
+                }
+            }
+    </script>
 </body>
 </html>

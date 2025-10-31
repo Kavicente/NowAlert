@@ -4,20 +4,29 @@
     <title>Choose Account To Sign Up</title>
     <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/type.css') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
-    <div class="form2">
-        <h1>Select Sign Up Type</h1>
-        <button class="button2" onclick="window.location.href='/signup_barangay'">Barangay</button>
-        <button class="button2" onclick="window.location.href='/signup_muna'">Agencies</button>
-        <h2 class="h2">Or</h2>
-        <button class="button3" onclick="window.location.href='/choose_login_type'">Choose Account</button>
+    <div class="container">
+
+        <!-- LEFT: Welcome + QR -->
+        <div class="left-panel">
+            <img src="{{ url_for('static', filename='logo/app_icon.png') }}" alt="Alert Logo" class="alert-logo">
+            <h1>Welcome To Alert Now</h1>
+            <h2>For starters to get the app<br>scan the qr code below to install</h2>
+            <div class="qr-box">
+                <img src="{{ url_for('static', filename='qrcode.png') }}" alt="QR Code">
+            </div>
+        </div>
+
+        <!-- RIGHT: Sign Up Type -->
+        <div class="right-panel">
+            <h1>Select Sign Up Type</h1>
+            <button class="signup-btn" onclick="window.location.href='/signup_barangay'">Barangay</button>
+            <button class="signup-btn" onclick="window.location.href='/signup_muna'">Agencies</button>
+            <div class="or-text">Or</div>
+            <button class="signup-btn" onclick="window.location.href='/choose_login_type'">Choose Account</button>
+        </div>
+
     </div>
-    <div class="form3">
-        <h2>To Install The App Scan This QR Code</h2>
-        <img src="{{ url_for('static', filename='qrcode.png') }}" alt="QR Code" style="width: 250px; height: 250px;">
-    </div>
-    
 </body>
 </html>

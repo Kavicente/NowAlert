@@ -5,8 +5,6 @@ import ast
 import os
 import json
 import sqlite3
-import joblib
-import cv2
 import numpy as np
 from collections import Counter
 from datetime import datetime, timedelta
@@ -16,103 +14,36 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import uuid
-from models import road_accident_predictor, fire_accident_predictor, crime_predictor, health_predictor, birth_predictor
+from models import (road_accident_predictor, 
+                    fire_accident_predictor, crime_predictor, 
+                    health_predictor, birth_predictor)
 from SignUpType import download_apk_folder, generate_qr
-from BarangayDashboard import get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update
-from CDRRMODashboard import get_cdrrmo_stats, get_latest_alert, get_the_cdrrmo_stats, get_cdrrmo_new_alert, get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update
-from PNPDashboard import get_pnp_stats, get_latest_alert, get_the_pnp_stats, get_pnp_new_alert, get_pnp_alerts_per_month, get_pnp_responded_count, emit_pnp_alerts_per_month_update
-from BFPDashboard import get_bfp_stats, get_latest_alert, get_the_stat_bfp, get_bfp_alerts_per_month, get_bfp_responded_count, emit_bfp_alerts_per_month_update
+from BarangayDashboard import (get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, 
+                               get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update)
+from CDRRMODashboard import (get_cdrrmo_stats, get_latest_alert, get_the_cdrrmo_stats, get_cdrrmo_new_alert, 
+                             get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update)
+from PNPDashboard import (get_pnp_stats, get_latest_alert, get_the_pnp_stats, get_pnp_new_alert, get_pnp_alerts_per_month, 
+                          get_pnp_responded_count, emit_pnp_alerts_per_month_update)
+from BFPDashboard import (get_bfp_stats, get_latest_alert, get_the_stat_bfp, get_bfp_alerts_per_month, 
+                          get_bfp_responded_count, emit_bfp_alerts_per_month_update)
 from HealthDashboard import get_health_stats, get_latest_alert
 from HospitalDashboard import get_hospital_stats, get_latest_alert
-from BarangayCharts import barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, barangay_health_charts_data, get_barangay_health_chart_data, barangay_crime_charts_data
+from BarangayCharts import (barangay_charts, barangay_charts_data, get_barangay_chart_data, barangay_fire_charts_data, 
+                            barangay_health_charts_data, get_barangay_health_chart_data, barangay_crime_charts_data)
 from CDRRMOCharts import cdrrmo_charts, cdrrmo_charts_data, get_cdrrmo_chart_data
 from PNPCharts import pnp_charts, pnp_charts_data, get_pnp_chart_data, pnp_fire_charts_data, pnp_crime_charts_data
 from BFPCharts import bfp_charts, bfp_charts_data, get_bfp_chart_data
 from HealthCharts import health_charts, health_charts_data
 from HospitalCharts import hospital_charts, hospital_charts_data
-import random
-import onnxruntime as ort
-import re
+from dataset import road_accident_df, fire_incident_df, health_emergencies_df, crime_df
+from PassReset import pass_reset
+
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 
-road_accident_predictor 
-try:
-    logger.info("road_accident_predictor_lr.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("road_accident_predictor_lr.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading road_accident_predictor_lr.pkl: {e}") 
-    
-fire_accident_predictor
-try:
-    logger.info("fire_accident_predictor_lr.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("fire_accident_predictor_lr.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading fire_accident_predictor_lr.pkl: {e}")
-    
-crime_predictor
-try:
-    logger.info("crime_predictor_lr.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("crime_predictor_lr.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading crime_predictor_lr.pkl: {e}")
 
-health_predictor
-try:
-    logger.info("health_predictor_lr.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("health_predictor_lr.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading health_predictor_lr.pkl: {e}")
-    
-birth_predictor
-try:
-    logger.info("birth_predictor_lr.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("birth_predictor_lr.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading birth_predictor_lr.pkl: {e}")
-
-road_accident_df = pd.DataFrame()
-try:
-    road_accident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'road_accident.csv'))
-    logger.info("Successfully loaded road_accident.csv")
-except FileNotFoundError:
-    logger.error("road_accident.csv not found in dataset directory")
-except Exception as e:
-    logger.error(f"Error loading road_accident.csv: {e}")
-    
-fire_incident_df = pd.DataFrame()
-try:
-    fire_incident_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'fire_incident.csv'))
-    logger.info("Successfully loaded fire_incident.csv")
-except FileNotFoundError:
-    logger.error("fire_incident.csv not found in dataset directory")
-except Exception as e:
-    logger.error(f"Error loading fire_incident.csv: {e}")
-    
-health_emergencies_df = pd.DataFrame()
-try:
-    health_emergencies_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'health_emergencies.csv'))
-    logger.info("Successfully loaded fire_incident.csv")
-except FileNotFoundError:
-    logger.error("fire_incident.csv not found in dataset directory")
-except Exception as e:
-    logger.error(f"Error loading fire_incident.csv: {e}")
-    
-crime_df = pd.DataFrame()
-try:
-    health_emergencies_df = pd.read_csv(os.path.join(os.path.dirname(__file__), 'dataset', 'crime_emergencies.csv'))
-    logger.info("Successfully loaded crime_emergencies.csv")
-except FileNotFoundError:
-    logger.error("crime_emergencies.csv not found in dataset directory")
-except Exception as e:
-    logger.error(f"Error loading crime_emergencies.csv: {e}")
 
 
 app = Flask(__name__)
@@ -126,17 +57,15 @@ pending_alerts = []
 accepted_roles = {}
 
 def get_db_connection():
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
+    db_path = os.path.join('/database', 'users_web.db')
+    if not os.path.exists(db_path):
+        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def get_android_db_connection():
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+
 
 def get_municipality_from_barangay(barangay):
     for municipality, barangays in barangay_coords.items():
@@ -145,132 +74,7 @@ def get_municipality_from_barangay(barangay):
     return None
 
 
-@app.route('/api/android_signup', methods=['POST'])
-def android_signup():
-    data = request.json
-    conn = get_android_db_connection()
-    try:
-        username = data.get('username')
-        password = data.get('password')
-        role = data.get('role').lower()
-        first_name = data.get('first_name')
-        middle_name = data.get('middle_name')
-        last_name = data.get('last_name')
-        age = data.get('age')
-        contact_no = data.get('contact_no')
-        house_no = data.get('house_no')
-        street_no = data.get('street_no')
-        barangay = data.get('barangay')
-        municipality = data.get('municipality')
-        province = data.get('province')
-        position = data.get('position')
-        synced = 1
 
-        conn.execute('''
-            INSERT INTO users (username, password, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position, synced)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (username, password, role, first_name, middle_name, last_name, age, contact_no, house_no, street_no, barangay, municipality, province, position, synced))
-        conn.commit()
-        logger.info(f"User {username} signed up successfully with role {role}")
-        return jsonify({'message': 'Signup successful'})
-    except Exception as e:
-        logger.error(f"Signup failed for {username}: {e}")
-        return jsonify({'error': str(e)}), 400
-    finally:
-        conn.close()
-
-@app.route('/api/android_login', methods=['POST'])
-def android_login():
-    data = request.json
-    conn = get_android_db_connection()
-    try:
-        if 'username' in data:
-            username = data['username']
-            password = data['password']
-            user = conn.execute('SELECT role, barangay, house_no, street_no FROM users WHERE username = ? AND password = ?', (username, password)).fetchone()
-            if user:
-                logger.info(f"Login successful for username: {username}, role: {user['role']}")
-                return jsonify({'role': user['role'], 'barangay': user['barangay'] or '', 'house_no': user['house_no'] or '', 'street_no': user['street_no'] or ''})
-            else:
-                logger.warning(f"Invalid credentials for username: {username}")
-                return jsonify({'error': 'Invalid credentials'}), 401
-        else:
-            role = data['role'].lower()
-            municipality = data['municipality']
-            contact_no = data['contact_no']
-            password = data['password']
-            user = conn.execute('SELECT role, municipality FROM users WHERE role = ? AND municipality = ? AND contact_no = ? AND password = ?', 
-                                (role, municipality, contact_no, password)).fetchone()
-            if user:
-                logger.info(f"Login successful for contact_no: {contact_no}, role: {user['role']}")
-                return jsonify({'role': user['role'], 'municipality': user['municipality'] or ''})
-            else:
-                logger.warning(f"Invalid credentials for contact_no: {contact_no}, role: {role}")
-                return jsonify({'error': 'Invalid credentials'}), 401
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        return jsonify({'error': str(e)}), 400
-    finally:
-        conn.close()
-
-
-
-@app.route('/admin/dashboard')
-def admin_dashboard():
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to admin_dashboard")
-        return redirect(url_for('admin_login'))
-    conn = get_db_connection()
-    users = conn.execute('SELECT * FROM users WHERE role != "admin"').fetchall()
-    conn.close()
-    return render_template('admin_dashboard.html', users=users)
-
-@app.route('/admin/create_user', methods=['POST'])
-def admin_create_user():
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to admin_create_user")
-        return jsonify({'error': 'Unauthorized'}), 401
-    data = request.form
-    role = data.get('role').lower()
-    contact_no = data.get('contact_no')
-    password = data.get('password')
-    barangay = data.get('barangay') if role == 'barangay' else None
-    municipality = data.get('municipality') if role in ['pnp', 'cdrrmo', 'bfp'] else None
-    conn = get_db_connection()
-    try:
-        conn.execute('INSERT INTO users (role, contact_no, password, barangay, assigned_municipality) VALUES (?, ?, ?, ?, ?)',
-                    (role, contact_no, password, barangay, municipality))
-        conn.commit()
-        logger.info(f"User created with contact_no: {contact_no}, role: {role}, barangay: {barangay}, municipality: {municipality}")
-    except sqlite3.IntegrityError:
-        conn.close()
-        logger.error(f"User creation failed, contact_no {contact_no} already exists")
-        return jsonify({'error': 'User already exists'}), 400
-    conn.close()
-    return jsonify({'message': 'User created successfully'})
-
-@app.route('/admin/delete_user/<contact_no>', methods=['POST'])
-def admin_delete_user(contact_no):
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to admin_delete_user")
-        return jsonify({'error': 'Unauthorized'}), 401
-    conn = get_db_connection()
-    conn.execute('DELETE FROM users WHERE contact_no = ?', (contact_no,))
-    conn.commit()
-    conn.close()
-    logger.info(f"User deleted with contact_no: {contact_no}")
-    return jsonify({'message': 'User deleted successfully'})
-
-@app.route('/debug/users', methods=['GET'])
-def debug_users():
-    if 'role' not in session or session['role'] != 'admin':
-        logger.warning("Unauthorized access to debug_users")
-        return jsonify({'error': 'Unauthorized'}), 401
-    conn = get_db_connection()
-    users = conn.execute('SELECT role, barangay, contact_no, assigned_municipality, province FROM users').fetchall()
-    conn.close()
-    logger.debug(f"Debug users: {[dict(row) for row in users]}")
-    return jsonify([dict(row) for row in users])
 
 @socketio.on('request_heatmap_data')
 def handle_heatmap_data(role):
@@ -292,8 +96,6 @@ def handle_heatmap_data(role):
     except Exception as e:
         logger.error(f"Error in handle_heatmap_data: {e}")
         emit('heatmap_data', {'error': str(e)})
-
-
 
 
 @socketio.on('alert')
@@ -2077,9 +1879,7 @@ def handle_health_response(data):
             'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
             'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
             'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str},
-            'resident_barangay': {'db_column': 'resident_barangay', 'default': 'Unknown', 'type': str},
-            'image': {'db_column': 'image', 'default': '', 'type': str}
+            'emergency_type': {'db_column': 'emergency_type', 'default': 'Health Emergency', 'type': str}
         }
         
         extracted_data = {
@@ -2095,8 +1895,8 @@ def handle_health_response(data):
             INSERT INTO health_response (
                 alert_id, health_type, health_cause, patient_age, 
                 patient_gender, lat, lon, barangay, emergency_type, 
-                timestamp, responded, resident_barangay, image
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                timestamp, responded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'],
             extracted_data['health_type'],
@@ -2108,9 +1908,7 @@ def handle_health_response(data):
             extracted_data['barangay'],
             extracted_data['emergency_type'],
             extracted_data['timestamp'],
-            extracted_data['responded'],
-            extracted_data['resident_barangay'],
-            extracted_data['image']
+            extracted_data['responded']
         ))
         conn.commit()
         logger.info(f"Stored city health response for alert_id: {data.get('alert_id')}")
@@ -2375,13 +2173,6 @@ municipality_coords = {
     "Quezon Province": {"lat": 13.9347, "lon": 121.9473},
 }
 
-def get_db_connection():
-    db_path = os.path.join('/database', 'users_web.db')
-    if not os.path.exists(db_path):
-        db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 @app.route('/export_users', methods=['GET'])
 def export_users():
@@ -2402,13 +2193,6 @@ def download_db():
     logger.debug(f"Serving database from: {db_path}")
     return send_file(db_path, as_attachment=True, download_name='users_web.db')
 
-@app.route('/download_android_db', methods=['GET'])
-def download_android_db():
-    db_path = os.path.join(os.path.dirname(__file__), 'database', 'AlertNowLocal.db')
-    if not os.path.exists(db_path):
-        return "Database file not found", 404
-    logger.debug(f"Serving Android database from: {db_path}")
-    return send_file(db_path, as_attachment=True, download_name='AlertNowLocal.db')
 
 def construct_unique_id(role, barangay=None, assigned_municipality=None, contact_no=None):
     if role == 'barangay':
@@ -2683,7 +2467,9 @@ def sign():
     return render_template('SignUpPage.html')
 
 
-
+@app.route('/pass_reset', methods=['GET', 'POST'])
+def pass_reset_route():
+    return pass_reset()
 
 @app.route('/go_to_login_page', methods=['GET'])
 def go_to_login_page():
@@ -2699,6 +2485,8 @@ def go_to_signup_type():
 def choose_login_type():
     logger.debug("Rendering LoginType.html")
     return render_template('LoginType.html')
+
+
 
 @app.route('/login_agency', methods=['GET'])
 def go_to_cdrrmopnpbfpin():
