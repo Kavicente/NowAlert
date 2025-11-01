@@ -2997,6 +2997,45 @@ def hospital_dashboard():
         logger.error(f"Error in health_dashboard: {e}")
         return "Internal Server Error", 500
 
+def dilg_get_database():
+    """
+    """
+    try:
+        conn = get_db_connection()
+        tables = [
+            'barangay_response', 'barangay_fire_response', 'barangay_crime_response', 'barangay_health_response',
+            'cdrrmo_response', 'bfp_response', 'health_response', 'hospital_response',
+            'pnp_response', 'pnp_fire_response', 'pnp_crime_response'
+        ]
+        
+        data = {}
+        for table in tables:
+            try:
+                cursor = conn.execute(f"SELECT * FROM {table}")
+                rows = [dict(row) for row in cursor.fetchall()]
+                data[table] = rows
+            except sqlite3.Error as e:
+                logger.warning(f"Table {table} not found or error: {e}")
+                data[table] = []
+
+        # Add barangay list
+        try:
+            with open(os.path.join(os.path.dirname(__file__), 'static', 'barangay.txt'), 'r') as f:
+                data['barangays'] = [line.strip() for line in f if line.strip()]
+        except:
+            data['barangays'] = []
+
+        conn.close()
+        return jsonify(data)
+
+    except Exception as e:
+        logger.error(f"Error in dilg_get_database: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/dilg_data')
+def dilg_data_route():
+    return dilg_get_database()
+
 def get_latest_alert():
     try:
         if alerts:
