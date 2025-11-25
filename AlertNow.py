@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_file, make_response
+from flask import Flask, request, jsonify, render_template, redirect, url_for, session, send_file, make_response, flash
 from flask_socketio import SocketIO, emit, join_room
 import logging
 import ast
@@ -36,8 +36,14 @@ from BFPCharts import bfp_charts, bfp_charts_data, get_bfp_chart_data
 from HealthCharts import health_charts, health_charts_data
 from HospitalCharts import hospital_charts, hospital_charts_data
 from dataset import road_accident_df, fire_incident_df, health_emergencies_df, crime_df
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import secrets
 from PassReset import pass_reset
-
+from DILGDashboard import (dilg_dashboard, dilg_data, dilg_accounts, dilg_update_account, dilg_delete_account, 
+                           dilg_delete_all, dilg_warn_account, dilg_barangays, dilg_barangay_report, dilg_cdrrmo_report,
+                           dilg_bfp_report, dilg_health_report, dilg_pnp_report)
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -55,6 +61,19 @@ responses = []
 today_responses = []
 pending_alerts = []
 accepted_roles = {}
+
+app.add_url_rule('/dilg_dashboard', 'dilg_dashboard', dilg_dashboard)
+app.add_url_rule('/dilg_data', 'dilg_data', dilg_data)
+app.add_url_rule('/dilg_accounts', 'dilg_accounts', dilg_accounts)
+app.add_url_rule('/dilg_delete_account/<contact>', 'dilg_delete_account', dilg_delete_account, methods=['DELETE'])
+app.add_url_rule('/dilg_delete_all/<role_type>', 'dilg_delete_all', dilg_delete_all, methods=['DELETE'])
+app.add_url_rule('/dilg_warn_account', 'dilg_warn_account', dilg_warn_account, methods=['POST'])
+app.add_url_rule('/dilg_barangays', 'dilg_barangays', dilg_barangays)
+app.add_url_rule('/dilg_barangay_report', 'dilg_barangay_report', dilg_barangay_report)
+app.add_url_rule('/dilg_cdrrmo_report', 'dilg_cdrrmo_report', dilg_cdrrmo_report)
+app.add_url_rule('/dilg_bfp_report', 'dilg_bfp_report', dilg_bfp_report)
+app.add_url_rule('/dilg_health_report', 'dilg_health_report', dilg_health_report)
+app.add_url_rule('/dilg_pnp_report', 'dilg_pnp_report', dilg_pnp_report)
 
 def get_db_connection():
     db_path = os.path.join('/database', 'users_web.db')
@@ -2997,44 +3016,69 @@ def hospital_dashboard():
         logger.error(f"Error in health_dashboard: {e}")
         return "Internal Server Error", 500
 
-def dilg_get_database():
+# ADD THIS FUNCTION (anywhere in file)
+# ADD THESE ROUTES (anywhere in routes section)
+@app.route('/send_dilg_password', methods=['POST'])
+def send_dilg_password():
+    data = request.get_json()
+    password = data.get('password')
+    if not password:
+        return jsonify({'error': 'No password'}), 400
+    
+    sender = "castillovinceb@gmail.com"
+    receiver = "vncbcstll@gmail.com"
+    app_pass = os.getenv('EMAIL_PASS')
+    if not app_pass:
+        logger.error("EMAIL_PASS not set")
+        return jsonify({'error': 'Email not configured'}), 500
+
+    app_pass = app_pass.replace(" ", "")
+    subject = "DILG Login Password - Alert Now"
+    body = f"""
+    <h2>DILG Access Granted</h2>
+    <p><strong>Password:</strong> <code style="background:#f0f0f0;padding:8px;font-size:18px;">{password}</code></p>
+    <p>Use this password with your municipality in the DILG login modal.</p>
+    <p><em>Auto-generated • Valid once</em></p>
     """
-    """
+
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
     try:
-        conn = get_db_connection()
-        tables = [
-            'barangay_response', 'barangay_fire_response', 'barangay_crime_response', 'barangay_health_response',
-            'cdrrmo_response', 'bfp_response', 'health_response', 'hospital_response',
-            'pnp_response', 'pnp_fire_response', 'pnp_crime_response'
-        ]
-        
-        data = {}
-        for table in tables:
-            try:
-                cursor = conn.execute(f"SELECT * FROM {table}")
-                rows = [dict(row) for row in cursor.fetchall()]
-                data[table] = rows
-            except sqlite3.Error as e:
-                logger.warning(f"Table {table} not found or error: {e}")
-                data[table] = []
-
-        # Add barangay list
-        try:
-            with open(os.path.join(os.path.dirname(__file__), 'static', 'barangay.txt'), 'r') as f:
-                data['barangays'] = [line.strip() for line in f if line.strip()]
-        except:
-            data['barangays'] = []
-
-        conn.close()
-        return jsonify(data)
-
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender, app_pass)
+        server.sendmail(sender, receiver, msg.as_string())
+        server.quit()
+        logger.info("DILG password email sent successfully")
+        return jsonify({'status': 'sent'})
     except Exception as e:
-        logger.error(f"Error in dilg_get_database: {e}")
+        logger.error(f"Email failed: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/dilg_data')
-def dilg_data_route():
-    return dilg_get_database()
+
+@app.route('/login_dilg', methods=['POST'])
+def login_dilg():
+    municipality = request.form['municipality']
+    password = request.form['password']
+    
+    if password.endswith('DILG!'):
+        session['role'] = 'dilg'
+        session['municipality'] = municipality
+        session['contact_no'] = 'DILG_ADMIN'
+        logger.info(f"DILG login successful: {municipality}")
+        return redirect('/dilg_dashboard')
+    
+    return render_template('AgencyIn.html', error="Invalid DILG password")
+
+@app.route('/dilg_accounts')
+def dilg_accounts_route():
+    return dilg_accounts()
+
+
 
 def get_latest_alert():
     try:

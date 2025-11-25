@@ -1,15 +1,15 @@
-from flask import request, redirect, url_for, render_template, session, jsonify
+from flask import request, redirect, url_for, render_template, session, jsonify, flash
 import requests
 import sqlite3
 import os
-import logging  # Added for debugging
+import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import secrets
 
-# Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-
-
 
 def get_db_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database', 'users_web.db')
@@ -17,6 +17,37 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def send_dilg_password(password):
+    sender = "castillovinceb@gmail.com"
+    receiver = "vncbcstll@gmail.com"
+    subject = "Your DILG Login Password"
+    body = f"""
+    <h2>DILG Login Access</h2>
+    <p>Your temporary login password is:</p>
+    <h3 style="color:#224380; font-family:monospace;">{password}</h3>
+    <p>Use this with your assigned municipality to log in.</p>
+    <p><em>This is an automated message.</em></p>
+    """
+
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'html'))
+
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        app_pass = os.getenv('EMAIL_PASS')
+        if not app_pass:
+            logger.error("EMAIL_PASS not set")
+            return
+        server.login(sender, app_pass.replace(" ", ""))
+        server.sendmail(sender, receiver, msg.as_string())
+        server.quit()
+        logger.info(f"DILG password email sent: {password}")
+    except Exception as e:
+        logger.error(f"Failed to send DILG email: {e}")
 
 def login_agency():
     logger.debug("Accessing /login_agency with method: %s", request.method)
@@ -30,14 +61,22 @@ def login_agency():
         password = request.form['password']
         assigned_hospital = request.form.get('assigned_hospital', '').lower() if role == 'hospital' else None
         
-        if role not in ['cdrrmo', 'pnp', 'bfp', 'city health', 'hospital']:
+        if role not in ['cdrrmo', 'pnp', 'bfp', 'city health', 'hospital', 'dilg']:
             logger.error(f"Invalid role provided: {role}")
             return "Invalid role", 400
         
         logger.debug(f"Login attempt: role={role}, municipality={assigned_municipality}, contact_no={contact_no}")
         
         conn = get_db_connection()
-        if role == 'hospital':
+        if role == 'dilg':
+            # Allow login if password ends with 'DILG!' (generated)
+            if password.endswith('DILG!'):
+                session['role'] = 'dilg'
+                session['municipality'] = assigned_municipality
+                session['contact_no'] = 'DILG_ADMIN'
+                conn.close()
+                return redirect('/dilg_dashboard')
+        elif role == 'hospital':
             user = conn.execute('''
                 SELECT * FROM users WHERE role = ? AND contact_no = ? AND password = ? AND assigned_municipality = ? AND assigned_hospital = ?
             ''', (role, contact_no, password, assigned_municipality, assigned_hospital)).fetchone()
@@ -70,13 +109,9 @@ def login_agency():
     conn = get_db_connection()
     cdrrmo_pnp_bfp_users = conn.execute('SELECT role, assigned_municipality, contact_no, password, assigned_hospital FROM users WHERE role IN (?, ?, ?, ?, ?)', 
                                         ('cdrrmo', 'pnp', 'bfp', 'city health', 'hospital')).fetchall()
-    logger.debug(f"Retrieved {len(cdrrmo_pnp_bfp_users)} CDRRMO/PNP/BFP/City Health/Hospital users: {[dict(row) for row in cdrrmo_pnp_bfp_users]}")
+    logger.debug(f"Retrieved {len(cdrrmo_pnp_bfp_users)} users")
     conn.close()
     return render_template('AgencyIn.html', cdrrmo_pnp_bfp_users=cdrrmo_pnp_bfp_users)
-
-
-
-
 
 def choose_login_type():
     return render_template('LoginType.html')
