@@ -6,6 +6,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import os
 from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -18,12 +19,12 @@ def get_db_connection():
     return conn
 
 def send_dilg_password(password):
-    sender = "castillovinceb@gmail.com"  # ← YOUR EMAIL
+    sender = "castillovinceb@gmail.com"
     receiver = "vncbcstll@gmail.com"
     app_password = os.getenv('EMAIL_PASS', '').replace(" ", "")
 
     if not app_password:
-        logger.warning("EMAIL_PASS not set — email skipped in dev mode")
+        logger.warning("EMAIL_PASS not set — email skipped")
         return jsonify({'status': 'skipped'})
 
     subject = "Your DILG Alert Now Login Password"
@@ -46,13 +47,15 @@ def send_dilg_password(password):
     msg.attach(MIMEText(body, 'html'))
 
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
+        # THIS LINE IS THE ONLY CHANGE — USE SSL + PORT 465
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.login(sender, app_password)
         server.sendmail(sender, receiver, msg.as_string())
         server.quit()
-        logger.info(f"DILG password sent to {receiver}")
+        
+        logger.info("DILG password sent successfully!")
         return jsonify({'status': 'sent'})
+        
     except Exception as e:
         logger.error(f"Email failed: {e}")
         return jsonify({'status': 'failed'})
