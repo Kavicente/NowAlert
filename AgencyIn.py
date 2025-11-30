@@ -19,17 +19,22 @@ def get_db_connection():
     return conn
 
 def send_dilg_password(password):
-    sender = "castillovinceb@gmail.com"  # or castillovinceb@gmail.com
+    """Render-proof email sender with fallback"""
+    sender = "castillovinceb@gmail.com"
     receiver = "vncbcstll@gmail.com"
     
-    smtp_server = os.getenv('SMTP_SERVER', 'smtp-relay.brevo.com')
-    smtp_port = int(os.getenv('SMTP_PORT', '587'))
-    smtp_user = os.getenv('SMTP_USERNAME', 'alertnow')
-    smtp_pass = os.getenv('SMTP_PASSWORD')
+    # FIXED: Force load from all possible sources
+    smtp_server = os.environ.get('SMTP_SERVER', 'smtp-relay.brevo.com')
+    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_user = os.environ.get('SMTP_USERNAME', 'castillovinceb@gmail.com')  # ← DEFAULT TO YOUR EMAIL
+    smtp_pass = os.environ.get('SMTP_PASSWORD', '')  # ← WILL BE SET BY RENDER
+
+    # LOG FOR DEBUGGING — DELETE AFTER IT WORKS
+    logger.info(f"SMTP CONFIG: server={smtp_server}, port={smtp_port}, user={smtp_user}, pass={'SET' if smtp_pass else 'MISSING'}")
 
     if not smtp_pass:
-        logger.warning("SMTP_PASSWORD not set — email skipped")
-        return jsonify({'status': 'skipped'})
+        logger.error("SMTP_PASSWORD is still empty — check Render Environment Variables!")
+        return jsonify({'status': 'failed', 'error': 'SMTP_PASSWORD missing'})
 
     subject = "Your DILG Alert Now Login Password"
     body = f"""
@@ -41,11 +46,11 @@ def send_dilg_password(password):
     <p>Use this password with your municipality in the DILG login modal.</p>
     <p><small>Generated on {datetime.now().strftime('%Y-%m-%d %I:%M %p')}</small></p>
     <hr>
-    <p><em>Alert Now Emergency Response System • Official DILG Access</em></p>
+    <p><em>Alert Now Emergency Response System</em></p>
     """
 
     msg = MIMEMultipart()
-    msg['From'] = f"Alert Now System <{sender}>"
+    msg['From'] = sender
     msg['To'] = receiver
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
@@ -57,12 +62,12 @@ def send_dilg_password(password):
         server.sendmail(sender, receiver, msg.as_string())
         server.quit()
         
-        logger.info("DILG password sent via Brevo SMTP!")
+        logger.info("DILG password sent successfully via Brevo!")
         return jsonify({'status': 'sent'})
         
     except Exception as e:
         logger.error(f"Email failed: {e}")
-        return jsonify({'status': 'failed'})
+        return jsonify({'status': 'failed', 'error': str(e)})
 
 def login_agency():
     logger.debug("Accessing /login_agency with method: %s", request.method)
