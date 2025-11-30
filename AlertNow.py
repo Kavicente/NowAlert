@@ -51,7 +51,9 @@ logger = logging.getLogger(__name__)
 
 
 
-
+if os.path.exists('.env'):
+    from dotenv import load_dotenv
+    load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your-secret-key-here')
