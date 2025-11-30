@@ -17,6 +17,7 @@ import uuid
 from models import (road_accident_predictor, 
                     fire_accident_predictor, crime_predictor, 
                     health_predictor, birth_predictor)
+from AgencyIn import send_dilg_password
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import (get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, 
                                get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update)
@@ -3019,12 +3020,12 @@ def hospital_dashboard():
 # ADD THIS FUNCTION (anywhere in file)
 # ADD THESE ROUTES (anywhere in routes section)
 @app.route('/send_dilg_password', methods=['POST'])
-def send_dilg_password():
+def send_dilg_password_route():
     data = request.get_json()
     password = data.get('password')
     if not password:
         return jsonify({'error': 'No password'}), 400
-    return send_dilg_password(password)  # ← Call the safe function
+    return send_dilg_password(password)  # ← Now calls the function correctly
 
 
 @app.route('/login_dilg', methods=['POST'])

@@ -20,26 +20,21 @@ def get_db_connection():
 def send_dilg_password(password):
     sender = "castillovinceb@gmail.com"
     receiver = "vncbcstll@gmail.com"
+    app_password = os.getenv('EMAIL_PASS', '').replace(" ", "")
     
-    # FIXED: Safe loading with fallback
-    app_password = os.getenv('EMAIL_PASS')
     if not app_password:
-        logger.warning("EMAIL_PASS not set in .env - using fallback (email will fail in production)")
-        app_password = "your_fallback_app_password_here"  # ← Change this to your real one if needed
-    
-    app_password = app_password.replace(" ", "")  # Clean spaces
+        logger.warning("EMAIL_PASS not set - email skipped in dev mode")
+        return jsonify({'status': 'skipped (dev mode)'})
 
-    subject = "Your DILG Login Password - Alert Now"
+    subject = "DILG Login Password - Alert Now"
     body = f"""
     <h2>DILG Access Granted</h2>
-    <p><strong>Password:</strong></p>
-    <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;letter-spacing:2px;">
+    <p>Your temporary login password is:</p>
+    <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;">
         {password}
     </h3>
-    <p>Use this password with your municipality in the DILG login modal.</p>
-    <p><small>Valid for this session only • Auto-generated</small></p>
-    <hr>
-    <p><em>Alert Now Emergency System</em></p>
+    <p>Use this with your municipality in the DILG login modal.</p>
+    <p><em>Auto-generated • Valid once</em></p>
     """
 
     msg = MIMEMultipart()
@@ -57,9 +52,8 @@ def send_dilg_password(password):
         logger.info("DILG password email sent successfully")
         return jsonify({'status': 'sent'})
     except Exception as e:
-        logger.error(f"Email failed (but will not crash): {e}")
-        # Don't crash — just log
-        return jsonify({'status': 'fallback', 'message': 'Email disabled in dev mode'})
+        logger.error(f"Email failed: {e}")
+        return jsonify({'status': 'failed', 'error': str(e)})
 
 def login_agency():
     logger.debug("Accessing /login_agency with method: %s", request.method)
