@@ -19,3 +19,7 @@ setuptools==70.0.0
 xgboost==2.1.1
 onnxruntime
 dotenv
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client

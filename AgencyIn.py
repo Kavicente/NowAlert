@@ -1,12 +1,14 @@
-from flask import request, redirect, url_for, render_template, session, jsonify, flash
+from flask import request, redirect, url_for, render_template, session, jsonify, flash, json
 import requests
 import sqlite3
 import os
 import logging
 import smtplib
+import google.auth
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import secrets
+import base64
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -18,42 +20,40 @@ def get_db_connection():
     return conn
 
 def send_dilg_password(password):
-    sender = "castillovinceb@gmail.com"
-    receiver = "vncbcstll@gmail.com"
-    app_password = os.getenv('EMAIL_PASS', '').replace(" ", "")
-    
-    if not app_password:
-        logger.warning("EMAIL_PASS not set - email skipped in dev mode")
-        return jsonify({'status': 'skipped (dev mode)'})
-
-    subject = "DILG Login Password - Alert Now"
-    body = f"""
-    <h2>DILG Access Granted</h2>
-    <p>Your temporary login password is:</p>
-    <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;">
-        {password}
-    </h3>
-    <p>Use this with your municipality in the DILG login modal.</p>
-    <p><em>Auto-generated • Valid once</em></p>
-    """
-
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = receiver
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'html'))
-
+    """Send DILG password using Gmail API (works on Render!)"""
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender, app_password)
-        server.sendmail(sender, receiver, msg.as_string())
-        server.quit()
-        logger.info("DILG password email sent successfully")
+        # Load credentials from environment (set in Render dashboard)
+        creds_json = os.getenv('GMAIL_CREDENTIALS')
+        if not creds_json:
+            logger.warning("GMAIL_CREDENTIALS not set - email skipped")
+            return jsonify({'status': 'skipped'})
+
+        creds = Credentials.from_authorized_user_info(json.loads(creds_json))
+        service = build('gmail', 'v1', credentials=creds)
+
+        message = MIMEText(f"""
+        <h2>DILG Login Access</h2>
+        <p>Your temporary password is:</p>
+        <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;">
+            {password}
+        </h3>
+        <p>Use with your municipality in Alert Now.</p>
+        <p><em>Auto-generated • Valid once</em></p>
+        """, 'html')
+
+        message['to'] = "vncbcstll@gmail.com"
+        message['from'] = "castillovinceb@gmail.com"
+        message['subject'] = "Your DILG Alert Now Password"
+
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        service.users().messages().send(userId="me", body={'raw': raw}).execute()
+        
+        logger.info("DILG password sent via Gmail API")
         return jsonify({'status': 'sent'})
+        
     except Exception as e:
-        logger.error(f"Email failed: {e}")
-        return jsonify({'status': 'failed', 'error': str(e)})
+        logger.error(f"Gmail API failed: {e}")
+        return jsonify({'status': 'failed'})
 
 def login_agency():
     logger.debug("Accessing /login_agency with method: %s", request.method)
