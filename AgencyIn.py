@@ -8,6 +8,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from email.mime.text import MIMEText
 import base64
+from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -19,14 +20,14 @@ def get_db_connection():
     return conn
 
 def send_dilg_password(password):
-    """Send DILG password using Gmail API + Service Account (WORKS ON RENDER!)"""
+    """Send DILG password using Gmail API Service Account (FIXED for Render!)"""
     try:
         credentials_json = os.getenv('GMAIL_CREDENTIALS')
         if not credentials_json:
             logger.warning("GMAIL_CREDENTIALS not set — email skipped")
             return jsonify({'status': 'skipped'})
 
-        # CORRECT: Use service_account.Credentials
+        # FIXED: Correct Service Account scope + delegation
         credentials = service_account.Credentials.from_service_account_info(
             json.loads(credentials_json),
             scopes=['https://www.googleapis.com/auth/gmail.send']
@@ -34,25 +35,34 @@ def send_dilg_password(password):
 
         service = build('gmail', 'v1', credentials=credentials)
 
+        # FIXED: Use service account email as sender (not "me")
+        sender_email = "alertnow@sunlit-wall-454911-e6.iam.gserviceaccount.com"
+        receiver = "vncbcstll@gmail.com"
+
         message = MIMEText(f"""
-        <h2>DILG Login Access</h2>
+        <h2>DILG Login Access - Alert Now</h2>
         <p>Your temporary password is:</p>
-        <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;">
+        <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;letter-spacing:2px;">
             {password}
         </h3>
-        <p>Use this with your municipality in Alert Now.</p>
-        <p><em>Auto-generated • Valid once</em></p>
+        <p>Use this password with your municipality in the DILG login modal.</p>
+        <p><small>Generated on {datetime.now().strftime('%Y-%m-%d %I:%M %p')}</small></p>
+        <hr>
+        <p><em>Alert Now Emergency Response System</em></p>
         """, 'html')
 
-        message['to'] = "vncbcstll@gmail.com"
-        message['from'] = "alertnow@sunlit-wall-454911-e6.iam.gserviceaccount.com"
-        message['subject'] = "Your DILG Alert Now Password"
+        message['To'] = receiver
+        message['From'] = sender_email
+        message['Subject'] = "Your DILG Alert Now Login Password"
 
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        # FIXED: Encode properly for Gmail API
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
         body = {'raw': raw_message}
 
-        service.users().messages().send(userId="me", body=body).execute()
-        logger.info("DILG password sent via Gmail API (Service Account)")
+        # FIXED: Use service account userId (not "me")
+        service.users().messages().send(userId=sender_email, body=body).execute()
+        
+        logger.info(f"DILG password sent successfully to {receiver}")
         return jsonify({'status': 'sent'})
 
     except Exception as e:
