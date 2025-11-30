@@ -14,6 +14,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import uuid
+from dotenv import load_dotenv
 from models import (road_accident_predictor, 
                     fire_accident_predictor, crime_predictor, 
                     health_predictor, birth_predictor)
@@ -3024,40 +3025,7 @@ def send_dilg_password():
     password = data.get('password')
     if not password:
         return jsonify({'error': 'No password'}), 400
-    
-    sender = "castillovinceb@gmail.com"
-    receiver = "vncbcstll@gmail.com"
-    app_pass = os.getenv('EMAIL_PASS')
-    if not app_pass:
-        logger.error("EMAIL_PASS not set")
-        return jsonify({'error': 'Email not configured'}), 500
-
-    app_pass = app_pass.replace(" ", "")
-    subject = "DILG Login Password - Alert Now"
-    body = f"""
-    <h2>DILG Access Granted</h2>
-    <p><strong>Password:</strong> <code style="background:#f0f0f0;padding:8px;font-size:18px;">{password}</code></p>
-    <p>Use this password with your municipality in the DILG login modal.</p>
-    <p><em>Auto-generated • Valid once</em></p>
-    """
-
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = receiver
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'html'))
-
-    try:
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender, app_pass)
-        server.sendmail(sender, receiver, msg.as_string())
-        server.quit()
-        logger.info("DILG password email sent successfully")
-        return jsonify({'status': 'sent'})
-    except Exception as e:
-        logger.error(f"Email failed: {e}")
-        return jsonify({'error': str(e)}), 500
+    return send_dilg_password(password)  # ← Call the safe function
 
 
 @app.route('/login_dilg', methods=['POST'])

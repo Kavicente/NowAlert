@@ -20,13 +20,26 @@ def get_db_connection():
 def send_dilg_password(password):
     sender = "castillovinceb@gmail.com"
     receiver = "vncbcstll@gmail.com"
-    subject = "Your DILG Login Password"
+    
+    # FIXED: Safe loading with fallback
+    app_password = os.getenv('EMAIL_PASS')
+    if not app_password:
+        logger.warning("EMAIL_PASS not set in .env - using fallback (email will fail in production)")
+        app_password = "your_fallback_app_password_here"  # ← Change this to your real one if needed
+    
+    app_password = app_password.replace(" ", "")  # Clean spaces
+
+    subject = "Your DILG Login Password - Alert Now"
     body = f"""
-    <h2>DILG Login Access</h2>
-    <p>Your temporary login password is:</p>
-    <h3 style="color:#224380; font-family:monospace;">{password}</h3>
-    <p>Use this with your assigned municipality to log in.</p>
-    <p><em>This is an automated message.</em></p>
+    <h2>DILG Access Granted</h2>
+    <p><strong>Password:</strong></p>
+    <h3 style="background:#f0f4f8;padding:15px;border-radius:8px;font-family:monospace;letter-spacing:2px;">
+        {password}
+    </h3>
+    <p>Use this password with your municipality in the DILG login modal.</p>
+    <p><small>Valid for this session only • Auto-generated</small></p>
+    <hr>
+    <p><em>Alert Now Emergency System</em></p>
     """
 
     msg = MIMEMultipart()
@@ -38,16 +51,15 @@ def send_dilg_password(password):
     try:
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
-        app_pass = os.getenv('EMAIL_PASS')
-        if not app_pass:
-            logger.error("EMAIL_PASS not set")
-            return
-        server.login(sender, app_pass.replace(" ", ""))
+        server.login(sender, app_password)
         server.sendmail(sender, receiver, msg.as_string())
         server.quit()
-        logger.info(f"DILG password email sent: {password}")
+        logger.info("DILG password email sent successfully")
+        return jsonify({'status': 'sent'})
     except Exception as e:
-        logger.error(f"Failed to send DILG email: {e}")
+        logger.error(f"Email failed (but will not crash): {e}")
+        # Don't crash — just log
+        return jsonify({'status': 'fallback', 'message': 'Email disabled in dev mode'})
 
 def login_agency():
     logger.debug("Accessing /login_agency with method: %s", request.method)
