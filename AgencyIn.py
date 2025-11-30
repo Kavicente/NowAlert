@@ -19,12 +19,16 @@ def get_db_connection():
     return conn
 
 def send_dilg_password(password):
-    sender = "castillovinceb@gmail.com"
+    sender = "castillovinceb@gmail.com"  # or castillovinceb@gmail.com
     receiver = "vncbcstll@gmail.com"
-    app_password = os.getenv('EMAIL_PASS', '').replace(" ", "")
+    
+    smtp_server = os.getenv('SMTP_SERVER', 'smtp-relay.brevo.com')
+    smtp_port = int(os.getenv('SMTP_PORT', '587'))
+    smtp_user = os.getenv('SMTP_USERNAME', 'alertnow')
+    smtp_pass = os.getenv('SMTP_PASSWORD')
 
-    if not app_password:
-        logger.warning("EMAIL_PASS not set — email skipped")
+    if not smtp_pass:
+        logger.warning("SMTP_PASSWORD not set — email skipped")
         return jsonify({'status': 'skipped'})
 
     subject = "Your DILG Alert Now Login Password"
@@ -37,23 +41,23 @@ def send_dilg_password(password):
     <p>Use this password with your municipality in the DILG login modal.</p>
     <p><small>Generated on {datetime.now().strftime('%Y-%m-%d %I:%M %p')}</small></p>
     <hr>
-    <p><em>Alert Now Emergency Response System</em></p>
+    <p><em>Alert Now Emergency Response System • Official DILG Access</em></p>
     """
 
     msg = MIMEMultipart()
-    msg['From'] = sender
+    msg['From'] = f"Alert Now System <{sender}>"
     msg['To'] = receiver
     msg['Subject'] = subject
     msg.attach(MIMEText(body, 'html'))
 
     try:
-        # THIS LINE IS THE ONLY CHANGE — USE SSL + PORT 465
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-        server.login(sender, app_password)
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
         server.sendmail(sender, receiver, msg.as_string())
         server.quit()
         
-        logger.info("DILG password sent successfully!")
+        logger.info("DILG password sent via Brevo SMTP!")
         return jsonify({'status': 'sent'})
         
     except Exception as e:
