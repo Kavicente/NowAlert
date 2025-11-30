@@ -14,7 +14,6 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 import uuid
-from dotenv import load_dotenv
 from models import (road_accident_predictor, 
                     fire_accident_predictor, crime_predictor, 
                     health_predictor, birth_predictor)
