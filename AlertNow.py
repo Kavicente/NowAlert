@@ -1025,7 +1025,19 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1 year']
 
+arima_model = None  # ← Use this name consistently
 
+model_path = os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima_model.pkl')
+
+if os.path.exists(model_path):
+    try:
+        arima_model = joblib.load(model_path)
+        logger.info(f"ARIMA model loaded successfully from: {model_path}")
+    except Exception as e:
+        logger.error(f"Failed to load ARIMA model: {e}")
+else:
+    logger.error(f"ARIMA model not found at: {model_path}")
+    logger.error("Make sure arima_model.pkl is in: training/Road Models/")
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1091,7 +1103,7 @@ def handle_barangay_response_submitted(data):
 
     # === 2. ARIMA REAL-TIME FORECAST ===
     try:
-        if not arima_pred:
+        if arima_model is None:  # ← CORRECT VARIABLE NAME
             raise Exception("ARIMA model not loaded")
 
         now_ph = datetime.now(pytz.timezone('Asia/Manila'))
@@ -1106,17 +1118,15 @@ def handle_barangay_response_submitted(data):
             window = f"{start_hour:02d}:00 – {end_hour:02d}:00"
 
         # Forecast next 2 hours
-        forecast = arima_pred.forecast(steps=2)
+        forecast = arima_model.forecast(steps=2)
         risk_now = float(forecast.iloc[0])
         risk_next = float(forecast.iloc[1])
         
-        # Normalize to % (adjust historical_max based on your data)
-        historical_max = 8  # Change this to your real max accidents per hour
+        historical_max = 8
         prob_now = min(98, (risk_now / historical_max) * 100)
         prob_next = min(98, (risk_next / historical_max) * 100)
         avg_prob = (prob_now + prob_next) / 2
 
-        # Final message
         data['prediction'] = f"This time coverage ({window}) has {avg_prob:.1f}% chance of road accident"
 
     except Exception as e:
