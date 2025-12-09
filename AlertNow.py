@@ -1107,12 +1107,13 @@ def handle_barangay_response_submitted(data):
             prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
             extracted_data['prediction'] = prediction_text
 
-            # DO NOT put in data['prediction'] → prevents display in alert cards
-            # data['prediction'] = prediction_text  ← REMOVED INTENTIONALLY
+            # DO NOT add to data[] → prevents display in alert cards
+            # data['prediction'] = prediction_text   ← REMOVED ON PURPOSE
 
         except Exception as e:
             logger.error(f"Yearly ARIMA Prediction failed: {e}")
-            extracted_data['prediction'] = "Yearly forecast unavailable"
+            prediction_text = "Yearly forecast unavailable"
+            extracted_data['prediction'] = prediction_text
     except Exception as e:
         logger.error(f"DB Error: {e}")
         if 'conn' in locals():
