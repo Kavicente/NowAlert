@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 arima_pred = None
 try:
-    road_accident_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima_model.pkl'))
+    arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima_model.pkl'))
     logger.info("arima_model.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("arima_model.pkl not found.")
