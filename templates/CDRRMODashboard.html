@@ -122,6 +122,27 @@
             border: 1px solid #ccc;
             font-size: 16px;
         }
+
+        #prediction-section {
+            margin: 40px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            max-width: 1000px;
+            text-align: center;
+            display: none;
+        }
+        #prediction-section.active { display: block; }
+        #prediction-chart-container {
+            height: 800px;
+            width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 16px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body>
@@ -133,6 +154,7 @@
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
                 <li><a href="{{ url_for('cdrrmo_charts') }}"><span>📊</span> Manage Reports</a></li>
+                <li><a href="#" id="prediction-link"></span>📈</span> Prediction</a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
@@ -201,6 +223,12 @@
             </div>
         </section>
 
+        <section id="prediction-section">
+            <div id="prediction-chart-container">
+                <canvas id="yearlyPredictionChart"></canvas>
+            </div>
+        </section>
+
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
             <span class="close-btn">&times;</span>
@@ -222,6 +250,91 @@
                 'Driver Gender': ['Male', 'Female']
             },
         };
+
+        let yearlyPredictionChart = null;
+
+        function showPredictionSection() {
+            document.querySelectorAll('.main-content > *:not(#prediction-section):not(#image-modal)').forEach(el => el.style.display = 'none');
+            const section = document.getElementById('prediction-section');
+            section.style.display = 'block';
+            section.classList.add('active');
+            section.scrollIntoView({ behavior: 'smooth' });
+
+            if (!yearlyPredictionChart) {
+                const ctx = document.getElementById('yearlyPredictionChart').getContext('2d');
+                yearlyPredictionChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['2020', '2021', '2022', '2023 (Predicted)'],
+                        datasets: [{
+                            label: 'Road Accidents Per Year',
+                            data: [0, 0, 392, 92],
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                            borderWidth: 6,
+                            pointBackgroundColor: ['#3498db', '#3498db', '#3498db', '#e74c3c'],
+                            pointRadius: [8, 8, 8, 16],
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 1800 },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                min: 0,
+                                max: 160,
+                                ticks: { stepSize: 10, font: { size: 14 } },
+                                title: { display: true, text: 'Number of Accidents', font: { size: 16, weight: 'bold' } }
+                            },
+                            x: { title: { display: true, text: 'Year', font: { size: 16, weight: 'bold' } } }
+                        },
+                        plugins: { title: { display: true, text: 'Road Accident Trend & 2023 Forecast', font: { size: 22 } } }
+                    }
+                });
+
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.prediction && res.prediction.includes('%')) {
+                            const prob = parseFloat(res.prediction.match(/(\d+\.\d+)%/)[1]);
+                            const count = Math.round((prob / 100) * 150);
+                            yearlyPredictionChart.data.datasets[0].data[3] = count;
+                            yearlyPredictionChart.options.plugins.title.text = `2023 Forecast (${prob.toFixed(1)}% Risk)`;
+                            yearlyPredictionChart.update();
+                        }
+                    });
+            } else {
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.prediction && res.prediction.includes('%')) {
+                            const prob = parseFloat(res.prediction.match(/(\d+\.\d+)%/)[1]);
+                            const count = Math.round((prob / 100) * 150);
+                            yearlyPredictionChart.data.datasets[0].data[3] = count;
+                            yearlyPredictionChart.options.plugins.title.text = `2023 Forecast (${prob.toFixed(1)}% Risk)`;
+                            yearlyPredictionChart.update();
+                        }
+                    });
+            }
+        }
+
+        function showMainContent() {
+            document.querySelectorAll('.main-content > *:not(#prediction-section):not(#image-modal)').forEach(el => el.style.display = 'block');
+            document.getElementById('prediction-section').style.display = 'none';
+        }
+
+        document.getElementById('prediction-link').addEventListener('click', e => {
+            e.preventDefault();
+            showPredictionSection();
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('prediction-section').style.display = 'none';
+        });
 
         const liveAlerts = new Map();
         const recentAlerts = new Map();

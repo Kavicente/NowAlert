@@ -1507,8 +1507,9 @@ def handle_cdrrmo_response_submitted(data):
 
     # === 3. Emit to CDRRMO room ===
     municipality = data.get('municipality', 'unknown').lower()
+    # DO NOT send prediction text → keep it hidden
     emit('cdrrmo_response', data, room=f"cdrrmo_{municipality}")
-    logger.info(f"CDRRMO prediction emitted: {data['prediction']} to room cdrrmo_{municipality}")
+    logger.info(f"CDRRMO response emitted (prediction hidden from alert card)")
 
 
 @socketio.on('pnp_response')
@@ -1591,8 +1592,9 @@ def handle_pnp_response_submitted(data):
 
     # === 3. Emit to PNP room ===
     municipality = data.get('municipality', 'unknown').lower()
+    # DO NOT send prediction text → keep it hidden
     emit('pnp_response', data, room=f"pnp_{municipality}")
-    logger.info(f"PNP prediction emitted: {data['prediction']} to room pnp_{municipality}")
+    logger.info(f"PNP response emitted (prediction hidden from alert card)")
 
 @socketio.on('pnp_fire_submitted')
 def handle_pnp_fire_submitted(data):
