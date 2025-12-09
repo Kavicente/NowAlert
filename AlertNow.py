@@ -1028,9 +1028,13 @@ TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1
 @app.route('/get_latest_prediction')
 def get_latest_prediction():
     conn = get_db_connection()
-    result = conn.execute("SELECT prediction FROM barangay_response ORDER BY timestamp DESC LIMIT 1").fetchone()
+    result = conn.execute('''
+        SELECT prediction FROM barangay_response 
+        WHERE prediction IS NOT NULL AND prediction LIKE '%2023%'
+        ORDER BY timestamp DESC LIMIT 1
+    ''').fetchone()
     conn.close()
-    return jsonify({'prediction': result['prediction'] if result else 'No prediction yet'})
+    return jsonify({'prediction': result[0] if result else 'No prediction available'})
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1093,23 +1097,26 @@ def handle_barangay_response_submitted(data):
             if arima_pred is None:
                 raise Exception("ARIMA model not loaded")
 
+            # Forecast for the year 2023 (one step ahead from last known data)
             forecast = arima_pred.forecast(steps=1)
-            predicted_count = float(forecast.iloc[0])
-            historical_avg = 45  # Adjust based on your data
-            probability = min(98, max(10, (predicted_count / historical_avg) * 100))
+            predicted_accidents_2023 = float(forecast.iloc[0])
+            
+            # Historical reference (adjust based on your data; here we assume max yearly ~100 accidents)
+            historical_max_yearly = 100
+            probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
+            
+            # Generate prediction message
+            prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
+            data['prediction'] = prediction_text
 
-            data['prediction'] = f"In 2023, there is a {probability:.1f}% chance another road accident will occur"
-
-            # Save prediction to DB
-            conn = get_db_connection()
-            conn.execute("UPDATE barangay_response SET prediction = ? WHERE alert_id = ?", 
-                        (data['prediction'], data['alert_id']))
-            conn.commit()
-            conn.close()
+            # Save prediction to database
+            extracted_data['prediction'] = prediction_text
 
         except Exception as e:
             logger.error(f"Yearly ARIMA Prediction failed: {e}")
-            data['prediction'] = "Yearly prediction unavailable"
+            prediction_text = "Yearly forecast unavailable"
+            data['prediction'] = prediction_text
+            extracted_data['prediction'] = prediction_text
     except Exception as e:
         logger.error(f"DB Error: {e}")
         if 'conn' in locals():
@@ -1175,6 +1182,7 @@ def handle_barangay_fire_submitted(data):
         # === PREDICTION — NOW 100% COMPATIBLE WITH YOUR MODEL ===
         try:
             if not fire_accident_predictor:
+# sourcery skip: raise-specific-error
                 raise Exception("Fire model not loaded")
 
             input_data = {
@@ -1935,7 +1943,7 @@ def handle_health_response(data):
 
 
 @socketio.on('hospital_response')
-def handle_hospital_response(data):
+def handle_hospital_response(data):  # sourcery skip: low-code-quality  # sourcery skip: low-code-quality
     try:
         conn = get_db_connection()  # Create new connection
         c = conn.cursor()
