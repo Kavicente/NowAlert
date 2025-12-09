@@ -1097,26 +1097,22 @@ def handle_barangay_response_submitted(data):
             if arima_pred is None:
                 raise Exception("ARIMA model not loaded")
 
-            # Forecast for the year 2023 (one step ahead from last known data)
             forecast = arima_pred.forecast(steps=1)
             predicted_accidents_2023 = float(forecast.iloc[0])
             
-            # Historical reference (adjust based on your data; here we assume max yearly ~100 accidents)
             historical_max_yearly = 100
             probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
             
-            # Generate prediction message
+            # ONLY store in DB — NO emission to frontend alert cards
             prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
-            data['prediction'] = prediction_text
-
-            # Save prediction to database
             extracted_data['prediction'] = prediction_text
+
+            # DO NOT put in data['prediction'] → prevents display in alert cards
+            # data['prediction'] = prediction_text  ← REMOVED INTENTIONALLY
 
         except Exception as e:
             logger.error(f"Yearly ARIMA Prediction failed: {e}")
-            prediction_text = "Yearly forecast unavailable"
-            data['prediction'] = prediction_text
-            extracted_data['prediction'] = prediction_text
+            extracted_data['prediction'] = "Yearly forecast unavailable"
     except Exception as e:
         logger.error(f"DB Error: {e}")
         if 'conn' in locals():
