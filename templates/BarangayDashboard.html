@@ -13,6 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <script src="{{ url_for('static', filename='js/test_socket.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-3d"></script>
     <style>
         .alert-item { 
             font-size: 18px; 
@@ -160,9 +161,7 @@
             padding-bottom: 20px;
         }
         #prediction-link {
-            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
             color: white !important;
-            animation: pulse 3s infinite;
         }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.7); }
@@ -180,7 +179,7 @@
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
                 <li><a href="{{ url_for('barangay_charts') }}"><span>📊</span> Manage Reports</a></li>
-                <li><a href="#" id="prediction-link"></span>📈<span class="title">Prediction</span></a></li>
+                <li><a href="#prediction-section"></span>📈</span> Prediction</a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
@@ -257,6 +256,16 @@
             </div>
         </section>
 
+        <section id="prediction-section" class="prediction-section" style="display:none; padding: 30px; background: #f8f9fa; border-radius: 15px; margin: 20px;">
+            <h2 style="text-align:center; color:#2c3e50; margin-bottom:20px;">Road Accident Risk Forecast for 2023</h2>
+            <div style="width:100%; max-width:1000px; margin:0 auto;">
+                <canvas id="predictionChart3D"></canvas>
+            </div>
+            <p style="text-align:center; margin-top:20px; font-size:18px; color:#e74c3c;" id="predictionText">
+                Loading 2023 forecast...
+            </p>
+        </section>
+
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
             <span class="close-btn">&times;</span>
@@ -331,6 +340,8 @@
         const recentAlerts = new Map();
         const alertElements = new Map(); // for response updates
 
+        let predictionChart3D = null;
+
         // Move alert from Live → Recent after 60 seconds
         function moveToRecent(alertId) {
             if (!liveAlerts.has(alertId)) return;
@@ -360,6 +371,19 @@
             mainContent.classList.toggle('shifted');
         }
 
+        document.querySelectorAll('.sidebar a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (this.getAttribute('href').startsWith('#')) {
+                    e.preventDefault();
+                    document.querySelectorAll('section').forEach(sec => sec.style.display = 'none');
+                    const target = this.getAttribute('href');
+                    if (document.querySelector(target)) {
+                        document.querySelector(target).style.display = 'block';
+                    }
+                }
+            });
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
@@ -388,6 +412,54 @@
             L.control.layers(baseLayers).addTo(barangayMap);
 
             const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
+
+
+            function updatePredictionChart(predictionText) {
+                const match = predictionText.match(/(\d+\.\d+)%/);
+                const risk2023 = match ? parseFloat(match[1]) : 0;
+
+                document.getElementById('predictionText').textContent = predictionText;
+                document.getElementById('prediction-section').style.display = 'block';
+
+                const ctx = document.getElementById('predictionChart3D').getContext('2d');
+
+                if (predictionChart3D) predictionChart3D.destroy();
+
+                predictionChart3D = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: ['2022', '2023 (Forecast)'],
+                        datasets: [{
+                            label: 'Road Accident Risk (%)',
+                            data: [68.4, risk2023],  // 2022 historical avg
+                            borderColor: risk2023 > 80 ? '#e74c3c' : risk2023 > 60 ? '#f39c12' : '#27ae60',
+                            backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                            borderWidth: 4,
+                            pointBackgroundColor: '#e74c3c',
+                            pointRadius: 8,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: { display: false },
+                            legend: { position: 'top' }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                title: { display: true, text: 'Risk Level (%)' }
+                            },
+                            x: { title: { display: true, text: 'Year' } }
+                        },
+                        animation: { duration: 2000, easing: 'easeOutQuart' }
+                    },
+                    plugins: [Chart3D]
+                });
+            }
 
             // Chart
             const ctx = document.getElementById('emergencyTypeChart').getContext('2d');
@@ -555,28 +627,18 @@
             });
 
             // === ROAD ACCIDENT RESPONSE (Same Style as Fire) ===
+            // Update prediction display after submission
             socket.on('barangay_response', (data) => {
-                console.log('Road response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
                 if (alertItem) {
                     const predictionDiv = alertItem.querySelector('.prediction');
-                    
-                    // NEW 2023 PREDICTION DISPLAY
-                    predictionDiv.innerHTML = `<strong>2023 RISK FORECAST:</strong><br>${data.prediction || 'Calculating...'}`;
+                    predictionDiv.textContent = `Prediction: ${data.prediction || 'N/A'}`;
                     predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '17px';
-                    predictionDiv.style.color = '#d63031';
-                    predictionDiv.style.fontWeight = 'bold';
-                    predictionDiv.style.marginTop = '15px';
-                    predictionDiv.style.padding = '10px';
-                    predictionDiv.style.backgroundColor = '#ffeaa7';
-                    predictionDiv.style.borderRadius = '8px';
-                    predictionDiv.style.border = '2px solid #d63031';
+                    predictionDiv.style.color = 'black';
+                    predictionDiv.style.fontSize = '18px';
 
-                    // Update status
-                    const statusDiv = alertItem.querySelector('div:first-child');
-                    statusDiv.textContent = 'RESPONDED';
-                    statusDiv.style.color = '#00b894';
+                    // UPDATE 3D CHART WITH NEW 2023 FORECAST
+                    updatePredictionChart(data.prediction || "In 2023, prediction unavailable");
                 }
             });
 

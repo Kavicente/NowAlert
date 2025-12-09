@@ -1088,25 +1088,24 @@ def handle_barangay_response_submitted(data):
             if arima_pred is None:
                 raise Exception("ARIMA model not loaded")
 
-            # Forecast full year ahead → pick a random day in 2023
-            forecast = arima_pred.forecast(steps=365)
-            random_day_index = np.random.randint(0, len(forecast)-1)
-            predicted_count = float(forecast.iloc[random_day_index])
-            predicted_count = max(1.0, predicted_count)
+            # Forecast entire 2023 (365 days ahead)
+            forecast_steps = 365
+            forecast = arima_pred.forecast(steps=forecast_steps)
+            yearly_risk = forecast.mean()  # Average risk over 2023
 
-            # Convert to % chance
-            base_prob = (predicted_count / 8.0) * 100
-            final_prob = min(98.9, base_prob + np.random.uniform(10, 35))
+            historical_max = 12  # Adjust based on your data
+            risk_2023_pct = min(98.9, (yearly_risk / historical_max) * 100)
 
-            data['prediction'] = f"In 2023, there is a {final_prob:.1f}% chance another road accident will occur"
+            data['prediction'] = f"In 2023, there is a {risk_2023_pct:.1f}% chance another road accident will occur"
 
-            # SAVE TO DB — BEFORE CLOSING CONNECTION
-            conn.execute('UPDATE barangay_response SET prediction = ? WHERE alert_id = ?',
+            # SAVE TO DB
+            conn = get_db_connection()
+            conn.execute('UPDATE barangay_response SET prediction = ? WHERE alert_id = ?', 
                         (data['prediction'], data['alert_id']))
             conn.commit()
 
         except Exception as e:
-            logger.error(f"2023 Prediction failed: {e}")
+            logger.error(f"ARIMA 2023 Forecast failed: {e}")
             data['prediction'] = "2023 forecast unavailable"
     except Exception as e:
         logger.error(f"DB Error: {e}")
