@@ -1126,7 +1126,7 @@ def handle_barangay_response_submitted(data):
     # === 3. Emit ===
     barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
-    logger.info(f"Barangay arima prediction emitted: {data['prediction']}")
+    logger.info(f"Barangay arima prediction emitted: {prediction_text}")
 
 
 @socketio.on('barangay_fire_submitted')
