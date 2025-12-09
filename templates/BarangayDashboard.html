@@ -313,6 +313,17 @@
     </main>
 
     <script>
+
+        const CURRENT_SECTION_KEY = 'current_barangay_section';
+
+        function saveCurrentSection(section) {
+            localStorage.setItem(CURRENT_SECTION_KEY, section);
+        }
+
+        function getCurrentSection() {
+            return localStorage.getItem(CURRENT_SECTION_KEY) || 'dashboard';
+        }
+
         let menuData = {
             'Road Accident': {
                 'Road Accident Cause': ['Head-on Collision', 'Rear-end Collision', 'Side-impact Collision', 'Single Vehicle Accident', 'Pedestrian Accident'],
@@ -390,6 +401,8 @@
             section.classList.add('active');
             section.scrollIntoView({ behavior: 'smooth' });
 
+            saveCurrentSection('prediction'); // Remember user is here
+
             if (!yearlyPredictionChart) {
                 const ctx = document.getElementById('yearlyPredictionChart').getContext('2d');
                 yearlyPredictionChart = new Chart(ctx, {
@@ -398,76 +411,103 @@
                         labels: ['2020', '2021', '2022', '2023 (Predicted)'],
                         datasets: [{
                             label: 'Road Accidents Per Year',
-                            data: [45, 68, 92, null],
+                            data: [45, 68, 92, 92],
                             borderColor: '#e74c3c',
                             backgroundColor: 'rgba(231, 76, 60, 0.2)',
                             borderWidth: 7,
                             pointBackgroundColor: ['#3498db', '#3498db', '#3498db', '#e74c3c'],
-                            pointRadius: 8,
-                            pointHoverRadius: 12,
+                            pointBorderColor: '#ffffff',
+                            pointBorderWidth: 4,
+                            pointRadius: [8, 8, 8, 16],
+                            pointHoverRadius: [10, 10, 10, 20],
                             tension: 0.4,
                             fill: true
                         }]
-                        },
+                    },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        animation: { duration: 1800, easing: 'easeOutQuart' },
                         scales: {
                             y: {
                                 beginAtZero: true,
                                 min: 0,
-                                max: 160,                    // NEW: Cap the scale
-                                ticks: {
-                                    stepSize: 10,            // NEW: Show every 10
-                                    callback: function(value) {
-                                        return value;        // Show actual numbers
-                                    }
-                                },
-                                title: { display: true, text: 'Number of Accidents' }
+                                max: 160,
+                                ticks: { stepSize: 10, font: { size: 14 } },
+                                title: { display: true, text: 'Number of Accidents', font: { size: 16, weight: 'bold' } }
                             },
-                            x: { title: { display: true, text: 'Year' } }
+                            x: { title: { display: true, text: 'Year', font: { size: 16, weight: 'bold' } } }
                         },
                         plugins: {
-                            title: { display: true, text: 'Road Accident Trend & 2023 Forecast', font: { size: 20 } },
-                            legend: { position: 'top' }
-                        },
-                        animation: { duration: 2000 }
+                            title: {
+                                display: true,
+                                text: 'Road Accident Trend & 2023 Forecast',
+                                font: { size: 22, weight: 'bold' },
+                                padding: 20
+                            },
+                            legend: { position: 'top', labels: { font: { size: 16 } } }
+                        }
                     }
                 });
-            }
-        }
 
+                // Load latest prediction
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(res => {
                         if (res.prediction && res.prediction.includes('%')) {
                             const match = res.prediction.match(/(\d+\.\d+)%/);
                             const probability = match ? parseFloat(match[1]) : 50;
+                            const predictedCount = Math.round((probability / 100) * 150);
 
-                            // CRITICAL FIX: Scale properly so even low % shows movement
-                            // We assume max possible accidents = 150 → makes 1.5% = ~2.25 → visible!
-                            const predictedAccidents = (probability / 100) * 150;
-
-                            // Update the 2023 point
-                            yearlyPredictionChart.data.datasets[0].data[3] = predictedAccidents;
-                            yearlyPredictionChart.update();
-
-                            // Optional: Show the % on the chart title
+                            yearlyPredictionChart.data.datasets[0].data[3] = predictedCount;
                             yearlyPredictionChart.options.plugins.title.text = 
                                 `Road Accident Trend & 2023 Forecast (${probability.toFixed(1)}% Risk)`;
                             yearlyPredictionChart.update();
                         }
-                    })
-                    .catch(err => console.error("Failed to load prediction:", err));
-                
+                    });
+            } else {
+                // Chart exists → just refresh data
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.prediction && res.prediction.includes('%')) {
+                            const match = res.prediction.match(/(\d+\.\d+)%/);
+                            const probability = match ? parseFloat(match[1]) : 50;
+                            const predictedCount = Math.round((probability / 100) * 150);
+
+                            yearlyPredictionChart.data.datasets[0].data[3] = predictedCount;
+                            yearlyPredictionChart.options.plugins.title.text = 
+                                `Road Accident Trend & 2023 Forecast (${probability.toFixed(1)}% Risk)`;
+                            yearlyPredictionChart.update();
+                        }
+                    });
+            }
+        }
 
         function showDashboard() {
             document.querySelectorAll('.main-content > *:not(#prediction-section):not(#notification):not(#image-modal)').forEach(el => {
                 el.style.display = 'block';
             });
             document.getElementById('prediction-section').style.display = 'none';
+            document.getElementById('prediction-section').classList.remove('active');
+            saveCurrentSection('dashboard'); // Remember user is back
         }
 
+        // === ON PAGE LOAD: Restore the correct section ===
+        document.addEventListener('DOMContentLoaded', () => {
+            const currentSection = getCurrentSection();
+
+            if (currentSection === 'prediction') {
+                showPredictionSection();
+            } else {
+                showDashboard();
+            }
+
+            // Hide prediction section by default (safety)
+            document.getElementById('prediction-section').style.display = 'none';
+        });
+
+        // === Click handlers ===
         document.getElementById('prediction-link').addEventListener('click', (e) => {
             e.preventDefault();
             showPredictionSection();
