@@ -1067,6 +1067,9 @@ def handle_barangay_response_submitted(data):
         extracted_data['timestamp'] = now.strftime('%Y-%m-%d %H:%M:%S')
         extracted_data['responded'] = True
 
+        # Default prediction text (in case ARIMA fails)
+        prediction_text = "Yearly forecast unavailable"
+
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO barangay_response (
@@ -1090,30 +1093,27 @@ def handle_barangay_response_submitted(data):
         ))
         conn.commit()
 
-    
-
-    # === 2. ARIMA REAL-TIME FORECAST ===
+        # === 2. ARIMA YEARLY FORECAST (2023) ===
         try:
             if arima_pred is None:
                 raise Exception("ARIMA model not loaded")
 
             forecast = arima_pred.forecast(steps=1)
             predicted_accidents_2023 = float(forecast.iloc[0])
-            
             historical_max_yearly = 100
             probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
             
-            # ONLY store in DB — NO emission to frontend alert cards
             prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
-            extracted_data['prediction'] = prediction_text
-
-            # DO NOT add to data[] → prevents display in alert cards
-            # data['prediction'] = prediction_text   ← REMOVED ON PURPOSE
 
         except Exception as e:
             logger.error(f"Yearly ARIMA Prediction failed: {e}")
             prediction_text = "Yearly forecast unavailable"
-            extracted_data['prediction'] = prediction_text
+
+        # Save prediction to DB only
+        extracted_data['prediction'] = prediction_text
+
+        # DO NOT add prediction to `data` → no display in alert cards
+
     except Exception as e:
         logger.error(f"DB Error: {e}")
         if 'conn' in locals():
@@ -1121,11 +1121,12 @@ def handle_barangay_response_submitted(data):
     finally:
         if 'conn' in locals():
             conn.close()
-    
 
     # === 3. Emit ===
     barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
+    
+    # FIXED: Use prediction_text instead of data['prediction']
     logger.info(f"Barangay arima prediction emitted: {prediction_text}")
 
 
