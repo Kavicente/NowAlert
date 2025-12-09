@@ -18,7 +18,7 @@ import uuid
 import random
 from models import (road_accident_predictor, 
                     fire_accident_predictor, crime_predictor, 
-                    health_predictor, birth_predictor)
+                    health_predictor, birth_predictor, arima_pred)
 from AgencyIn import send_dilg_password
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import (get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, 
@@ -40,6 +40,7 @@ from HealthCharts import health_charts, health_charts_data
 from HospitalCharts import hospital_charts, hospital_charts_data
 from dataset import road_accident_df, fire_incident_df, health_emergencies_df, crime_df
 import smtplib
+import joblib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from google.oauth2 import service_account
@@ -1024,6 +1025,8 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1 year']
 
+
+
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
     logger.info(f"Barangay response received: {data}")
@@ -1074,69 +1077,9 @@ def handle_barangay_response_submitted(data):
             'Yes' if str(data.get('SUSPECTS Alcohol Used','')).strip().lower() == 'yes' else 'No',
             now.hour,
             now.weekday(),
-            extracted_data['barangay'].lower().replace(' ', '*') if extracted_data['barangay'] else 'unknown'
+            extracted_data['barangay'].lower().replace(' ', '_') if extracted_data['barangay'] else 'unknown'
         ))
         conn.commit()
-
-        # === 2. GENERATE HIGH, RANDOM, REALISTIC PREDICTION USING FULL DATA ===
-        try:
-            if not road_accident_predictor:
-                raise Exception("Model not loaded")
-
-            # USE ALL FORM FIELDS — THIS GIVES HIGH, ACCURATE PREDICTIONS
-            input_data = {
-                'BARANGAY': extracted_data['barangay'],
-                'Road_Accident_Type': extracted_data['road_accident_type'],
-                'Accident_Cause': extracted_data['road_accident_cause'],
-                'Weather_Condition': extracted_data['weather'],
-                'Road_Condition': extracted_data['road_condition'],
-                'Vehicle_Type': extracted_data['vehicle_type'],
-                'Driver_Age': extracted_data['driver_age'],
-                'Driver_Gender': extracted_data['driver_gender'],
-                'Alcohol': 1 if str(data.get('SUSPECTS Alcohol Used','')).strip().lower() == 'yes' else 0,
-                'Hour': now.hour,
-                'Weekday': now.weekday(),
-                'Year': now.year
-            }
-
-            input_df = pd.DataFrame([input_data])
-
-            # Match exact model columns
-            model_columns = [
-                'Year', 'BARANGAY', 'Road_Accident_Type', 'Accident_Cause',
-                'Weather_Condition', 'Road_Condition', 'Vehicle_Type',
-                'Driver_Age', 'Driver_Gender', 'Alcohol', 'Hour', 'Weekday'
-            ]
-            for col in model_columns:
-                if col not in input_df.columns:
-                    input_df[col] = 0
-            input_df = input_df[model_columns]
-
-            # Get strong prediction
-            prob = road_accident_predictor.predict_proba(input_df)[0][1] * 100
-
-            # RANDOM HIGH % + RANDOM TIME RANGE
-            base_prob = prob
-            random_boost = random.uniform(15, 45)  # Makes it feel dynamic and high
-            final_prob = min(98.9, base_prob + random_boost)  # Never 100%
-
-            time_range = random.choice([
-                "A Week", "1-2 Weeks", "2-3 Weeks", "4-5 Weeks",
-                "A Month", "1-2 Months", "2-3 Months", "4-5 Months"
-            ])
-
-            emergency = data.get('emergency_type', 'Road Accident')
-            final_prediction = f"There Will Be A {final_prob:.1f}% chance of another {emergency} Again Within {time_range}"
-            data['prediction'] = final_prediction
-
-            # SAVE TO DB — ONE TRUE PREDICTION
-            conn.execute('UPDATE barangay_response SET prediction = ? WHERE alert_id = ?', 
-                        (final_prediction, data['alert_id']))
-            conn.commit()
-
-        except Exception as e:
-            logger.error(f"Prediction failed: {e}")
-            data['prediction'] = "Prediction unavailable"
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
@@ -1146,10 +1089,44 @@ def handle_barangay_response_submitted(data):
         if 'conn' in locals():
             conn.close()
 
+    # === 2. ARIMA REAL-TIME FORECAST ===
+    try:
+        if not arima_pred:
+            raise Exception("ARIMA model not loaded")
+
+        now_ph = datetime.now(pytz.timezone('Asia/Manila'))
+        current_hour = now_ph.hour
+
+        # Define 2-hour window
+        start_hour = current_hour
+        end_hour = (current_hour + 2) % 24
+        if end_hour <= start_hour:
+            window = f"{start_hour:02d}:00 – {end_hour:02d}:00 (next day)"
+        else:
+            window = f"{start_hour:02d}:00 – {end_hour:02d}:00"
+
+        # Forecast next 2 hours
+        forecast = arima_pred.forecast(steps=2)
+        risk_now = float(forecast.iloc[0])
+        risk_next = float(forecast.iloc[1])
+        
+        # Normalize to % (adjust historical_max based on your data)
+        historical_max = 8  # Change this to your real max accidents per hour
+        prob_now = min(98, (risk_now / historical_max) * 100)
+        prob_next = min(98, (risk_next / historical_max) * 100)
+        avg_prob = (prob_now + prob_next) / 2
+
+        # Final message
+        data['prediction'] = f"This time coverage ({window}) has {avg_prob:.1f}% chance of road accident"
+
+    except Exception as e:
+        logger.error(f"ARIMA Prediction failed: {e}")
+        data['prediction'] = "Real-time forecast unavailable"
+
     # === 3. Emit ===
     barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
-    logger.info(f"Barangay HIGH prediction emitted: {data['prediction']}")
+    logger.info(f"Barangay arima prediction emitted: {data['prediction']}")
 
 
 @socketio.on('barangay_fire_submitted')
