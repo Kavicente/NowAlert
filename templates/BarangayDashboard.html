@@ -313,17 +313,6 @@
     </main>
 
     <script>
-
-        const CURRENT_SECTION_KEY = 'current_barangay_section';
-
-        function saveCurrentSection(section) {
-            localStorage.setItem(CURRENT_SECTION_KEY, section);
-        }
-
-        function getCurrentSection() {
-            return localStorage.getItem(CURRENT_SECTION_KEY) || 'dashboard';
-        }
-
         let menuData = {
             'Road Accident': {
                 'Road Accident Cause': ['Head-on Collision', 'Rear-end Collision', 'Side-impact Collision', 'Single Vehicle Accident', 'Pedestrian Accident'],
@@ -393,6 +382,7 @@
         let yearlyPredictionChart = null;
 
         function showPredictionSection() {
+            // Hide everything except prediction section
             document.querySelectorAll('.main-content > *:not(#prediction-section):not(#notification):not(#image-modal)').forEach(el => {
                 el.style.display = 'none';
             });
@@ -401,8 +391,7 @@
             section.classList.add('active');
             section.scrollIntoView({ behavior: 'smooth' });
 
-            saveCurrentSection('prediction'); // Remember user is here
-
+            // Create chart only once
             if (!yearlyPredictionChart) {
                 const ctx = document.getElementById('yearlyPredictionChart').getContext('2d');
                 yearlyPredictionChart = new Chart(ctx, {
@@ -411,10 +400,10 @@
                         labels: ['2020', '2021', '2022', '2023 (Predicted)'],
                         datasets: [{
                             label: 'Road Accidents Per Year',
-                            data: [45, 68, 92, 92],
+                            data: [45, 68, 92, 92],  // Start with 2022 value so line doesn't drop to 0
                             borderColor: '#e74c3c',
                             backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                            borderWidth: 7,
+                            borderWidth: 6,
                             pointBackgroundColor: ['#3498db', '#3498db', '#3498db', '#e74c3c'],
                             pointBorderColor: '#ffffff',
                             pointBorderWidth: 4,
@@ -427,7 +416,10 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: { duration: 1800, easing: 'easeOutQuart' },
+                        animation: {
+                            duration: 1800,
+                            easing: 'easeOutQuart'
+                        },
                         scales: {
                             y: {
                                 beginAtZero: true,
@@ -450,7 +442,7 @@
                     }
                 });
 
-                // Load latest prediction
+                // Load latest prediction and animate the 2023 point
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(res => {
@@ -459,14 +451,20 @@
                             const probability = match ? parseFloat(match[1]) : 50;
                             const predictedCount = Math.round((probability / 100) * 150);
 
+                            // This is what makes it MOVE
                             yearlyPredictionChart.data.datasets[0].data[3] = predictedCount;
                             yearlyPredictionChart.options.plugins.title.text = 
                                 `Road Accident Trend & 2023 Forecast (${probability.toFixed(1)}% Risk)`;
-                            yearlyPredictionChart.update();
+                            yearlyPredictionChart.update();  // Triggers smooth animation
                         }
+                    })
+                    .catch(err => {
+                        console.error("Prediction fetch failed:", err);
+                        yearlyPredictionChart.data.datasets[0].data[3] = 95;
+                        yearlyPredictionChart.update();
                     });
             } else {
-                // Chart exists → just refresh data
+                // Chart already exists → just refresh the data (this triggers movement again!)
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(res => {
@@ -478,36 +476,20 @@
                             yearlyPredictionChart.data.datasets[0].data[3] = predictedCount;
                             yearlyPredictionChart.options.plugins.title.text = 
                                 `Road Accident Trend & 2023 Forecast (${probability.toFixed(1)}% Risk)`;
-                            yearlyPredictionChart.update();
+                            yearlyPredictionChart.update();  // This makes it jump again!
                         }
                     });
             }
         }
+                
 
         function showDashboard() {
             document.querySelectorAll('.main-content > *:not(#prediction-section):not(#notification):not(#image-modal)').forEach(el => {
                 el.style.display = 'block';
             });
             document.getElementById('prediction-section').style.display = 'none';
-            document.getElementById('prediction-section').classList.remove('active');
-            saveCurrentSection('dashboard'); // Remember user is back
         }
 
-        // === ON PAGE LOAD: Restore the correct section ===
-        document.addEventListener('DOMContentLoaded', () => {
-            const currentSection = getCurrentSection();
-
-            if (currentSection === 'prediction') {
-                showPredictionSection();
-            } else {
-                showDashboard();
-            }
-
-            // Hide prediction section by default (safety)
-            document.getElementById('prediction-section').style.display = 'none';
-        });
-
-        // === Click handlers ===
         document.getElementById('prediction-link').addEventListener('click', (e) => {
             e.preventDefault();
             showPredictionSection();
