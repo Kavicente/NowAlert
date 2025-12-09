@@ -159,6 +159,11 @@
             min-height: 320px;
             padding-bottom: 20px;
         }
+        #prediction-link {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white !important;
+            animation: pulse 3s infinite;
+        }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.7); }
             70% { box-shadow: 0 0 0 15px rgba(255,0,0,0); }
@@ -175,6 +180,7 @@
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
                 <li><a href="{{ url_for('barangay_charts') }}"><span>📊</span> Manage Reports</a></li>
+                <li><a href="#" id="prediction-link"></span>📈<span class="title">Prediction</span></a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
@@ -550,26 +556,28 @@
 
             // === ROAD ACCIDENT RESPONSE (Same Style as Fire) ===
             socket.on('barangay_response', (data) => {
-                console.log('Road accident response:', data);
-
+                console.log('Road response submitted:', data);
                 const alertItem = alertElements.get(data.alert_id);
-                if (!alertItem) return;
+                if (alertItem) {
+                    const predictionDiv = alertItem.querySelector('.prediction');
+                    
+                    // NEW 2023 PREDICTION DISPLAY
+                    predictionDiv.innerHTML = `<strong>2023 RISK FORECAST:</strong><br>${data.prediction || 'Calculating...'}`;
+                    predictionDiv.style.display = 'block';
+                    predictionDiv.style.fontSize = '17px';
+                    predictionDiv.style.color = '#d63031';
+                    predictionDiv.style.fontWeight = 'bold';
+                    predictionDiv.style.marginTop = '15px';
+                    predictionDiv.style.padding = '10px';
+                    predictionDiv.style.backgroundColor = '#ffeaa7';
+                    predictionDiv.style.borderRadius = '8px';
+                    predictionDiv.style.border = '2px solid #d63031';
 
-                const predictionDiv = alertItem.querySelector('.prediction');
-                if (!predictionDiv) return;
-
-                let msg = data.prediction || "No forecast available";
-
-                // Beautiful real-time display
-                predictionDiv.innerHTML = `
-                    <div style="background:#fff3cd; padding:16px; border-radius:12px; padding:16px; margin:10px 0; border-left:6px solid #ffc107; font-family:Arial;">
-                        <strong>REAL-TIME RISK FORECAST</strong><br>
-                        <span style="font-size:24px; color:#d32f2f; font-weight:bold;">
-                            ${msg}
-                        </span>
-                    </div>
-                `;
-                predictionDiv.style.display = 'block';
+                    // Update status
+                    const statusDiv = alertItem.querySelector('div:first-child');
+                    statusDiv.textContent = 'RESPONDED';
+                    statusDiv.style.color = '#00b894';
+                }
             });
 
             socket.on('barangay_fire_submitted', (data) => {
