@@ -1025,7 +1025,12 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1 year']
 
-
+@app.route('/get_latest_prediction')
+def get_latest_prediction():
+    conn = get_db_connection()
+    result = conn.execute("SELECT prediction FROM barangay_response ORDER BY timestamp DESC LIMIT 1").fetchone()
+    conn.close()
+    return jsonify({'prediction': result['prediction'] if result else 'No prediction yet'})
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1088,25 +1093,23 @@ def handle_barangay_response_submitted(data):
             if arima_pred is None:
                 raise Exception("ARIMA model not loaded")
 
-            # Forecast entire 2023 (365 days ahead)
-            forecast_steps = 365
-            forecast = arima_pred.forecast(steps=forecast_steps)
-            yearly_risk = forecast.mean()  # Average risk over 2023
+            forecast = arima_pred.forecast(steps=1)
+            predicted_count = float(forecast.iloc[0])
+            historical_avg = 45  # Adjust based on your data
+            probability = min(98, max(10, (predicted_count / historical_avg) * 100))
 
-            historical_max = 12  # Adjust based on your data
-            risk_2023_pct = min(98.9, (yearly_risk / historical_max) * 100)
+            data['prediction'] = f"In 2023, there is a {probability:.1f}% chance another road accident will occur"
 
-            data['prediction'] = f"In 2023, there is a {risk_2023_pct:.1f}% chance another road accident will occur"
-
-            # SAVE TO DB
+            # Save prediction to DB
             conn = get_db_connection()
-            conn.execute('UPDATE barangay_response SET prediction = ? WHERE alert_id = ?', 
+            conn.execute("UPDATE barangay_response SET prediction = ? WHERE alert_id = ?", 
                         (data['prediction'], data['alert_id']))
             conn.commit()
+            conn.close()
 
         except Exception as e:
-            logger.error(f"ARIMA 2023 Forecast failed: {e}")
-            data['prediction'] = "2023 forecast unavailable"
+            logger.error(f"Yearly ARIMA Prediction failed: {e}")
+            data['prediction'] = "Yearly prediction unavailable"
     except Exception as e:
         logger.error(f"DB Error: {e}")
         if 'conn' in locals():
