@@ -413,7 +413,18 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         scales: {
-                            y: { beginAtZero: true, title: { display: true, text: 'Number of Accidents' } },
+                            y: {
+                                beginAtZero: true,
+                                min: 0,
+                                max: 160,                    // NEW: Cap the scale
+                                ticks: {
+                                    stepSize: 10,            // NEW: Show every 10
+                                    callback: function(value) {
+                                        return value;        // Show actual numbers
+                                    }
+                                },
+                                title: { display: true, text: 'Number of Accidents' }
+                            },
                             x: { title: { display: true, text: 'Year' } }
                         },
                         plugins: {
@@ -428,15 +439,26 @@
 
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
-                    .then(data => {
-                        if (data.prediction && data.prediction.includes('%')) {
-                            const match = data.prediction.match(/(\d+\.\d+)%/);
-                            const prob = match ? parseFloat(match[1]) : 65;
-                            const predictedCount = Math.round((prob / 100) * 130);
-                            yearlyPredictionChart.data.datasets[0].data[3] = predictedCount;
+                    .then(res => {
+                        if (res.prediction && res.prediction.includes('%')) {
+                            const match = res.prediction.match(/(\d+\.\d+)%/);
+                            const probability = match ? parseFloat(match[1]) : 50;
+
+                            // CRITICAL FIX: Scale properly so even low % shows movement
+                            // We assume max possible accidents = 150 → makes 1.5% = ~2.25 → visible!
+                            const predictedAccidents = (probability / 100) * 150;
+
+                            // Update the 2023 point
+                            yearlyPredictionChart.data.datasets[0].data[3] = predictedAccidents;
+                            yearlyPredictionChart.update();
+
+                            // Optional: Show the % on the chart title
+                            yearlyPredictionChart.options.plugins.title.text = 
+                                `Road Accident Trend & 2023 Forecast (${probability.toFixed(1)}% Risk)`;
                             yearlyPredictionChart.update();
                         }
-                    });
+                    })
+                    .catch(err => console.error("Failed to load prediction:", err));
                 
 
         function showDashboard() {
