@@ -423,6 +423,8 @@
                         animation: { duration: 2000 }
                     }
                 });
+            }
+        }
 
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
@@ -435,6 +437,7 @@
                             yearlyPredictionChart.update();
                         }
                     });
+                
 
         function showDashboard() {
             document.querySelectorAll('.main-content > *:not(#prediction-section):not(#notification):not(#image-modal)').forEach(el => {
