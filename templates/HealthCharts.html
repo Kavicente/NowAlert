@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Health Charts - {{ barangay }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/hcharts.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+    <header>
+        <h1>Health Charts</h1>
+        <p id="datetime">{{ current_datetime }}</p>
+    </header>
+    <div class="sidebar" id="sidebar">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('health_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('health_charts') }}">Charts</a></li>
+            </ul>
+        </nav>
+    </div>
+    <main class="main-content" id="mainContent">
+        <div class="tabs">
+            <button class="tab active" onclick="filterData('today')">Today</button>
+            <button class="tab" onclick="filterData('daily')">Daily</button>
+            <button class="tab" onclick="filterData('weekly')">Weekly</button>
+            <button class="tab" onclick="filterData('monthly')">Monthly</button>
+            <button class="tab" onclick="filterData('yearly')">Yearly</button>
+        </div>
+
+        <div class="dropdown-container">
+            <label for="barangayDropdown">Select Barangay: </label>
+            <select id="barangayDropdown" onchange="jumpToBarangay()">
+                <option value="">Select a Barangay</option>
+                {% for barangay in barangays %}
+                <option value="{{ barangay | replace(' ', '-') }}">{{ barangay }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div id="chartSection" class="section">
+            {% for barangay in barangays %}
+            <div class="barangay-section" id="barangay-{{ barangay | replace(' ', '-') }}">
+                <h2>{{ barangay }} Emergency Health Reports</h2>
+                <div class="chart-grid">
+                    <div class="chart-container"><h2>Health Emergency Type Chart</h2><canvas id="healthTypeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Health Emergency Cause Chart</h2><canvas id="healthCauseChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Weather Chart</h2><canvas id="weatherChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Patient Age Chart</h2><canvas id="patientAgeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Patient Gender Chart</h2><canvas id="patientGenderChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+    <script>
+        const socket = io.connect('https://alertnow-cgre.onrender.com');
+        let charts = {};
+
+        function jumpToBarangay() {
+            const dropdown = document.getElementById('barangayDropdown');
+            const barangayId = dropdown.value;
+            if (barangayId) {
+                const section = document.getElementById(`barangay-${barangayId}`);
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
+        function initCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            charts[`${safeBarangay}-healthTypeChart`] = new Chart(document.getElementById(`healthTypeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.health_type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-healthCauseChart`] = new Chart(document.getElementById(`healthCauseChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.health_cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-weatherChart`] = new Chart(document.getElementById(`weatherChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-patientAgeChart`] = new Chart(document.getElementById(`patientAgeChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.patient_age, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-patientGenderChart`] = new Chart(document.getElementById(`patientGenderChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.patient_gender, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+        }
+
+        function updateCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            if (charts[`${safeBarangay}-healthTypeChart`]) {
+                charts[`${safeBarangay}-healthTypeChart`].data = data.health_type;
+                charts[`${safeBarangay}-healthCauseChart`].data = data.health_cause;
+                charts[`${safeBarangay}-weatherChart`].data = data.weather;
+                charts[`${safeBarangay}-patientAgeChart`].data = data.patient_age;
+                charts[`${safeBarangay}-patientGenderChart`].data = data.patient_gender;
+                Object.keys(charts).filter(key => key.startsWith(safeBarangay)).forEach(key => charts[key].update());
+            } else {
+                initCharts(barangay, data);
+            }
+        }
+
+        socket.on('health_response_update', (data) => {
+            const timeFilter = document.querySelector('.tabs:not(.hospital-tabs) .tab.active').textContent.toLowerCase();
+            if (timeFilter === 'today') {
+                fetchCharts(timeFilter, data.barangay);
+            }
+        });
+
+        function filterData(timeFilter) {
+            document.querySelectorAll('.tabs:not(.hospital-tabs) .tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tabs:not(.hospital-tabs) .tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            fetchCharts(timeFilter);
+        }
+
+        function fetchCharts(timeFilter, barangay = null) {
+            const barangays = {{ barangays | tojson }};
+            barangays.forEach(b => {
+                fetch(`/health_charts_data?time_filter=${timeFilter}&barangay=${encodeURIComponent(b)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const safeBarangay = b.replace(/\s+/g, '-');
+                        if (charts[`${safeBarangay}-healthTypeChart`]) {
+                            Object.keys(charts).filter(key => key.startsWith(safeBarangay)).forEach(key => charts[key].destroy());
+                        }
+                        initCharts(b, data);
+                    });
+            });
+        }
+
+        window.onload = () => {
+            filterData('today');
+        };
+    </script>
+</body>
+</html>

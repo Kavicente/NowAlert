@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>BFP Charts</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo/alertnow.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fcharts.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+    <header>
+        <h1>BFP Charts</h1>
+        <p id="datetime">{{ current_datetime }}</p>
+    </header>
+    <div class="sidebar" id="sidebar">
+        <nav>
+            <ul>
+                <li><a href="{{ url_for('bfp_dashboard') }}">Dashboard</a></li>
+                <li><a href="{{ url_for('bfp_charts') }}">Charts</a></li>
+                <li><a href="#" onclick="showSection('fire')">Fire Incident Reports</a></li>
+            </ul>
+        </nav>
+    </div>
+    <main class="main-content" id="mainContent">
+        <div class="tabs">
+            <button class="tab active" onclick="filterData('today')">Today</button>
+            <button class="tab" onclick="filterData('daily')">Daily</button>
+            <button class="tab" onclick="filterData('weekly')">Weekly</button>
+            <button class="tab" onclick="filterData('monthly')">Monthly</button>
+            <button class="tab" onclick="filterData('yearly')">Yearly</button>
+        </div>
+        <div class="dropdown-container">
+            <label for="barangayDropdown">Select Barangay: </label>
+            <select id="barangayDropdown" onchange="jumpToBarangay()">
+                <option value="">Select a Barangay</option>
+                {% for barangay in barangays %}
+                <option value="{{ barangay | replace(' ', '-') }}">{{ barangay }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div id="fireSection" class="section" style="display: block;">
+            {% for barangay in barangays %}
+            <div class="barangay-section" id="fire-barangay-{{ barangay | replace(' ', '-') }}">
+                <h2>{{ barangay }} Fire Incident Reports</h2>
+                <div class="chart-grid">
+                    <div class="chart-container"><h2>Fire Cause Chart</h2><canvas id="fireCauseChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Fire Type Chart</h2><canvas id="fireTypeChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Weather Chart</h2><canvas id="fireWeatherChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                    <div class="chart-container"><h2>Fire Severity Chart</h2><canvas id="fireSeverityChart-{{ barangay | replace(' ', '-') }}"></canvas></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+    <script>
+        const socket = io.connect('https://alertnow-wi0n.onrender.com');
+        let charts = {};
+        let currentSection = 'fire';
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            sidebar.classList.toggle('active');
+            mainContent.classList.toggle('shifted');
+        }
+
+        function showSection(section) {
+            document.getElementById('fireSection').style.display = section === 'fire' ? 'block' : 'none';
+            currentSection = section;
+            filterData('today');
+        }
+
+        function jumpToBarangay() {
+            const dropdown = document.getElementById('barangayDropdown');
+            const barangayId = dropdown.value;
+            if (barangayId) {
+                const section = document.getElementById(`fire-barangay-${barangayId}`);
+                if (section) {
+                    section.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
+
+        function initFireCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            charts[`${safeBarangay}-fireCauseChart`] = new Chart(document.getElementById(`fireCauseChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.cause, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-fireTypeChart`] = new Chart(document.getElementById(`fireTypeChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.type, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-fireWeatherChart`] = new Chart(document.getElementById(`fireWeatherChart-${safeBarangay}`).getContext('2d'), { type: 'doughnut', data: data.weather, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+            charts[`${safeBarangay}-fireSeverityChart`] = new Chart(document.getElementById(`fireSeverityChart-${safeBarangay}`).getContext('2d'), { type: 'pie', data: data.severity, options: { responsive: true, plugins: { legend: { labels: { color: 'white' } }, title: { color: 'white' } } } });
+        }
+
+        function updateFireCharts(barangay, data) {
+            const safeBarangay = barangay.replace(/\s+/g, '-');
+            charts[`${safeBarangay}-fireCauseChart`].data = data.cause;
+            charts[`${safeBarangay}-fireTypeChart`].data = data.type;
+            charts[`${safeBarangay}-fireWeatherChart`].data = data.weather;
+            charts[`${safeBarangay}-fireSeverityChart`].data = data.severity;
+            Object.keys(charts).filter(key => key.startsWith(`${safeBarangay}-fire`)).forEach(key => charts[key].update());
+        }
+
+        socket.on('bfp_charts_response_update', (data) => {
+            if (currentSection === 'fire' && document.querySelector('.tab.active').textContent.toLowerCase() === 'today') {
+                updateFireCharts(data.barangay, data);
+            }
+        });
+
+        function filterData(timeFilter) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelector(`.tab[onclick="filterData('${timeFilter}')"]`).classList.add('active');
+            const barangay = document.getElementById('barangayDropdown').value.replace(/-/g, ' ') || '{{ barangays[0] }}';
+            fetch(`/bfp_charts_data?time_filter=${timeFilter}&barangay=${barangay}`)
+                .then(response => response.json())
+                .then(data => {
+                    Object.keys(charts).forEach(key => charts[key].destroy());
+                    charts = {};
+                    initFireCharts(barangay, data);
+                });
+        }
+
+        function initCharts(barangay, data) {
+            initFireCharts(barangay, data);
+        }
+
+        window.onload = () => {
+            showSection('fire');
+            filterData('today');
+        };
+    </script>
+</body>
+</html>
