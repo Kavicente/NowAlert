@@ -1041,43 +1041,60 @@ def handle_barangay_response_submitted(data):
     logger.info(f"Barangay response received: {data}")
     data['timestamp'] = datetime.now(pytz.timezone('Asia/Manila')).strftime('%Y-%m-%d %H:%M:%S')
 
-    # === 1. Save to DB ===
+    # === 1. Extract data ===
+    field_mappings = {
+        'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
+        'road_accident_cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
+        'road_accident_type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
+        'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
+        'road_conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
+        'vehicle_types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
+        'driver_ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},
+        'driver_gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
+        'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
+        'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
+        'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
+        'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
+    }
+
+    extracted_data = {}
+    for key, mapping in field_mappings.items():
+        val = data.get(key)
+        extracted_data[mapping['db_column']] = mapping['type'](val) if val is not None else mapping['default']
+
+    now = datetime.now(pytz.timezone('Asia/Manila'))
+    extracted_data['timestamp'] = now.strftime('%Y-%m-%d %H:%M:%S')
+    extracted_data['responded'] = True
+
+    # === 2. Generate ARIMA Prediction FIRST ===
+    prediction_text = "Yearly forecast unavailable"
     try:
-        field_mappings = {
-            'alert_id': {'db_column': 'alert_id', 'default': str(uuid.uuid4()), 'type': str},
-            'road_accident_cause': {'db_column': 'road_accident_cause', 'default': 'Head-on Collision', 'type': str},
-            'road_accident_type': {'db_column': 'road_accident_type', 'default': 'Overspeeding', 'type': str},
-            'weather_conditions': {'db_column': 'weather', 'default': 'Sunny', 'type': str},
-            'road_conditions': {'db_column': 'road_condition', 'default': 'Dry', 'type': str},
-            'vehicle_types': {'db_column': 'vehicle_type', 'default': 'Car', 'type': str},
-            'driver_ages': {'db_column': 'driver_age', 'default': '26-35', 'type': str},
-            'driver_gender': {'db_column': 'driver_gender', 'default': 'Male', 'type': str},
-            'lat': {'db_column': 'lat', 'default': 0.0, 'type': float},
-            'lon': {'db_column': 'lon', 'default': 0.0, 'type': float},
-            'barangay': {'db_column': 'barangay', 'default': 'Unknown', 'type': str},
-            'emergency_type': {'db_column': 'emergency_type', 'default': 'Road Accident', 'type': str}
-        }
+        if arima_pred is None:
+            raise Exception("ARIMA model not loaded")
 
-        extracted_data = {}
-        for key, mapping in field_mappings.items():
-            val = data.get(key)
-            extracted_data[mapping['db_column']] = mapping['type'](val) if val is not None else mapping['default']
+        forecast = arima_pred.forecast(steps=1)
+        predicted_accidents_2023 = float(forecast.iloc[0])
+        historical_max_yearly = 100
+        probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
+        prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
 
-        now = datetime.now(pytz.timezone('Asia/Manila'))
-        extracted_data['timestamp'] = now.strftime('%Y-%m-%d %H:%M:%S')
-        extracted_data['responded'] = True
+    except Exception as e:
+        logger.error(f"Yearly ARIMA Prediction failed: {e}")
 
-        # Default prediction text (in case ARIMA fails)
-        prediction_text = "Yearly forecast unavailable"
+    # CRITICAL: Save prediction to extracted_data BEFORE INSERT
+    extracted_data['prediction'] = prediction_text
 
+    # === 3. Now save to DB (including prediction column) ===
+    try:
         conn = get_db_connection()
         conn.execute('''
             INSERT INTO barangay_response (
                 alert_id, road_accident_cause, road_accident_type, weather, 
                 road_condition, vehicle_type, driver_age, driver_gender, 
                 lat, lon, barangay, emergency_type, timestamp, responded,
-                alcohol_used, incident_hour, incident_weekday, barangay_clean
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                alcohol_used, incident_hour, incident_weekday, barangay_clean,
+                prediction
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             extracted_data['alert_id'], extracted_data['road_accident_cause'],
             extracted_data['road_accident_type'], extracted_data['weather'],
@@ -1089,30 +1106,11 @@ def handle_barangay_response_submitted(data):
             'Yes' if str(data.get('SUSPECTS Alcohol Used','')).strip().lower() == 'yes' else 'No',
             now.hour,
             now.weekday(),
-            extracted_data['barangay'].lower().replace(' ', '_') if extracted_data['barangay'] else 'unknown'
+            extracted_data['barangay'].lower().replace(' ', '_') if extracted_data['barangay'] else 'unknown',
+            extracted_data['prediction']  # THIS IS NOW INCLUDED
         ))
         conn.commit()
-
-        # === 2. ARIMA YEARLY FORECAST (2023) ===
-        try:
-            if arima_pred is None:
-                raise Exception("ARIMA model not loaded")
-
-            forecast = arima_pred.forecast(steps=1)
-            predicted_accidents_2023 = float(forecast.iloc[0])
-            historical_max_yearly = 100
-            probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
-            
-            prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
-
-        except Exception as e:
-            logger.error(f"Yearly ARIMA Prediction failed: {e}")
-            prediction_text = "Yearly forecast unavailable"
-
-        # Save prediction to DB only
-        extracted_data['prediction'] = prediction_text
-
-        # DO NOT add prediction to `data` → no display in alert cards
+        logger.info(f"Prediction saved to DB: {prediction_text}")
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
@@ -1122,12 +1120,10 @@ def handle_barangay_response_submitted(data):
         if 'conn' in locals():
             conn.close()
 
-    # === 3. Emit ===
+    # === 4. Emit response (NO prediction in data → no text shown in alert cards) ===
     barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
-    
-    # FIXED: Use prediction_text instead of data['prediction']
-    logger.info(f"Barangay arima prediction emitted: {prediction_text}")
+    logger.info(f"Barangay response emitted (prediction hidden from UI)")
 
 
 @socketio.on('barangay_fire_submitted')
