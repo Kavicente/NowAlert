@@ -528,10 +528,10 @@
                 const full2023Count = Math.round((full / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // Chart 1: Full Year
+                // Chart 1: Full Year Forecast
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
-                    yearlyPredictionChart.options.plugins.title.text = fullText;
+                    yearlyPredictionChart.options.plugins.title.text = `2023 Full Year Risk: ${full.toFixed(1)}%`;
                     yearlyPredictionChart.update();
                 }
 
@@ -540,7 +540,7 @@
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => Math.round(v * (full2023Count / 92)));
                     monthlyComparisonChart.data.datasets[1].data = monthly2023;
-                    monthlyComparisonChart.options.plugins.title.text = `2023 Monthly: ${full.toFixed(1)}% Risk`;
+                    monthlyComparisonChart.options.plugins.title.text = `2023 Monthly Risk: ${full.toFixed(1)}%`;
                     monthlyComparisonChart.update();
                 }
 
@@ -549,25 +549,43 @@
                     const baseJulDec2022 = [42,45,41,36,33,30];
                     const forecastJulDec = baseJulDec2022.map(v => Math.round(v * (julDec2023Count / 75)));
                     julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
-                    julDecChart.options.plugins.title.text = julDecText;
+                    julDecChart.options.plugins.title.text = `July–Dec 2023 Risk: ${julDec.toFixed(1)}%`;
                     julDecChart.update();
                 }
             }
 
             function initializeCharts() {
+                // Chart 1: Full Year
                 yearlyPredictionChart = new Chart('yearlyPredictionChart', {
                     type: 'line',
                     data: {
                         labels: ['2020','2021','2022','2023 (Predicted)'],
                         datasets: [{
-                            label: 'Accidents', data: [45,68,92,92],
-                            borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)',
-                            tension: 0.4, fill: true
+                            label: 'Road Accidents',
+                            data: [45,68,92,92],
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231,76,60,0.2)',
+                            borderWidth: 7,
+                            tension: 0.4,
+                            fill: true
                         }]
                     },
-                    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1800 } }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 1800 },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '2023 Full Year Risk: Loading...',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50'
+                            }
+                        }
+                    }
                 });
 
+                // Chart 2: Monthly Full Year
                 monthlyComparisonChart = new Chart('monthlyComparisonChart', {
                     type: 'line',
                     data: {
@@ -577,9 +595,21 @@
                             { label: '2023 Forecast', data: [30,28,33,32,38,40,45,48,43,38,35,32], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: false }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '2023 Monthly Risk: Loading...',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50'
+                            }
+                        }
+                    }
                 });
 
+                // Chart 3: July–Dec Only
                 julDecChart = new Chart('julDecChart', {
                     type: 'line',
                     data: {
@@ -589,7 +619,18 @@
                             { label: '2023 Jul–Dec Forecast', data: [null,null,null,null,null,null,45,50,48,42,39,36], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)', fill: true }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: false }
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'July–Dec 2023 Risk: Loading...',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50'
+                            }
+                        }
+                    }
                 });
 
                 // Initial load
