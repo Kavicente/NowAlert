@@ -1125,9 +1125,7 @@ def handle_barangay_response_submitted(data):
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted (prediction hidden from UI)")
     
-    emit('update_prediction_charts', {
-        'prediction': prediction_text
-    }, broadcast=True)  # This goes to ALL connected clients
+    emit('update_prediction_charts', {'prediction': prediction_text}, broadcast=True)
 
     logger.info(f"Prediction broadcasted to all dashboards: {prediction_text}")
 
