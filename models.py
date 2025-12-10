@@ -5,6 +5,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
+arima_22 = None
+try:
+    arima_22 = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima_model_2022.pkl'))
+    logger.info("arima_model_2022.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("arima_model_22.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading arima_model_2022.pkl: {e}")
+
 arima_pred = None
 try:
     arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima_model.pkl'))

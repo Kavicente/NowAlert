@@ -18,7 +18,7 @@ import uuid
 import random
 from models import (road_accident_predictor, 
                     fire_accident_predictor, crime_predictor, 
-                    health_predictor, birth_predictor, arima_pred)
+                    health_predictor, birth_predictor, arima_pred, arima_22)
 from AgencyIn import send_dilg_password
 from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import (get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, 
@@ -1069,10 +1069,10 @@ def handle_barangay_response_submitted(data):
     # === 2. Generate ARIMA Prediction FIRST ===
     prediction_text = "Yearly forecast unavailable"
     try:
-        if arima_pred is None:
+        if arima_22 is None:
             raise Exception("ARIMA model not loaded")
 
-        forecast = arima_pred.forecast(steps=1)
+        forecast = arima_22.forecast(steps=1)
         predicted_accidents_2023 = float(forecast.iloc[0])
         historical_max_yearly = 100
         probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
