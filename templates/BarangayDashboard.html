@@ -435,7 +435,7 @@
 
             const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
 
-            initializeCharts();
+            
 
             // Chart
             const ctx = document.getElementById('emergencyTypeChart').getContext('2d');
@@ -490,6 +490,7 @@
             let yearlyPredictionChart = null;
             let monthlyComparisonChart = null;
 
+            initializeCharts();
             function updateChartsFromPrediction(predictionText) {
                 if (!predictionText || !predictionText.includes('%')) return;
 
