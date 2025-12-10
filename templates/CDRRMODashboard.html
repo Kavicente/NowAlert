@@ -154,7 +154,6 @@
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
                 <li><a href="{{ url_for('cdrrmo_charts') }}"><span>📊</span> Manage Reports</a></li>
-                <li><a href="#" id="prediction-link"></span>📈</span> Prediction</a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
@@ -197,6 +196,10 @@
                     <h4>Alerts Received Per Month</h4>
                     <canvas id="alertsPerMonthChart"></canvas>
                 </div>
+                <div class="chart-container">
+                    <h4>Road Accident Trend & Forecast</h4>
+                    <canvas id="yearlyPredictionChart"></canvas>
+                </div>
             </section>
         </div>
 
@@ -220,12 +223,6 @@
                     <input type="date" id="recent-date-filter">
                 </div>
                 <div id="recent-alert-container" class="alert-grid"></div>
-            </div>
-        </section>
-
-        <section id="prediction-section">
-            <div id="prediction-chart-container">
-                <canvas id="yearlyPredictionChart"></canvas>
             </div>
         </section>
 
@@ -253,14 +250,7 @@
 
         let yearlyPredictionChart = null;
 
-        function showPredictionSection() {
-            document.querySelectorAll('.main-content > *:not(#prediction-section):not(#image-modal)').forEach(el => el.style.display = 'none');
-            const section = document.getElementById('prediction-section');
-            section.style.display = 'block';
-            section.classList.add('active');
-            section.scrollIntoView({ behavior: 'smooth' });
-
-            if (!yearlyPredictionChart) {
+        function initializePredictionChart() {
                 const ctx = document.getElementById('yearlyPredictionChart').getContext('2d');
                 yearlyPredictionChart = new Chart(ctx, {
                     type: 'line',
@@ -307,71 +297,10 @@
                             yearlyPredictionChart.update();
                         }
                     });
-            } else {
-                fetch('/get_latest_prediction')
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.prediction && res.prediction.includes('%')) {
-                            const prob = parseFloat(res.prediction.match(/(\d+\.\d+)%/)[1]);
-                            const count = Math.round((prob / 100) * 150);
-                            yearlyPredictionChart.data.datasets[0].data[3] = count;
-                            yearlyPredictionChart.options.plugins.title.text = `2023 Forecast (${prob.toFixed(1)}% Risk)`;
-                            yearlyPredictionChart.update();
-                        }
-                    });
-            }
-        }
-
-        function showMainContent() {
-            document.querySelectorAll('.main-content > *:not(#prediction-section):not(#image-modal)').forEach(el => el.style.display = 'block');
-            document.getElementById('prediction-section').style.display = 'none';
-        }
-
-        document.getElementById('prediction-link').addEventListener('click', e => {
-            e.preventDefault();
-            showPredictionSection();
-        });
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('prediction-section').style.display = 'none';
-        });
-
-        const liveAlerts = new Map();
-        const recentAlerts = new Map();
-        const alertElements = new Map();
-
-        function moveToRecent(alertId) {
-            if (!liveAlerts.has(alertId)) return;
-            const { element } = liveAlerts.get(alertId);
-            liveAlerts.delete(alertId);
-            recentAlerts.set(alertId, { element, timestamp: Date.now() });
-
-            const statusDiv = element.querySelector('.alert-status');
-            statusDiv.textContent = 'RESPONDED';
-            statusDiv.className = 'alert-status status-expired';
-
-            document.getElementById('recent-alert-container')
-                    .insertBefore(element, document.getElementById('recent-alert-container').firstChild);
-        }
-
-        // Tab switching
-        document.querySelectorAll('.alert-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.alert-tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                tab.classList.add('active');
-                document.getElementById(tab.dataset.tab + '-alerts-tab').classList.add('active');
-            });
-        });
-
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const mainContent = document.getElementById('mainContent');
-            sidebar.classList.toggle('active');
-            mainContent.classList.toggle('shifted');
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            initializePredictionChart();
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';

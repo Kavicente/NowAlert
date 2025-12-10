@@ -188,6 +188,7 @@ main {
 .dashboard-container {
     display: flex; /* Horizontal flexbox */
     gap: 20px; /* Space between map and stats */
+    flex-wrap: wrap; /* Allow items to wrap */
     align-items: flex-start; /* Align top for consistency */
     margin-bottom: 20px; /* Space below the container */
     
@@ -235,11 +236,11 @@ main {
 .chart-container {
     background: #ffffff; 
     border-right: 4px solid #3498db; 
-    margin-left: 30px;
-    margin-top: 10px; /* Remove extra margins */
-    width: 90%; /* Full width within stat-item */
+    margin-top: 20px; /* Space below the map/stats row */
+    width: 100%; /* Full width to match map/stats row */
     height: 420px; /* As provided, adjusted to max-height */
     border-radius: 10px;
+    padding: 20px;
     
     
 }
@@ -392,41 +393,6 @@ canvas {
     margin-top: 10px;
     border-radius: 5px;
 }
-#prediction-section {
-        margin: 40px auto;
-        padding: 30px;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        max-width: 1000px;
-        text-align: center;
-        display: none;
-    }
-
-    #prediction-section.active {
-        display: block;
-    }
-
-    #prediction-chart-container {
-        height: 480px;              /* Increased height for clarity */
-        max-width: 900px;
-        margin: 30px auto;
-        padding: 20px;
-        background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-    }
-
-    .prediction-title h2 {
-        font-size: 28px;
-        color: #2c3e50;
-        margin-bottom: 10px;
-    }
-
-    .prediction-title p {
-        color: #7f8c8d;
-        font-size: 18px;
-    }
 
 .filters {
     background-color: #02CABA;

@@ -199,6 +199,7 @@ main {
 .dashboard-container {
     display: flex; /* Horizontal flexbox */
     gap: 20px; /* Space between map and stats */
+    flex-wrap: wrap; /* Allow items to wrap to the next line */
     align-items: flex-start; /* Align top for consistency */
     margin-bottom: 20px; /* Space below the container */
     
@@ -252,19 +253,21 @@ main {
 .chart-container {
     background: #ffffff; 
     border-right: 4px solid #3498db; 
-    margin-top: 50px; /* Remove extra margins */
+    margin-top: 20px; /* Space below the map/stats row */
     width: 100%; /* Full width within stat-item */
     height: 380px; /* As provided, adjusted to max-height */
     border-radius: 10px;
+    padding: 20px;
 }
-#emergencyTypeChart {
+
+#alertsPerMonthChart {
         width: 40% !important;
         height: 80% !important;
         transition: transform 0.3s ease;
         
     }
 #emergencyTypeChart:hoover {
-    background-color: #66c2ff;
+    background-color: #66c2ff; /* Typo: should be :hover */
     cursor: pointer;
     transform: scale(1.05); /* Slight zoom in on hover (5% scale up) */
 
@@ -531,12 +534,12 @@ canvas {
         height: 380px; /* As provided, adjusted to max-height */
         border-radius: 10px;
     }
-    .alert-tabs {
+    #prediction-section {
         display: flex;
         background: #f1f1f1;
         border-radius: 10px;
         overflow: hidden;
-        margin-bottom: 20px;
+        margin: 20px 0;
         width: fit-content;
     }
     .alert-tab {
@@ -557,17 +560,6 @@ canvas {
         display: block;
     }
     .date-filter {
-        margin-bottom: 15px;
-        padding: 10px;
-        font-size: 16px;
-        border-radius: 8px;
-        border: 1px solid #000;
-    }
-
-    #prediction-section {
-        margin: 40px auto;
-        padding: 30px;
-        background: white;
         border-radius: 15px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         max-width: 1000px;
@@ -579,10 +571,10 @@ canvas {
         display: block;
     }
 
-    #prediction-chart-container {
+    #yearly-prediction-chart-container {
         height: 480px;              /* Increased height for clarity */
         max-width: 900px;
-        margin: 30px auto;
+        margin: 20px auto;
         padding: 20px;
         background: #ffffff;
         border-radius: 16px;
@@ -614,7 +606,7 @@ canvas {
     .back-to-dashboard:hover {
         background: #2980b9;
     }
-    #yearlyPredictionChart{
+    #yearlyPredictionChart {
         width: 780px !important;
         height: 80% !important;
 
@@ -625,13 +617,13 @@ canvas {
             transition: transform 0.3s ease;
             
         }
-    #alertsPerMonthChart {
+    #emergencyTypeChart {
         width: 30% !important;
         height: 40% !important;
         
         
     }
-    #alertsPerMonthChart:hoover {
+    #emergencyTypeChart:hoover {
         background-color: #66c2ff;
         cursor: pointer;
         transform: scale(1.05); /* Slight zoom in on hover (5% scale up) */

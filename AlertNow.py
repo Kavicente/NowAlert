@@ -1124,6 +1124,9 @@ def handle_barangay_response_submitted(data):
     barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
     logger.info(f"Barangay response emitted (prediction hidden from UI)")
+    
+    emit('update_prediction_charts', {'prediction': prediction_text}, broadcast=True)
+    logger.info(f"Real-time chart update broadcasted: {prediction_text}")
 
 
 @socketio.on('barangay_fire_submitted')
