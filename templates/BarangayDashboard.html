@@ -507,7 +507,6 @@
             let monthlyComparisonChart = null;
             let julDecChart = null;
 
-            initializeCharts();
 
 
             function parsePrediction(full, julDec) {
@@ -518,6 +517,8 @@
                     julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 65
                 };
             }
+
+            
 
             function updateAllCharts(data) {
                 const fullText = data.full_year || "2023 Full Year: 50.0% risk";
@@ -602,10 +603,11 @@
             }
 
             // LIVE UPDATE FROM SERVER
-            const socket = io();
             socket.on('update_prediction_charts', (data) => {
                 updateAllCharts(data);
             });
+
+            initializeCharts();
 
             
 
