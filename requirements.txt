@@ -6,7 +6,7 @@ Flask-SocketIO==5.3.6
 gunicorn==22.0.0
 gevent==25.5.1
 joblib==1.4.2
-numpy==1.26.4
+numpy
 opencv-python==4.10.0.84
 pandas==2.2.3
 psycopg2-binary==2.9.9
