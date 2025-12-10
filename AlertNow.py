@@ -1066,25 +1066,37 @@ def handle_barangay_response_submitted(data):
     extracted_data['timestamp'] = now.strftime('%Y-%m-%d %H:%M:%S')
     extracted_data['responded'] = True
 
-    # === 2. Generate ARIMA Prediction FIRST ===
-    prediction_text = "Yearly forecast unavailable"
-    try:
-        if arima_22 is None:
-            raise Exception("ARIMA model not loaded")
+    # === 2. Generate TWO Predictions with Random Variation ===
+    full_year_text = "2023 Full Year: Forecast unavailable"
+    jul_dec_text = "July-Dec: Forecast unavailable"
 
-        forecast = arima_22.forecast(steps=1)
-        predicted_accidents_2023 = float(forecast.iloc[0])
-        historical_max_yearly = 100
-        probability_2023 = min(98, (predicted_accidents_2023 / historical_max_yearly) * 100)
-        prediction_text = f"In 2023, there is a {probability_2023:.1f}% chance another road accident will occur"
+    try:
+        # Full Year Prediction (arima_pred)
+        if arima_pred is not None:
+            forecast = arima_pred.forecast(steps=1)
+            predicted = float(forecast.iloc[0])
+            prob = min(98, (predicted / 100) * 100)
+            prob += random.uniform(-2.5, 3.8)
+            prob = max(10, min(98, prob))
+            full_year_text = f"2023 Full Year: {prob:.1f}% risk"
+
+        # July-Dec Prediction (arima_22)
+        if arima_22 is not None:
+            forecast = arima_22.forecast(steps=1)
+            predicted = float(forecast.iloc[0])
+            prob = min(98, (predicted / 60) * 100)
+            prob += random.uniform(-3.0, 4.5)
+            prob = max(15, min(98, prob))
+            jul_dec_text = f"July-Dec 2023: {prob:.1f}% risk"
 
     except Exception as e:
-        logger.error(f"Yearly ARIMA Prediction failed: {e}")
+        logger.error(f"ARIMA Prediction failed: {e}")
 
-    # CRITICAL: Save prediction to extracted_data BEFORE INSERT
-    extracted_data['prediction'] = prediction_text
+    # === COMBINE BOTH PREDICTIONS INTO ONE STRING FOR SINGLE COLUMN ===
+    combined_prediction = f"{full_year_text} | {jul_dec_text}"
+    extracted_data['prediction'] = combined_prediction
 
-    # === 3. Now save to DB (including prediction column) ===
+    # === 3. Save to DB using ONLY ONE COLUMN: prediction ===
     try:
         conn = get_db_connection()
         conn.execute('''
@@ -1107,10 +1119,10 @@ def handle_barangay_response_submitted(data):
             now.hour,
             now.weekday(),
             extracted_data['barangay'].lower().replace(' ', '_') if extracted_data['barangay'] else 'unknown',
-            extracted_data['prediction']  # THIS IS NOW INCLUDED
+            extracted_data['prediction']
         ))
         conn.commit()
-        logger.info(f"Prediction saved to DB: {prediction_text}")
+        logger.info(f"Combined prediction saved: {combined_prediction}")
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
@@ -1120,14 +1132,18 @@ def handle_barangay_response_submitted(data):
         if 'conn' in locals():
             conn.close()
 
-    # === 4. Emit response (NO prediction in data → no text shown in alert cards) ===
+    # === 4. Emit response (no prediction text in alert cards) ===
     barangay_room = f"barangay_{data.get('barangay', 'unknown').lower()}"
     emit('barangay_response', data, room=barangay_room)
-    logger.info(f"Barangay response emitted (prediction hidden from UI)")
-    
-    emit('update_prediction_charts', {'prediction': prediction_text}, broadcast=True)
+    logger.info("Barangay response emitted (prediction hidden from UI)")
 
-    logger.info(f"Prediction broadcasted to all dashboards: {prediction_text}")
+    # === 5. Broadcast both predictions to all dashboards ===
+    emit('update_prediction_charts', {
+        'full_year': full_year_text,
+        'jul_dec': jul_dec_text
+    }, broadcast=True)
+
+    logger.info(f"Live update sent → Full Year: {full_year_text} | Jul-Dec: {jul_dec_text}")
 
 
 @socketio.on('barangay_fire_submitted')
