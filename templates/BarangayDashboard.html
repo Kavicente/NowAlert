@@ -507,11 +507,11 @@
             let julDecChart = null;
 
             initializeCharts();
-            function parsePrediction(text) {
-                if (!text || typeof text !== 'string') return { full: 50, julDec: 65 };
-                const parts = text.split('|').map(p => p.trim());
-                const fullMatch = parts[0]?.match(/(\d+\.\d+)%/) || parts[0]?.match(/(\d+\.\d+)/);
-                const julDecMatch = parts[1]?.match(/(\d+\.\d+)%/) || parts[1]?.match(/(\d+\.\d+)/);
+
+
+            function parsePrediction(full, julDec) {
+                const fullMatch = full.match(/(\d+\.\d+)%/);
+                const julDecMatch = julDec.match(/(\d+\.\d+)%/);
                 return {
                     full: fullMatch ? parseFloat(fullMatch[1]) : 50,
                     julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 65
@@ -519,73 +519,54 @@
             }
 
             function updateAllCharts(data) {
-                const predictionText = data.prediction || data.prediction_full || "2023 Full Year: 50.0% risk | July-Dec 2023: 65.0% risk";
-                const { full, julDec } = parsePrediction(predictionText);
+                const fullText = data.full_year || "2023 Full Year: 50.0% risk";
+                const julDecText = data.jul_dec || "July-Dec 2023: 65.0% risk";
+                const { full, julDec } = parsePrediction(fullText, julDecText);
 
-                const full2023 = Math.round((full / 100) * 150);
-                const julDec2023 = Math.round((julDec / 100) * 90);
+                const full2023Count = Math.round((full / 100) * 150);
+                const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // Chart 1: Full Year Forecast
-                if (chart1) {
-                    chart1.data.datasets[0].data[3] = full2023;
-                    chart1.options.plugins.title.text = `2023 Full Year: ${full.toFixed(1)}% Risk`;
-                    chart1.update();
+                // Chart 1: Full Year
+                if (yearlyPredictionChart) {
+                    yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
+                    yearlyPredictionChart.options.plugins.title.text = fullText;
+                    yearlyPredictionChart.update();
                 }
 
-                // Chart 2: Monthly Full Year (2022 vs 2023)
-                if (chart2) {
+                // Chart 2: Monthly Full Year
+                if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
-                    const monthly2023 = base2022.map(v => Math.round(v * (full2023 / 92)));
-                    chart2.data.datasets[1].data = monthly2023;
-                    chart2.options.plugins.title.text = `2023 Monthly Forecast: ${full.toFixed(1)}% Risk`;
-                    chart2.update();
+                    const monthly2023 = base2022.map(v => Math.round(v * (full2023Count / 92)));
+                    monthlyComparisonChart.data.datasets[1].data = monthly2023;
+                    monthlyComparisonChart.options.plugins.title.text = `2023 Monthly: ${full.toFixed(1)}% Risk`;
+                    monthlyComparisonChart.update();
                 }
 
-                // Chart 3: July–Dec Only Forecast
-                if (chart3) {
-                    const baseJulDec2022 = [42, 45, 41, 36, 33, 30];
-                    const forecastJulDec2023 = baseJulDec2022.map(v => Math.round(v * (julDec2023 / 75)));
-
-                    chart3.data.datasets[1].data = [
-                        null, null, null, null, null, null,
-                        ...forecastJulDec2023
-                    ];
-                    chart3.options.plugins.title.text = `July–Dec 2023: ${julDec.toFixed(1)}% Risk`;
-                    chart3.update();
+                // Chart 3: July–Dec Only
+                if (julDecChart) {
+                    const baseJulDec2022 = [42,45,41,36,33,30];
+                    const forecastJulDec = baseJulDec2022.map(v => Math.round(v * (julDec2023Count / 75)));
+                    julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
+                    julDecChart.options.plugins.title.text = julDecText;
+                    julDecChart.update();
                 }
             }
 
             function initializeCharts() {
-                // Yearly Forecast Chart
-                const ctx1 = document.getElementById('yearlyPredictionChart').getContext('2d');
-                yearlyPredictionChart = new Chart(ctx1, {
+                yearlyPredictionChart = new Chart('yearlyPredictionChart', {
                     type: 'line',
                     data: {
-                        labels: ['2022', '2023 (Predicted)'],
+                        labels: ['2020','2021','2022','2023 (Predicted)'],
                         datasets: [{
-                            label: 'Road Accidents',
-                            data: [392, 2],
-                            borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231,76,60,0.2)',
-                            borderWidth: 7,
-                            pointBackgroundColor: ['#3498db','#3498db','#3498db','#e74c3c'],
-                            pointRadius: 12,
-                            tension: 0.4,
-                            fill: true
+                            label: 'Accidents', data: [45,68,92,92],
+                            borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)',
+                            tension: 0.4, fill: true
                         }]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: { duration: 2000 },
-                        plugins: { title: { display: true, text: '2023 Forecast: Loading...', font: { size: 20 } } },
-                        scales: { y: { beginAtZero: true, max: 160, ticks: { stepSize: 10 } } }
-                    }
+                    options: { responsive: true, maintainAspectRatio: false, animation: { duration: 1800 } }
                 });
 
-                // Monthly Comparison Chart
-                const ctx2 = document.getElementById('monthlyComparisonChart').getContext('2d');
-                monthlyComparisonChart = new Chart(ctx2, {
+                monthlyComparisonChart = new Chart('monthlyComparisonChart', {
                     type: 'line',
                     data: {
                         labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
@@ -594,59 +575,36 @@
                             { label: '2023 Forecast', data: [30,28,33,32,38,40,45,48,43,38,35,32], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true }
                         ]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: { duration: 1800 },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Monthly Road Accident Comparison (2022 vs 2023 Forecast)',
-                                font: { size: 26, weight: 'bold' },
-                                color: '#2c3e50',
-                                padding: 20
-                            },
-                            legend: { position: 'top', labels: { font: { size: 16 } } }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { font: { size: 16 }, color: '#2c3e50' },
-                                title: { display: true, text: 'Number of Accidents', font: { size: 18, weight: 'bold' } }
-                            },
-                            x: {
-                                ticks: {
-                                    font: { size: 20, weight: 'bold' },  // ← JAN, FEB, etc. NOW 20PX BOLD
-                                    color: '#2c3e50'
-                                },
-                                title: { display: true, text: 'Month', font: { size: 18, weight: 'bold' } },
-                                grid: { display: false }
-                            }
-                        }
-                    }
+                    options: { responsive: true, maintainAspectRatio: false }
                 });
 
-                chart3 = new Chart(document.getElementById('julDecChart'), {
+                julDecChart = new Chart('julDecChart', {
                     type: 'line',
                     data: {
                         labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
                         datasets: [
-                            { label: '2022 Jul–Dec', data: [28,32,35,30,40,38,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
-                            { label: '2023 Jul–Dec Forecast', data: [30,28,33,32,38,40,45,50,48,42,39,36], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)', fill: true }
+                            { label: '2022 Jul–Dec', data: [null,null,null,null,null,null,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
+                            { label: '2023 Jul–Dec Forecast', data: [null,null,null,null,null,null,45,50,48,42,39,36], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)', fill: true }
                         ]
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { title: { display: true, text: 'July–Dec 2023 Forecast', font: { size: 20 } } }
-                    }
+                    options: { responsive: true, maintainAspectRatio: false }
                 });
 
-                // Load initial prediction
+                // Initial load
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
-                    .then(data => updateChartsFromPrediction(data.prediction));
+                    .then(d => {
+                        const pred = d.prediction || "2023 Full Year: 50.0% risk | July-Dec 2023: 65.0% risk";
+                        const [full, jul] = pred.split('|').map(s => s.trim());
+                        updateAllCharts({ full_year: full, jul_dec: jul });
+                    });
             }
+
+            // LIVE UPDATE FROM SERVER
+            const socket = io();
+            socket.on('update_prediction_charts', (data) => {
+                updateAllCharts(data);
+            });
 
             
 
