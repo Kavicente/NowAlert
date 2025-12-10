@@ -1073,7 +1073,7 @@ def handle_barangay_response_submitted(data):
     try:
         # Full Year Prediction (arima_pred)
         if arima_pred is not None:
-            forecast = arima_pred.forecast(steps=1)
+            forecast = arima_22.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
             prob = min(98, (predicted / 100) * 100)
             prob += random.uniform(-2.5, 3.8)
