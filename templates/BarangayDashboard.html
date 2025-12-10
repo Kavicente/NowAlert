@@ -165,18 +165,34 @@
             100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
         }
         .prediction-charts-container {
-            display: flex; /* Show by default */
-            gap: 30px;
-            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            margin-top: 50px;
             width: 100%;
         }
-        .prediction-chart-wrapper {
-            flex: 1;
+
+        .chart-box {
+            width: 1250px;
+            height: 600px;
             background: white;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            height: 450px; /* Give a fixed height */
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 30px;
+            margin: 0 auto;
+        }
+
+        .chart-title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        #yearlyPredictionChart, #monthlyComparisonChart {
+            width: 100% !important;
+            height: 100% !important;
         }
     </style>
 </head>
@@ -215,6 +231,8 @@
 
         <div class="dashboard-container">
             <div id="map"></div>
+
+            
             <section class="stats">
                 <div class="stats-row">
                     <div class="stat-item">
@@ -265,15 +283,20 @@
             </div>
         </section>
 
-        <!-- Prediction Charts Section -->
-        <section class="prediction-charts-container">
-            <div class="prediction-chart-wrapper">
+        <div class="prediction-charts-container">
+            <div class="chart-box">
+                <div class="chart-title">Road Accident Trend & 2023 Forecast (ARIMA Model)</div>
                 <canvas id="yearlyPredictionChart"></canvas>
             </div>
-            <div class="prediction-chart-wrapper">
-                <canvas id="monthlyPredictionChart"></canvas>
+
+            <div class="chart-box">
+                <div class="chart-title">Monthly Road Accident Comparison (2022 vs 2023 Forecast)</div>
+                <canvas id="monthlyComparisonChart"></canvas>
             </div>
-        </section>
+        </div>
+
+        <!-- Prediction Charts Section -->
+        
 
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
@@ -383,6 +406,7 @@
         
 
         document.addEventListener('DOMContentLoaded', () => {
+            
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
@@ -411,7 +435,7 @@
 
             const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
 
-            
+            initializeCharts();
 
             // Chart
             const ctx = document.getElementById('emergencyTypeChart').getContext('2d');
@@ -463,13 +487,37 @@
                 emergencyTypeChart.update();
             });
 
-            let yearlyChart = null;
-            let monthlyChart = null;
+            let yearlyPredictionChart = null;
+            let monthlyComparisonChart = null;
 
-            function initCharts() {
-                // YEARLY CHART
+            function updateChartsFromPrediction(predictionText) {
+                if (!predictionText || !predictionText.includes('%')) return;
+
+                const match = predictionText.match(/(\d+\.\d+)%/);
+                const probability = match ? parseFloat(match[1]) : 50;
+                const predictedYearly = Math.round((probability / 100) * 150);
+
+                // Update Yearly Chart
+                if (yearlyPredictionChart) {
+                    yearlyPredictionChart.data.datasets[0].data[3] = predictedYearly;
+                    yearlyPredictionChart.options.plugins.title.text = `2023 Forecast: ${probability.toFixed(1)}% Risk`;
+                    yearlyPredictionChart.update();
+                }
+
+                // Update Monthly Chart — 2023 line extends from 2022 trend
+                if (monthlyComparisonChart) {
+                    const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
+                    const monthly2023 = base2022.map(val => Math.round(val * (predictedYearly / 92))); // scale from 2022 total
+                    monthlyComparisonChart.data.datasets[1].data = monthly2023;
+                    monthlyComparisonChart.options.plugins.title.text = `2023 Monthly Forecast (${probability.toFixed(1)}% Risk)`;
+                    monthlyComparisonChart.update();
+                }
+            }
+
+            function initializeCharts() {
+                // Yearly Forecast Chart
                 const ctx1 = document.getElementById('yearlyPredictionChart').getContext('2d');
-                yearlyChart = new Chart(ctx1, {
+                yearlyPredictionChart = new Chart(ctx1, {
                     type: 'line',
                     data: {
                         labels: ['2020', '2021', '2022', '2023 (Predicted)'],
@@ -477,13 +525,10 @@
                             label: 'Road Accidents',
                             data: [45, 68, 92, 92],
                             borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231, 76, 60, 0.25)',
-                            borderWidth: 8,
-                            pointBackgroundColor: ['#3498db', '#3498db', '#3498db', '#e74c3c'],
-                            pointBorderColor: '#fff',
-                            pointBorderWidth: 4,
-                            pointRadius: [10, 10, 10, 18],
-                            pointHoverRadius: 22,
+                            backgroundColor: 'rgba(231,76,60,0.2)',
+                            borderWidth: 7,
+                            pointBackgroundColor: ['#3498db','#3498db','#3498db','#e74c3c'],
+                            pointRadius: 12,
                             tension: 0.4,
                             fill: true
                         }]
@@ -491,55 +536,40 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: { duration: 2200, easing: 'easeOutQuart' },
-                        scales: { y: { beginAtZero: true, max: 500, ticks: { stepSize: 50 } } },
-                        plugins: { legend: { display: false } }
+                        animation: { duration: 2000 },
+                        plugins: { title: { display: true, text: '2023 Forecast: Loading...', font: { size: 24 } } },
+                        scales: { y: { beginAtZero: true, max: 160, ticks: { stepSize: 10 } } }
                     }
                 });
 
-                // MONTHLY CHART
-                const ctx2 = document.getElementById('monthlyPredictionChart').getContext('2d');
-                monthlyChart = new Chart(ctx2, {
+                // Monthly Comparison Chart
+                const ctx2 = document.getElementById('monthlyComparisonChart').getContext('2d');
+                monthlyComparisonChart = new Chart(ctx2, {
                     type: 'line',
                     data: {
                         labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
                         datasets: [
-                            { label: '2022', data: [28,32,35,30,40,38,42,45,41,36,33,30], borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', tension: 0.4 },
-                            { label: '2023 (Forecast)', data: [30,30,30,30,30,30,30,30,30,30,30,30], borderColor: '#e74c3c', borderWidth: 6, borderDash: [8,4], pointRadius: 8, tension: 0.4 }
+                            { label: '2022 Actual', data: [28,32,35,30,40,38,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
+                            { label: '2023 Forecast', data: [30,28,33,32,38,40,45,48,43,38,35,32], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true }
                         ]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        animation: { duration: 2000 },
-                        scales: { y: { beginAtZero: true, max: 80 } }
+                        plugins: { title: { display: true, text: '2023 Monthly Forecast', font: { size: 24 } } }
                     }
                 });
+
+                // Load initial prediction
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(data => updateChartsFromPrediction(data.prediction));
             }
 
-            function updateCharts(predictionText) {
-                if (!predictionText || !predictionText.includes('%')) return;
-                const prob = parseFloat(predictionText.match(/(\d+\.\d+)%/)?.[1]) || 50;
-
-                // Update Yearly Chart
-                const yearlyCount = Math.round((prob / 100) * 450);
-                yearlyChart.data.datasets[0].data[3] = yearlyCount;
-                yearlyChart.update();
-
-                // Update Monthly Chart - 2023 line rises above 2022
-                const base2022 = monthlyChart.data.datasets[0].data;
-                const forecast2023 = base2022.map(val => Math.round(val * (1 + prob/200)));
-                monthlyChart.data.datasets[1].data = forecast2023;
-                monthlyChart.update();
-            }
+            
 
             // Initial fetch for prediction data
-            fetch('/get_latest_prediction')
-                .then(r => r.json())
-                .then(res => {
-                    updateCharts(res.prediction);
-                })
-                .catch(err => console.error("Prediction fetch failed:", err));
+            
 
             socket.on('connect', () => {
                 console.log('Connected to server');
@@ -558,10 +588,6 @@
                     updateUIWithAlert(data);
                     notifyAlert(data);
                 }
-            });
-
-            socket.on('update_prediction_charts', (data) => {
-                updateCharts(data.prediction);
             });
 
             socket.on('update_dashboard_emergency_type', (data) => {
@@ -662,18 +688,10 @@
 
             // === ROAD ACCIDENT RESPONSE (Same Style as Fire) ===
             // Update prediction display after submission
-            socket.on('barangay_response', (data) => {
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const predictionDiv = alertItem.querySelector('.prediction');
-                    predictionDiv.textContent = `Prediction: ${data.prediction || 'N/A'}`;
-                    predictionDiv.style.display = 'block';
-                    predictionDiv.style.color = 'black';
-                    predictionDiv.style.fontSize = '18px';
-
-                    // UPDATE PREDICTION CHARTS WITH NEW FORECAST
-                    updatePredictionCharts(data.prediction);
-                }
+            socket.on('barangay_response', () => {
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(data => updateChartsFromPrediction(data.prediction));
             });
 
             socket.on('barangay_fire_submitted', (data) => {

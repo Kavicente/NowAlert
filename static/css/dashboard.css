@@ -498,29 +498,36 @@ canvas {
 
     /* Stats section */
 
-    .prediction-charts-container {
-        display: flex;
-        flex-direction: column;
-        gap: 40px;
-        margin-top: 50px;
-        width: 100%;
-    }
+.prediction-charts-container {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    margin-top: 50px;
+    width: 100%;
+}
 
-    .prediction-chart-wrapper {
-        background: white;
-        padding: 30px;
-        border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        height: 600px;
-    }
+.chart-box {
+    width: 1250px;
+    height: 600px;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    padding: 30px;
+    margin: 0 auto;
+}
 
-    .chart-title {
-        text-align: center;
-        font-size: 28px;
-        font-weight: bold;
-        color: #2c3e50;
-        margin-bottom: 20px;
-    }
+.chart-title {
+    text-align: center;
+    font-size: 28px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 20px;
+}
+
+#yearlyPredictionChart, #monthlyComparisonChart {
+    width: 100% !important;
+    height: 100% !important;
+}
     /* New: Row for Total Incidents and Responded */
     .stats-row {
         display: flex;
