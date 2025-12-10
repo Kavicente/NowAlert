@@ -528,7 +528,8 @@ canvas {
     }
 
     #yearlyPredictionChart,
-    #monthlyComparisonChart {
+    #monthlyComparisonChart,
+    #julDecChart {
         width: 100% !important;
         height: 100% !important;
         flex-grow: 1;
