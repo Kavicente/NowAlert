@@ -361,7 +361,7 @@ canvas {
     overflow-y: auto; 
     position: relative;
     left: -20px;
-    top: 20px;
+    top: 10px;
     background-color: #ffffff;
     border-radius: 20px;
     border: 1px solid #000000;
@@ -498,29 +498,41 @@ canvas {
 
     /* Stats section */
 
-.prediction-charts-container {
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-    margin-top: 50px;
-    width: 100%;
-}
+    .prediction-charts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-top: -10px;
+        margin: 50px auto;
+        max-width: 1700px;
+        padding: 0 20px;
+    }
 
-.prediction-chart-wrapper {
-    background: white;
-    padding: 30px;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    height: 600px;
-}
+    .chart-box {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        padding: 25px;
+        height: 420px;
+        display: flex;
+        flex-direction: column;
+    }
 
-.chart-title {
-    text-align: center;
-    font-size: 28px;
-    font-weight: bold;
-    color: #2c3e50;
-    margin-bottom: 20px;
-}
+    .chart-title {
+        text-align: center;
+        font-size: 22px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        flex-shrink: 0;
+    }
+
+    #yearlyPredictionChart,
+    #monthlyComparisonChart {
+        width: 100% !important;
+        height: 100% !important;
+        flex-grow: 1;
+    }
     /* New: Row for Total Incidents and Responded */
     .stats-row {
         display: flex;

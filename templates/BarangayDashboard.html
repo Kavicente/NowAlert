@@ -164,37 +164,42 @@
             70% { box-shadow: 0 0 0 15px rgba(255,0,0,0); }
             100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
         }
-        .prediction-charts-container {
-            display: flex;
-            flex-direction: column;
-            gap: 60px;
-            margin-top: 60px;
-            width: 100%;
+        .prediction-charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: -10px;
+            max-width: 1700px;
+            height: 420px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 0 20px;
         }
 
         .chart-box {
-            width: 1250px;
-            height: 600px;
             background: white;
             border-radius: 20px;
-            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
-            padding: 35px;
-            margin: 0 auto;
-            border: 3px solid #3498db;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 25px;
+            height: 420px;
+            display: flex;
+            flex-direction: column;
         }
 
         .chart-title {
             text-align: center;
-            font-size: 32px;
+            font-size: 20px;
             font-weight: bold;
             color: #2c3e50;
-            margin-bottom: 25px;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+            flex-shrink: 0;
         }
 
-        #yearlyPredictionChart, #monthlyComparisonChart {
+        #yearlyPredictionChart,
+        #monthlyComparisonChart {
             width: 100% !important;
             height: 100% !important;
+            flex-grow: 1;
         }
     </style>
 </head>
@@ -234,6 +239,8 @@
         <div class="dashboard-container">
             <div id="map"></div>
 
+
+
             
             <section class="stats">
                 <div class="stats-row">
@@ -259,6 +266,17 @@
                     <canvas id="emergencyTypeChart"></canvas>
                 </div>
             </section>
+
+            <div class="prediction-charts-grid">
+                <div class="chart-box">
+                    <div class="chart-title">Road Accident Trend & 2023 Forecast (ARIMA Model)</div>
+                    <canvas id="yearlyPredictionChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title"></div>
+                    <canvas id="monthlyComparisonChart"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- ALERTS SECTION WITH TABS -->
@@ -285,17 +303,7 @@
             </div>
         </section>
 
-        <div class="prediction-charts-container">
-            <div class="chart-box">
-                <div class="chart-title">Road Accident Trend & 2023 Forecast (ARIMA Model)</div>
-                <canvas id="yearlyPredictionChart"></canvas>
-            </div>
-
-            <div class="chart-box">
-                <div class="chart-title">Monthly Road Accident Comparison (2022 vs 2023 Forecast)</div>
-                <canvas id="monthlyComparisonChart"></canvas>
-            </div>
-        </div>
+        
 
         <!-- Prediction Charts Section -->
         
@@ -540,7 +548,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         animation: { duration: 2000 },
-                        plugins: { title: { display: true, text: '2023 Forecast: Loading...', font: { size: 24 } } },
+                        plugins: { title: { display: true, text: '2023 Forecast: Loading...', font: { size: 20 } } },
                         scales: { y: { beginAtZero: true, max: 160, ticks: { stepSize: 10 } } }
                     }
                 });
@@ -559,7 +567,32 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { title: { display: true, text: '2023 Monthly Forecast', font: { size: 24 } } }
+                        animation: { duration: 1800 },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Monthly Road Accident Comparison (2022 vs 2023 Forecast)',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50',
+                                padding: 20
+                            },
+                            legend: { position: 'top', labels: { font: { size: 16 } } }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { font: { size: 16 }, color: '#2c3e50' },
+                                title: { display: true, text: 'Number of Accidents', font: { size: 18, weight: 'bold' } }
+                            },
+                            x: {
+                                ticks: {
+                                    font: { size: 20, weight: 'bold' },  // ← JAN, FEB, etc. NOW 20PX BOLD
+                                    color: '#2c3e50'
+                                },
+                                title: { display: true, text: 'Month', font: { size: 18, weight: 'bold' } },
+                                grid: { display: false }
+                            }
+                        }
                     }
                 });
 
