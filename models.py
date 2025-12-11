@@ -17,12 +17,12 @@ except Exception as e:
 
 arima_pred = None
 try:
-    arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima_model.pkl'))
-    logger.info("arima_model.pkl loaded successfully.")
+    arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima70_15_15.pkl'))
+    logger.info("arima70_15_15.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("arima_model.pkl not found.")
+    logger.error("arima70_15_15.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading arima_model.pkl: {e}")
+    logger.error(f"Error loading arima70_15_15.pkl: {e}")
     
 # Load road accident model
 road_accident_predictor = None
