@@ -1073,11 +1073,11 @@ def handle_barangay_response_submitted(data):
     try:
         # Full Year Prediction — using arima_pred
         if arima_pred is not None:
-            forecast = arima_pred.predict(n_periods=1)  # ← pmdarima uses .predict()
+            forecast = arima_pred.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
             prob = min(98, (predicted / 100) * 100)
-            prob += random.uniform(-2.5, 3.8)
-            prob = max(10, min(98, prob))
+            prob += random.uniform(-4.0, 5.5)  # ← Larger random range for visible movement
+            prob = max(20, min(98, prob))      # ← Avoid too low/high
             full_year_text = f"2023 Full Year: {prob:.1f}% risk"
 
         # July–Dec Prediction — using arima_22
@@ -1085,7 +1085,7 @@ def handle_barangay_response_submitted(data):
             forecast = arima_22.predict(n_periods=1)  # ← ALSO .predict() for pmdarima!
             predicted = float(forecast.iloc[0])
             prob = min(98, (predicted / 60) * 100)  # July-Dec ≈ half year
-            prob += random.uniform(-3.0, 4.5)
+            prob += random.uniform(-5.0, 6.0)
             prob = max(15, min(98, prob))
             jul_dec_text = f"July-Dec 2023: {prob:.1f}% risk"
 
