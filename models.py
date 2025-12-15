@@ -4,7 +4,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
+arima_m = None
+try:
+    arima_m = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'monthly_arima_70_30.pkl'))
+    logger.info("monthly_arima_70_30.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("monthly_arima_70_30.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading monthly_arima_70_30.pkl: {e}")
 
 arima_22 = None
 try:
