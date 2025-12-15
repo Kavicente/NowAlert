@@ -1075,9 +1075,14 @@ def handle_barangay_response_submitted(data):
         if arima_pred is not None:
             forecast = arima_pred.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            prob = min(98, (predicted / 100) * 100)
-            prob += random.uniform(-4.0, 5.5)  # ← Larger random range for visible movement
-            prob = max(20, min(98, prob))      # ← Avoid too low/high
+            base_prob = (predicted / 100) * 100
+            base_prob = min(98, max(10, base_prob))  # Clamp base
+
+            # LARGE RANDOM VARIATION — this makes it truly random every submission
+            random_offset = random.uniform(-12.0, 15.0)  # ← Much bigger range
+            prob = base_prob + random_offset
+            prob = max(25, min(95, prob))  # ← Realistic bounds, never stuck
+
             full_year_text = f"2023 Full Year: {prob:.1f}% risk"
 
         # July–Dec Prediction — using arima_22
