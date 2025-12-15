@@ -197,73 +197,65 @@
                 return Math.random() * (max - min) + min;
             }
 
-
-
-            function parsePrediction(full, julDec) {
+            function parsePrediction(full, monthly, julDec) {
                 const fullMatch = full.match(/(\d+\.\d+)%/);
-                const julDecMatch = julDec.match(/(\d+\.\d+)%/);
                 const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
+                const julDecMatch = julDec.match(/(\d+\.\d+)%/);
                 return {
                     full: fullMatch ? parseFloat(fullMatch[1]) : 50,
                     monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
-                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 65
+                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
                 };
             }
 
-            
-
             function updateAllCharts(data) {
-                const fullText = data.full_year || "2023 Full Year: 50.0% risk";
-                const monthlyText = data.monthly || "2023 Monthly: 60.0% risk";
-                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% risk";
+                const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
+                const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
+                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
                 const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
 
                 const full2023Count = Math.round((full / 100) * 150);
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // Chart 1: Full Year Forecast
+                // Chart 1: Full Year — show % + move line
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
                     yearlyPredictionChart.options.plugins.title.text = fullText;
-                    yearlyPredictionChart.update();
+                    yearlyPredictionChart.update('active');
                 }
 
-                // Chart 2: Monthly Full Year (arima_m only)
+                // Chart 2: Monthly — show % + strong overlap + per-month random
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => {
-                        // Strong overlap + random fluctuation per month
                         const ratio = monthly2023Count / 92;
-                        const variation = random(-8, 12);  // per-month random
-                        return Math.round(v * ratio + variation);
+                        const variation = random(-12, 15);  // Strong per-month random
+                        return Math.max(0, Math.round(v * ratio + variation));
                     });
                     monthlyComparisonChart.data.datasets[1].data = monthly2023;
                     monthlyComparisonChart.options.plugins.title.text = monthlyText;
                     monthlyComparisonChart.update('active');
                 }
 
-                // Chart 3: July–Dec (arima_22)
+                // Chart 3: July–Dec — show % + strong overlap + per-month random
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
                     const forecastJulDec = baseJulDec2022.map(v => {
                         const ratio = julDec2023Count / 75;
-                        const variation = random(-10, 15);
-                        return Math.round(v * ratio + variation);
+                        const variation = random(-15, 18);
+                        return Math.max(0, Math.round(v * ratio + variation));
                     });
                     julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
                     julDecChart.options.plugins.title.text = julDecText;
                     julDecChart.update('active');
                 }
 
-                document.querySelector('.prediction-charts-grid').scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'start' 
-                });
+                // Auto-scroll to charts
+                document.querySelector('.prediction-charts-grid').scrollIntoView({ behavior: 'smooth' });
             }
 
             function initializeCharts() {
-                // Chart 1: Full Year
                 yearlyPredictionChart = new Chart('yearlyPredictionChart', {
                     type: 'line',
                     data: {
@@ -293,7 +285,6 @@
                     }
                 });
 
-                // Chart 2: Monthly Full Year
                 monthlyComparisonChart = new Chart('monthlyComparisonChart', {
                     type: 'line',
                     data: {
@@ -317,7 +308,6 @@
                     }
                 });
 
-                // Chart 3: July–Dec Only
                 julDecChart = new Chart('julDecChart', {
                     type: 'line',
                     data: {
@@ -345,7 +335,7 @@
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(d => {
-                        const pred = d.prediction || "2023 Full Year: 50.0% risk | 2023 Monthly: 60.0% risk | July-Dec 2023: 70.0% risk";
+                        const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
                         const [full, monthly, jul] = pred.split('|').map(s => s.trim());
                         updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
                     });

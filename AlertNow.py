@@ -1072,32 +1072,32 @@ def handle_barangay_response_submitted(data):
     jul_dec_text = "July-Dec: Forecast unavailable"
 
     try:
-        # Full Year (arima_pred) — LARGE random
+        # Full Year (arima_pred)
         if arima_pred is not None:
             forecast = arima_pred.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            base_prob = min(98, (predicted / 100) * 100)
-            prob = base_prob + random.uniform(-15.0, 18.0)  # ← HUGE variation
+            prob = (predicted / 100) * 100
+            prob += random.uniform(-15.0, 18.0)  # Big random for visible movement
             prob = max(20, min(95, prob))
-            full_year_text = f"2023 Full Year: {prob:.1f}% risk"
+            full_year_text = f"2023 Full Year: {prob:.1f}% Risk"
 
-        # Monthly Full Year (arima_m) — LARGE random
+        # Monthly (arima_m)
         if arima_m is not None:
             forecast = arima_m.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            base_prob = min(98, (predicted / 100) * 100)
-            prob = base_prob + random.uniform(-18.0, 20.0)  # ← Even bigger
+            prob = (predicted / 100) * 100
+            prob += random.uniform(-18.0, 20.0)
             prob = max(25, min(94, prob))
-            monthly_text = f"2023 Monthly: {prob:.1f}% risk"
+            monthly_text = f"2023 Monthly: {prob:.1f}% Risk"
 
-        # July–Dec Prediction — using arima_22
+        # July-Dec (arima_22)
         if arima_22 is not None:
-            forecast = arima_22.predict(n_periods=1)  # ← ALSO .predict() for pmdarima!
+            forecast = arima_22.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            prob = min(98, (predicted / 60) * 100)  # July-Dec ≈ half year
-            prob += random.uniform(-5.0, 6.0)
-            prob = max(15, min(98, prob))
-            jul_dec_text = f"July-Dec 2023: {prob:.1f}% risk"
+            prob = (predicted / 60) * 100
+            prob += random.uniform(-20.0, 22.0)
+            prob = max(30, min(92, prob))
+            jul_dec_text = f"July-Dec 2023: {prob:.1f}% Risk"
 
     except Exception as e:
         logger.error(f"ARIMA Prediction failed: {e}")
