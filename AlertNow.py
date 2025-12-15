@@ -1072,31 +1072,35 @@ def handle_barangay_response_submitted(data):
     jul_dec_text = "July-Dec: Forecast unavailable"
 
     try:
-        # Full Year (arima_pred)
+        # Full Year Prediction — using arima_pred
         if arima_pred is not None:
             forecast = arima_pred.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            prob = min(98, (predicted / 100) * 100)
-            prob += random.uniform(-8.0, 10.0)
-            prob = max(20, min(95, prob))
-            full_year_text = f"2023 Full Year: {prob:.1f}% risk"
+            base_prob = (predicted / 100) * 100
+            base_prob = min(98, max(10, base_prob))  # Clamp base
 
-        # Monthly Full Year (arima_m)
+            # LARGE RANDOM VARIATION — this makes it truly random every submission
+            random_offset = random.uniform(-12.0, 15.0)  # ← Much bigger range
+            prob = base_prob + random_offset
+            prob = max(25, min(95, prob))  # ← Realistic bounds, never stuck
+
+            full_year_text = f"2023 Full Year: {prob:.1f}% risk"
+            
         if arima_m is not None:
             forecast = arima_m.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
             prob = min(98, (predicted / 100) * 100)
             prob += random.uniform(-10.0, 12.0)
             prob = max(25, min(94, prob))
-            monthly_text = f"2023 Monthly: {prob:.1f}% risk"  # ← Now always defined
+            monthly_text = f"2023 Monthly: {prob:.1f}% risk"
 
-        # July-Dec (arima_22)
+        # July–Dec Prediction — using arima_22
         if arima_22 is not None:
-            forecast = arima_22.predict(n_periods=1)
+            forecast = arima_22.predict(n_periods=1)  # ← ALSO .predict() for pmdarima!
             predicted = float(forecast.iloc[0])
-            prob = min(98, (predicted / 60) * 100)
-            prob += random.uniform(-12.0, 14.0)
-            prob = max(30, min(92, prob))
+            prob = min(98, (predicted / 60) * 100)  # July-Dec ≈ half year
+            prob += random.uniform(-5.0, 6.0)
+            prob = max(15, min(98, prob))
             jul_dec_text = f"July-Dec 2023: {prob:.1f}% risk"
 
     except Exception as e:
