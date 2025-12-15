@@ -1068,26 +1068,27 @@ def handle_barangay_response_submitted(data):
 
     # === 2. Generate TWO Predictions with Random Variation ===
     full_year_text = "2023 Full Year: Forecast unavailable"
+    monthly_text = "2023 Monthly: Forecast unavailable"  # ← ADD THIS LINE
     jul_dec_text = "July-Dec: Forecast unavailable"
 
     try:
-        # Full Year Prediction — using arima_pred
+        # Full Year (arima_pred)
         if arima_pred is not None:
             forecast = arima_pred.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
             prob = min(98, (predicted / 100) * 100)
-            prob += random.uniform(-8.0, 10.0)  # Big random for visible movement
+            prob += random.uniform(-8.0, 10.0)
             prob = max(20, min(95, prob))
             full_year_text = f"2023 Full Year: {prob:.1f}% risk"
 
-        # Monthly Full Year (arima_m — your new monthly model)
+        # Monthly Full Year (arima_m)
         if arima_m is not None:
             forecast = arima_m.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
             prob = min(98, (predicted / 100) * 100)
-            prob += random.uniform(-10.0, 12.0)  # Even more variation
+            prob += random.uniform(-10.0, 12.0)
             prob = max(25, min(94, prob))
-            monthly_text = f"2023 Monthly: {prob:.1f}% risk"
+            monthly_text = f"2023 Monthly: {prob:.1f}% risk"  # ← Now always defined
 
         # July-Dec (arima_22)
         if arima_22 is not None:
