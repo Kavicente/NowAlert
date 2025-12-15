@@ -199,14 +199,14 @@
 
 
 
-            function parsePrediction(full, monthly, julDec) {
+            function parsePrediction(full, julDec) {
                 const fullMatch = full.match(/(\d+\.\d+)%/);
-                const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
                 const julDecMatch = julDec.match(/(\d+\.\d+)%/);
+                const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
                 return {
                     full: fullMatch ? parseFloat(fullMatch[1]) : 50,
                     monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
-                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
+                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 65
                 };
             }
 
@@ -222,14 +222,14 @@
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // Chart 1: Full Year — strong movement
+                // Chart 1: Full Year Forecast
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
                     yearlyPredictionChart.options.plugins.title.text = fullText;
-                    yearlyPredictionChart.update('active');
+                    yearlyPredictionChart.update();
                 }
 
-                // Chart 2: Monthly — 2023 overlaps & moves over 2022
+                // Chart 2: Monthly Full Year (arima_m only)
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => {
@@ -243,17 +243,13 @@
                     monthlyComparisonChart.update('active');
                 }
 
-                // Chart 3: July–Dec — 2023 overlaps & moves over 2022 Jul-Dec
+                // Chart 3: July–Dec (arima_22)
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
-                    const forecastJulDec = baseJulDec2022.map(v => {
-                        const ratio = julDec2023Count / 75;
-                        const variation = random.uniform(-10, 15);
-                        return Math.round(v * ratio + variation);
-                    });
+                    const forecastJulDec = baseJulDec2022.map(v => Math.round(v * (julDec2023Count / 75)));
                     julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
                     julDecChart.options.plugins.title.text = julDecText;
-                    julDecChart.update('active');
+                    julDecChart.update();
                 }
 
                 document.querySelector('.prediction-charts-grid').scrollIntoView({ 
