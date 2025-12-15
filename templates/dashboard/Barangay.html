@@ -193,14 +193,20 @@
             let monthlyComparisonChart = null;
             let julDecChart = null;
 
+            function random(min, max) {
+                return Math.random() * (max - min) + min;
+            }
 
 
-            function parsePrediction(full, julDec) {
+
+            function parsePrediction(full, monthly, julDec) {
                 const fullMatch = full.match(/(\d+\.\d+)%/);
+                const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
                 const julDecMatch = julDec.match(/(\d+\.\d+)%/);
                 return {
                     full: fullMatch ? parseFloat(fullMatch[1]) : 50,
-                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 65
+                    monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
+                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
                 };
             }
 
@@ -216,29 +222,38 @@
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // Chart 1: Full Year Forecast
+                // Chart 1: Full Year — strong movement
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
                     yearlyPredictionChart.options.plugins.title.text = fullText;
-                    yearlyPredictionChart.update();
+                    yearlyPredictionChart.update('active');
                 }
 
-                // Chart 2: Monthly Full Year (arima_m only)
+                // Chart 2: Monthly — 2023 overlaps & moves over 2022
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
-                    const monthly2023 = base2022.map(v => Math.round(v * (monthly2023Count / 92)));
+                    const monthly2023 = base2022.map(v => {
+                        // Strong overlap + random fluctuation per month
+                        const ratio = monthly2023Count / 92;
+                        const variation = random.uniform(-8, 12);  // per-month random
+                        return Math.round(v * ratio + variation);
+                    });
                     monthlyComparisonChart.data.datasets[1].data = monthly2023;
                     monthlyComparisonChart.options.plugins.title.text = monthlyText;
-                    monthlyComparisonChart.update();
+                    monthlyComparisonChart.update('active');
                 }
 
-                // Chart 3: July–Dec (arima_22)
+                // Chart 3: July–Dec — 2023 overlaps & moves over 2022 Jul-Dec
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
-                    const forecastJulDec = baseJulDec2022.map(v => Math.round(v * (julDec2023Count / 75)));
+                    const forecastJulDec = baseJulDec2022.map(v => {
+                        const ratio = julDec2023Count / 75;
+                        const variation = random.uniform(-10, 15);
+                        return Math.round(v * ratio + variation);
+                    });
                     julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
                     julDecChart.options.plugins.title.text = julDecText;
-                    julDecChart.update();
+                    julDecChart.update('active');
                 }
 
                 document.querySelector('.prediction-charts-grid').scrollIntoView({ 

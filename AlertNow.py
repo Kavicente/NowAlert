@@ -1068,29 +1068,25 @@ def handle_barangay_response_submitted(data):
 
     # === 2. Generate TWO Predictions with Random Variation ===
     full_year_text = "2023 Full Year: Forecast unavailable"
-    monthly_text = "2023 Monthly: Forecast unavailable"  # ← ADD THIS LINE
+    monthly_text = "2023 Monthly: Forecast unavailable"
     jul_dec_text = "July-Dec: Forecast unavailable"
 
     try:
-        # Full Year Prediction — using arima_pred
+        # Full Year (arima_pred) — LARGE random
         if arima_pred is not None:
             forecast = arima_pred.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            base_prob = (predicted / 100) * 100
-            base_prob = min(98, max(10, base_prob))  # Clamp base
-
-            # LARGE RANDOM VARIATION — this makes it truly random every submission
-            random_offset = random.uniform(-12.0, 15.0)  # ← Much bigger range
-            prob = base_prob + random_offset
-            prob = max(25, min(95, prob))  # ← Realistic bounds, never stuck
-
+            base_prob = min(98, (predicted / 100) * 100)
+            prob = base_prob + random.uniform(-15.0, 18.0)  # ← HUGE variation
+            prob = max(20, min(95, prob))
             full_year_text = f"2023 Full Year: {prob:.1f}% risk"
-            
+
+        # Monthly Full Year (arima_m) — LARGE random
         if arima_m is not None:
             forecast = arima_m.predict(n_periods=1)
             predicted = float(forecast.iloc[0])
-            prob = min(98, (predicted / 100) * 100)
-            prob += random.uniform(-10.0, 12.0)
+            base_prob = min(98, (predicted / 100) * 100)
+            prob = base_prob + random.uniform(-18.0, 20.0)  # ← Even bigger
             prob = max(25, min(94, prob))
             monthly_text = f"2023 Monthly: {prob:.1f}% risk"
 
