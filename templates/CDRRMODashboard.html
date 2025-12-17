@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <script src="https://unpkg.com/leaflet-heatmap@1.0.0/dist/leaflet-heatmap.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
@@ -143,6 +143,13 @@
             border-radius: 16px;
             box-shadow: inset 0 4px 10px rgba(0,0,0,0.05);
         }
+        #yearlyPredictionChart,
+        #monthlyComparisonChart,
+        #julDecChart {
+            width: 100% !important;
+            height: 100% !important;
+            flex-grow: 1;
+        }
     </style>
 </head>
 <body>
@@ -196,11 +203,22 @@
                     <h4>Alerts Received Per Month</h4>
                     <canvas id="alertsPerMonthChart"></canvas>
                 </div>
-                <div class="chart-container">
-                    <h4>Road Accident Trend & Forecast</h4>
+                
+            </section>
+            <div class="prediction-charts-grid">
+                <div class="chart-box">
+                    <div class="chart-title">2023 Full Year Risk Forecast</div>
                     <canvas id="yearlyPredictionChart"></canvas>
                 </div>
-            </section>
+                <div class="chart-box">
+                    <div class="chart-title">2023 Monthly Risk Forecast</div>
+                    <canvas id="monthlyComparisonChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">July–December 2023 High-Risk Forecast</div>
+                    <canvas id="julDecChart"></canvas>
+                </div>
+            </div>
         </div>
 
         <section id="alerts" class="alerts">

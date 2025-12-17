@@ -1025,6 +1025,9 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1 year']
 
+
+
+
 @app.route('/get_latest_prediction')
 def get_latest_prediction():
     conn = get_db_connection()
@@ -1035,6 +1038,13 @@ def get_latest_prediction():
     ''').fetchone()
     conn.close()
     return jsonify({'prediction': result[0] if result else 'No prediction available'})
+
+@app.route('/barangay_accident_counts')
+def barangay_accident_counts():
+    conn = get_db_connection()
+    result = conn.execute('SELECT barangay, COUNT(*) FROM barangay_response GROUP BY barangay').fetchall()
+    conn.close()
+    return jsonify(dict(result))
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1133,6 +1143,8 @@ def handle_barangay_response_submitted(data):
         ))
         conn.commit()
         logger.info(f"Combined prediction saved: {combined_prediction}")
+        
+        current_total_incidents = conn.execute('SELECT COUNT(*) FROM barangay_response').fetchone()[0]
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
@@ -1155,6 +1167,8 @@ def handle_barangay_response_submitted(data):
     }, broadcast=True)
 
     logger.info(f"Live update sent → Full: {full_year_text} | Monthly: {monthly_text} | Jul-Dec: {jul_dec_text}")
+    emit('update_total_incidents', {'total': current_total_incidents}, broadcast=True)
+    logger.info(f"Total incidents broadcasted: {current_total_incidents}")
 
 
 @socketio.on('barangay_fire_submitted')

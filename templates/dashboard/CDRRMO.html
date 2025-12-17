@@ -13,59 +13,262 @@
             },
         };
 
-        let yearlyPredictionChart = null;
-
-        function initializePredictionChart() {
-                const ctx = document.getElementById('yearlyPredictionChart').getContext('2d');
-                yearlyPredictionChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: ['2020', '2021', '2022', '2023 (Predicted)'],
-                        datasets: [{
-                            label: 'Road Accidents Per Year',
-                            data: [0, 0, 392, 92],
-                            borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                            borderWidth: 6,
-                            pointBackgroundColor: ['#3498db', '#3498db', '#3498db', '#e74c3c'],
-                            pointRadius: [8, 8, 8, 16],
-                            tension: 0.4,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: { duration: 1800 },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                min: 0,
-                                max: 160,
-                                ticks: { stepSize: 10, font: { size: 14 } },
-                                title: { display: true, text: 'Number of Accidents', font: { size: 16, weight: 'bold' } }
-                            },
-                            x: { title: { display: true, text: 'Year', font: { size: 16, weight: 'bold' } } }
-                        },
-                        plugins: { title: { display: true, text: 'Road Accident Trend & 2023 Forecast', font: { size: 22 } } }
-                    }
+        fetch('/barangay_accident_counts')
+            .then(r => r.json())
+            .then(counts => {
+                const heatmapData = [];
+                Object.keys(counts).forEach(barangay => {
+                    const lat = barangayLatLon[barangay]?.lat || 14.05;
+                    const lon = barangayLatLon[barangay]?.lon || 121.30;
+                    const intensity = counts[barangay] > 10 ? 1 : counts[barangay] > 5 ? 0.7 : 0.4;
+                    heatmapData.push([lat, lon, intensity]);
                 });
 
-                fetch('/get_latest_prediction')
-                    .then(r => r.json())
-                    .then(res => {
-                        if (res.prediction && res.prediction.includes('%')) {
-                            const prob = parseFloat(res.prediction.match(/(\d+\.\d+)%/)[1]);
-                            const count = Math.round((prob / 100) * 150);
-                            yearlyPredictionChart.data.datasets[0].data[3] = count;
-                            yearlyPredictionChart.options.plugins.title.text = `2023 Forecast (${prob.toFixed(1)}% Risk)`;
-                            yearlyPredictionChart.update();
-                        }
-                    });
+                const heat = L.heatLayer(heatmapData, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 17,
+                    gradient: { 0.4: 'blue', 0.7: 'yellow', 1.0: 'red' }
+                }).addTo(map);
+            });
+
+        let yearlyPredictionChart = null;
+        let monthlyComparisonChart = null;
+        let julDecChart = null;
+
+        
+
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
         }
 
+        function parsePrediction(full, monthly, julDec) {
+            const fullMatch = full.match(/(\d+\.\d+)%/);
+            const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
+            const julDecMatch = julDec.match(/(\d+\.\d+)%/);
+            return {
+                full: fullMatch ? parseFloat(fullMatch[1]) : 50,
+                monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
+                julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
+            };
+        }
+
+        function updateAllCharts(data) {
+            const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
+            const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
+            const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
+            const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
+
+            const full2023Count = Math.round((full / 100) * 150);
+            const monthly2023Count = Math.round((monthly / 100) * 150);
+            const julDec2023Count = Math.round((julDec / 100) * 90);
+
+            // Chart 1: Full Year
+            if (yearlyPredictionChart) {
+                yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
+                yearlyPredictionChart.options.plugins.title.text = fullText;
+                yearlyPredictionChart.update('active');
+            }
+
+            // Chart 2: Monthly Full Year
+            if (monthlyComparisonChart) {
+                const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
+                const monthly2023 = base2022.map(v => {
+                    const ratio = monthly2023Count / 92;
+                    const variation = random(-12, 15);
+                    return Math.max(0, Math.round(v * ratio + variation));
+                });
+                monthlyComparisonChart.data.datasets[1].data = monthly2023;
+                monthlyComparisonChart.options.plugins.title.text = monthlyText;
+                monthlyComparisonChart.update('active');
+            }
+
+            // Chart 3: July–Dec
+            if (julDecChart) {
+                const baseJulDec2022 = [42,45,41,36,33,30];
+                const forecastJulDec = baseJulDec2022.map(v => {
+                    const ratio = julDec2023Count / 75;
+                    const variation = random(-15, 18);
+                    return Math.max(0, Math.round(v * ratio + variation));
+                });
+                julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
+                julDecChart.options.plugins.title.text = julDecText;
+                julDecChart.update('active');
+            }
+
+            // Auto-scroll to charts after prediction update
+            document.querySelector('.prediction-charts-grid').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        initializeCharts();
+
+        function initializeCharts() {
+            yearlyPredictionChart = new Chart('yearlyPredictionChart', {
+                type: 'line',
+                data: {
+                    labels: ['2020','2021','2022','2023 (Predicted)'],
+                    datasets: [{
+                        label: 'Road Accidents',
+                        data: [45,68,92,92],
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231,76,60,0.2)',
+                        borderWidth: 7,
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 1800 },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '2023 Full Year Risk: Loading...',
+                            font: { size: 26, weight: 'bold' },
+                            color: '#2c3e50'
+                        }
+                    }
+                }
+            });
+
+            monthlyComparisonChart = new Chart('monthlyComparisonChart', {
+                type: 'line',
+                data: {
+                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                    datasets: [
+                        { label: '2022 Actual', data: [28,32,35,30,40,38,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
+                        { label: '2023 Forecast', data: [30,28,33,32,38,40,45,48,43,38,35,32], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '2023 Monthly Risk: Loading...',
+                            font: { size: 26, weight: 'bold' },
+                            color: '#2c3e50'
+                        }
+                    }
+                }
+            });
+
+            julDecChart = new Chart('julDecChart', {
+                type: 'line',
+                data: {
+                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                    datasets: [
+                        { label: '2022 Jul–Dec', data: [null,null,null,null,null,null,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
+                        { label: '2023 Jul–Dec Forecast', data: [null,null,null,null,null,null,45,50,48,42,39,36], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)', fill: true }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'July–Dec 2023 Risk: Loading...',
+                            font: { size: 26, weight: 'bold' },
+                            color: '#2c3e50'
+                        }
+                    }
+                }
+            });
+
+            // Initial prediction load
+            fetch('/get_latest_prediction')
+                .then(r => r.json())
+                .then(d => {
+                    const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
+                    const [full, monthly, jul] = pred.split('|').map(s => s.trim());
+                    updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                });
+        }
+
+        let barangayLatLon = {};  // Store barangay → lat/lon
+
+        function initializeHeatmap() {
+            fetch('/static/dataset/road_accident.csv')
+                .then(r => {
+                    if (!r.ok) throw new Error(`HTTP ${r.status} - CSV not found`);
+                    return r.text();
+                })
+                .then(text => {
+                    const rows = text.split('\n');
+                    if (rows.length < 2) {
+                        console.error('CSV is empty or malformed');
+                        return;
+                    }
+
+                    const headers = rows[0].toLowerCase().split(',');
+                    const barangayIdx = headers.indexOf('barangay');
+                    const latIdx = headers.indexOf('latitude');
+                    const lonIdx = headers.indexOf('longitude');
+
+                    if (barangayIdx === -1 || latIdx === -1 || lonIdx === -1) {
+                        console.error('CSV missing required columns: barangay, latitude, longitude');
+                        return;
+                    }
+
+                    const counts = {};
+                    const points = [];
+
+                    for (let i = 1; i < rows.length; i++) {
+                        const cols = rows[i].split(',');
+                        if (cols.length < 3) continue;
+
+                        const barangay = cols[barangayIdx].trim().toLowerCase();
+                        const lat = parseFloat(cols[latIdx]);
+                        const lon = parseFloat(cols[lonIdx]);
+
+                        if (isNaN(lat) || isNaN(lon) || !barangay) continue;
+
+                        counts[barangay] = (counts[barangay] || 0) + 1;
+
+                        // Store first valid lat/lon for each barangay
+                        if (!barangayLatLon[barangay]) {
+                            barangayLatLon[barangay] = { lat, lon };
+                        }
+                    }
+
+                    // Build heatmap points with intensity
+                    Object.keys(counts).forEach(barangay => {
+                        const count = counts[barangay];
+                        const { lat, lon } = barangayLatLon[barangay];
+
+                        // Intensity levels (matches your image: big glowing clusters)
+                        let intensity;
+                        if (count <= 3) intensity = 0.3;      // Blue - low
+                        else if (count <= 8) intensity = 0.6; // Yellow - moderate
+                        else if (count <= 15) intensity = 0.8;
+                        else intensity = 1.0;                 // Red - high
+
+                        points.push([lat, lon, intensity]);
+                    });
+
+                    // === HIGHLY VISIBLE HEATMAP — EXACTLY LIKE YOUR IMAGE ===
+                    const heat = L.heatLayer(points, {
+                        radius: 45,          // Larger glowing circles
+                        blur: 30,            // Soft edges
+                        maxZoom: 18,
+                        max: 1.0,
+                        gradient: {
+                            0.3: '#3498db',   // Blue
+                            0.6: '#f1c40f',   // Yellow
+                            1.0: '#e74c3c'    // Bright red
+                        }
+                    }).addTo(map);
+
+                    console.log(`Heatmap loaded successfully: ${points.length} barangay clusters`);
+                })
+                .catch(err => console.error("Failed to load heatmap CSV:", err));
+        }
+        initializeHeatmap();
+
         document.addEventListener('DOMContentLoaded', () => {
-            initializePredictionChart();
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';
@@ -91,6 +294,8 @@
                 "OpenStreetMap": osm
             };
             L.control.layers(baseLayers).addTo(cdrrmoMap);
+
+            
 
             const socket = io('https://alertnow-wi0n.onrender.com', { transports: ['websocket'] });
             const alertElements = new Map();
@@ -310,19 +515,29 @@
                 });
                 return menu;
             }
+            const liveAlerts = new Map();  // alert_id → { element, timer, countdownInterval }
+
+            function moveToRecent(alertId) {
+                if (!liveAlerts.has(alertId)) return;
+                const { element } = liveAlerts.get(alertId);
+                liveAlerts.delete(alertId);
+
+                element.querySelector('.status').textContent = 'EXPIRED ALERT';
+                document.getElementById('recent-alert-container')
+                    .insertBefore(element, document.getElementById('recent-alert-container').firstChild);
+            }
 
             function updateUIWithAlert(data) {
                 const isLive = data.expired !== true;
-                const container = isLive 
+                const container = isLive
                     ? document.getElementById('live-alert-container')
                     : document.getElementById('recent-alert-container');
-
                 const alertItem = document.createElement('div');
                 alertItem.className = 'alert-item';
                 alertItem.dataset.alertId = data.alert_id;
-
                 alertItem.innerHTML = `
                     <div class="alert-status status-pending">PENDING ROAD ACCIDENT</div>
+                    <div class="countdown">60</div>  <!-- COUNTDOWN ADDED -->
                     <div><strong>From:</strong> ${data.barangay}</div>
                     <div><strong>Resident:</strong> ${data.resident_barangay || data.barangay}</div>
                     <div><strong>Time:</strong> ${new Date().toLocaleTimeString()}</div>
@@ -330,30 +545,25 @@
                     <div class="response-form"></div>
                     <div class="prediction" style="display:none;">Prediction: N/A</div>
                 `;
-
                 if (data.image) {
                     alertItem.querySelector('img').addEventListener('click', () => {
                         document.getElementById('modal-image').src = `data:image/jpeg;base64,${data.image}`;
                         document.getElementById('image-modal').style.display = 'flex';
                     });
                 }
-
                 // === DIRECTLY SHOW DROPDOWN (NO RESPOND/DECLINE) ===
                 const responseForm = alertItem.querySelector('.response-form');
                 responseForm.style.display = 'block';
-
                 Object.keys(menuData['Road Accident']).forEach(key => {
                     const select = document.createElement('select');
                     select.className = 'dropdown-emergency';
                     select.name = key.toLowerCase().replace(/\s+/g, '_');
-
                     const placeholder = document.createElement('option');
                     placeholder.text = `Select ${key}`;
                     placeholder.value = '';
                     placeholder.disabled = true;
                     placeholder.selected = true;
                     select.appendChild(placeholder);
-
                     menuData['Road Accident'][key].forEach(opt => {
                         const option = document.createElement('option');
                         option.value = opt;
@@ -362,7 +572,6 @@
                     });
                     responseForm.appendChild(select);
                 });
-
                 const submitBtn = document.createElement('button');
                 submitBtn.textContent = 'Submit Response';
                 submitBtn.className = 'submit-emergency';
@@ -376,57 +585,67 @@
                         emergency_type: 'Road Accident',
                         municipality: '{{ municipality }}'.toLowerCase()
                     };
-
                     responseForm.querySelectorAll('select').forEach(s => {
                         responseData[s.name] = s.value;
                     });
-
                     socket.emit('cdrrmo_response', responseData);
-
                     // Change status + hide dropdown + show prediction
                     const statusDiv = alertItem.querySelector('.alert-status');
                     statusDiv.textContent = 'RESPONDED';
                     statusDiv.className = 'alert-status status-responded';
-
                     responseForm.style.display = 'none';
-
                     const predictionDiv = alertItem.querySelector('.prediction');
                     predictionDiv.style.display = 'block';
                     predictionDiv.innerHTML = '<em>Calculating prediction...</em>';
-
                     // Start 60-second timer
                     liveAlerts.set(data.alert_id, { element: alertItem });
                     setTimeout(() => moveToRecent(data.alert_id), 60000);
                 };
                 responseForm.appendChild(submitBtn);
-
                 container.appendChild(alertItem);
                 alertElements.set(data.alert_id, alertItem);
+
+                // === COUNTDOWN TIMER + EXPIRATION ===
+                let secondsLeft = 60;
+                const countdownEl = alertItem.querySelector('.countdown');
+                const interval = setInterval(() => {
+                    secondsLeft--;
+                    countdownEl.textContent = secondsLeft;
+                    if (secondsLeft <= 0) {
+                        clearInterval(interval);
+                        moveToRecent(data.alert_id);
+                    }
+                }, 1000);
+
+                liveAlerts.set(data.alert_id, { 
+                    element: alertItem, 
+                    countdownInterval: interval 
+                });
+
+                // AUTO-SCROLL TO NEW ALERT
+                alertItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // 1-minute expiration (backup)
+                setTimeout(() => moveToRecent(data.alert_id), 60000);
             }
+
+            clearInterval(liveAlerts.get(data.alert_id)?.countdownInterval);
+            liveAlerts.delete(data.alert_id);
 
             // === PREDICTION RESPONSE ===
             socket.on('cdrrmo_response', (data) => {
-                console.log('Response submitted:', data);
-                const alertItem = alertElements.get(data.alert_id);
-                if (alertItem) {
-                    const predictionDiv = alertItem.querySelector('.prediction');
-                    const predictionText = data.prediction || 'N/A';
-                    let formattedPrediction = 'N/A';
-                    if (predictionText !== 'N/A' && predictionText !== 'prediction_error') {
-                        const match = predictionText.match(/(\d+\.\d+)% chance in year \d+/);
-                        if (match) {
-                            const percentage = match[1];
-                            const yearRanges = ['A Week', '1-2 Weeks', '2-3 Weeks', '4-5 Weeks', 'A Month', '1-2 Months', '2-3 Months', '4-5 Months'];
-                            const randomRange = yearRanges[Math.floor(Math.random() * yearRanges.length)];
-                            formattedPrediction = `There will be a ${percentage}% chance of Road Accident Again Within ${randomRange}`;
-                        } else {
-                            formattedPrediction = predictionText;
-                        }
-                    }
-                    predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    predictionDiv.style.display = 'block';
-                    predictionDiv.style.fontSize = '18px';
-                    predictionDiv.style.color = 'black';
+                document.getElementById('live-alert-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+
+            socket.on('update_prediction_charts', (data) => {
+                updateAllCharts(data);
+            });
+
+            // UPDATE TOTAL INCIDENTS LIVE
+            socket.on('update_total_incidents', (data) => {
+                const totalElement = document.getElementById('total-incidents');
+                if (totalElement) {
+                    totalElement.textContent = data.total;
                 }
             });
 

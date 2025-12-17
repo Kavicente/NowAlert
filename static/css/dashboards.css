@@ -244,6 +244,33 @@ main {
     
     
 }
+
+.heatmap-blue { opacity: 0.9; background: radial-gradient(circle, #3498db, transparent); }
+.heatmap-yellow { opacity: 0.9; background: radial-gradient(circle, #f1c40f, transparent); }
+.heatmap-red { opacity: 0.9; background: radial-gradient(circle, #e74c3c, transparent); }
+
+/* Chart grid same as Barangay */
+.prediction-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin: 50px auto;
+    max-width: 1700px;
+    padding: 0 20px;
+}
+
+.chart-box {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    padding: 25px;
+    height: 420px;
+    display: flex;
+    flex-direction: column;
+}
+.alert-item .countdown {
+    display: none;
+}
 #alertsPerMonthChart {
         width: 40% !important;
         height: 70% !important;
