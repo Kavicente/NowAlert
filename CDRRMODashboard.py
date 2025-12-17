@@ -108,12 +108,44 @@ def emit_cdrrmo_alerts_per_month_update(socketio):
     alerts_per_month = get_cdrrmo_alerts_per_month()
     socketio.emit('update_alerts_per_month', alerts_per_month, room='cdrrmo')
 
-def get_heatmap_data(municipality):
-    db_path = os.path.join(os.path.dirname(__file__), '..', 'database', 'users_web.db')
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    cursor.execute('SELECT lat, lon FROM cdrrmo_response WHERE municipality = ?', (municipality,))
-    data = cursor.fetchall()
-    conn.close()
-    return [{'lat': row[0], 'lon': row[1]} for row in data]
+def get_heatmap_data():
+    """
+    Returns list of {lat, lon, intensity} for heatmap from road_accident.csv
+    Intensity: 0.4 (low), 0.7 (moderate), 1.0 (high) based on count per barangay
+    """
+    csv_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'dataset', 'road_accident.csv')
+    try:
+        import pandas as pd
+        df = pd.read_csv(csv_path, encoding='latin1')
+
+        # Ensure columns exist
+        if not all(col in df.columns for col in ['BARANGAY', 'LATITUDE', 'LONGITUDE']):
+            logger.error("CSV missing required columns: BARANGAY, LATITUDE, LONGITUDE")
+            return []
+
+        df = df.dropna(subset=['LATITUDE', 'LONGITUDE', 'BARANGAY'])
+
+        # Count accidents per barangay
+        counts = df['BARANGAY'].value_counts().to_dict()
+
+        # Get first lat/lon per barangay
+        df_unique = df.drop_duplicates(subset=['BARANGAY'])[['BARANGAY', 'LATITUDE', 'LONGITUDE']]
+
+        heatmap_data = []
+        for _, row in df_unique.iterrows():
+            barangay = row['BARANGAY']
+            count = counts.get(barangay, 0)
+            intensity = 0.4 if count <= 5 else 0.7 if count <= 15 else 1.0
+            heatmap_data.append({
+                'lat': float(row['LATITUDE']),
+                'lon': float(row['LONGITUDE']),
+                'intensity': intensity
+            })
+
+        logger.info(f"Heatmap data loaded: {len(heatmap_data)} barangays")
+        return heatmap_data
+
+    except Exception as e:
+        logger.error(f"Error loading heatmap from CSV: {e}")
+        return []
 

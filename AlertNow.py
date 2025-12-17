@@ -24,7 +24,7 @@ from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import (get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, 
                                get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update)
 from CDRRMODashboard import (get_cdrrmo_stats, get_latest_alert, get_the_cdrrmo_stats, get_cdrrmo_new_alert, 
-                             get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update)
+                             get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update, get_heatmap_data)
 from PNPDashboard import (get_pnp_stats, get_latest_alert, get_the_pnp_stats, get_pnp_new_alert, get_pnp_alerts_per_month, 
                           get_pnp_responded_count, emit_pnp_alerts_per_month_update)
 from BFPDashboard import (get_bfp_stats, get_latest_alert, get_the_stat_bfp, get_bfp_alerts_per_month, 
@@ -1026,7 +1026,10 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1 year']
 
 
-
+@app.route('/heatmap_data')
+def heatmap_data():
+    data = get_heatmap_data()
+    return jsonify(data)
 
 @app.route('/get_latest_prediction')
 def get_latest_prediction():
