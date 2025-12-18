@@ -166,22 +166,17 @@
         }
         .prediction-charts-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-top: -10px;
-            max-width: 1700px;
-            height: 420px;
-            margin-left: auto;
-            margin-right: auto;
-            padding: 0 20px;
+            grid-template-columns: repeat(3, 1fr);  /* ← 3 charts per row */
+            gap: 40px;
+            margin: 60px auto;
+            max-width: 1800px;
+            padding: 0 30px;
         }
 
         .chart-box {
-            background: white;
             border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            padding: 25px;
-            height: 420px;
+            padding: 30px;
+            height: 480px;
             display: flex;
             flex-direction: column;
         }
@@ -191,13 +186,51 @@
             font-size: 20px;
             font-weight: bold;
             color: #2c3e50;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             flex-shrink: 0;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 1600px) {
+            .prediction-charts-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .prediction-charts-grid {
+                grid-template-columns: 1fr;
+            }
+            .chart-box {
+                height: 400px;
+            }
+        }
+        #alerts {
+            margin-top: 40px;  /* ← Was probably too large before */
+        }
+
+        /* If you have multiple prediction grids, reduce the bottom margin of the last one */
+        .prediction-charts-grid:last-of-type {
+            margin-bottom: 40px;  /* ← Smaller gap before alerts */
+        }
+
+        /* Optional: tighter spacing for the entire section */
+        .main-content > section#alerts {
+            margin-top: 30px;
+            padding-top: 0;
         }
 
         #yearlyPredictionChart,
         #monthlyComparisonChart,
-        #julDecChart {
+        #julDecChart, 
+        #fireYearlyChart,
+        #fireMonthlyChart,
+        #fireJulDecChart{
             width: 100% !important;
             height: 100% !important;
             flex-grow: 1;
@@ -268,20 +301,36 @@
                 </div>
             </section>
 
+            <!-- ROAD ACCIDENT CHARTS (top row) -->
             <div class="prediction-charts-grid">
                 <div class="chart-box">
-                    <div class="chart-title">Road Accident Trend & 2023 Forecast (ARIMA Model)</div>
+                    <div class="chart-title">Road Accident - 2023 Full Year Forecast</div>
                     <canvas id="yearlyPredictionChart"></canvas>
                 </div>
                 <div class="chart-box">
-                    <div class="chart-title"></div>
+                    <div class="chart-title">Road Accident - 2023 Monthly Forecast</div>
                     <canvas id="monthlyComparisonChart"></canvas>
                 </div>
                 <div class="chart-box">
-                    <div class="chart-title">July–December 2023 High-Risk Forecast</div>
+                    <div class="chart-title">Road Accident - July–December 2023 Forecast</div>
                     <canvas id="julDecChart"></canvas>
                 </div>
-                
+            </div>
+
+            <!-- FIRE INCIDENT CHARTS (bottom row) -->
+            <div class="prediction-charts-grid" style="margin-top: 60px;">
+                <div class="chart-box">
+                    <div class="chart-title">Fire Incident - 2023 Full Year Forecast</div>
+                    <canvas id="fireYearlyChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Fire Incident - 2023 Monthly Forecast</div>
+                    <canvas id="fireMonthlyChart"></canvas>
+                </div>
+                <div class="chart-box">
+                    <div class="chart-title">Fire Incident - July–December 2023 Forecast</div>
+                    <canvas id="fireJulDecChart"></canvas>
+                </div>
             </div>
         </div>
 

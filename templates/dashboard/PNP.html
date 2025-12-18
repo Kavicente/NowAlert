@@ -70,136 +70,265 @@
             }
         };
 
-        let yearlyPredictionChart = null;
-        let monthlyComparisonChart = null;
-        let julDecChart = null;
+        // ROAD ACCIDENT CHARTS
+            let yearlyPredictionChart = null;
+            let monthlyComparisonChart = null;
+            let julDecChart = null;
 
-        function random(min, max) {
-            return Math.random() * (max - min) + min;
-        }
+            // FIRE INCIDENT CHARTS
+            let fireYearlyChart = null;
+            let fireMonthlyChart = null;
+            let fireJulDecChart = null;
 
-        function parsePrediction(full, monthly, julDec) {
-            const fullMatch = full.match(/(\d+\.\d+)%/);
-            const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
-            const julDecMatch = julDec.match(/(\d+\.\d+)%/);
-            return {
-                full: fullMatch ? parseFloat(fullMatch[1]) : 50,
-                monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
-                julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
-            };
-        }
-
-        function updateAllCharts(data) {
-            const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
-            const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
-            const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
-            const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
-
-            const full2023Count = Math.round((full / 100) * 150);
-            const monthly2023Count = Math.round((monthly / 100) * 150);
-            const julDec2023Count = Math.round((julDec / 100) * 90);
-
-            // Chart 1: Full Year
-            if (yearlyPredictionChart) {
-                yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
-                yearlyPredictionChart.options.plugins.title.text = fullText;
-                yearlyPredictionChart.update('active');
+            function random(min, max) {
+                return Math.random() * (max - min) + min;
             }
 
-            // Chart 2: Monthly
-            if (monthlyComparisonChart) {
-                const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
-                const monthly2023 = base2022.map(v => {
-                    const ratio = monthly2023Count / 92;
-                    const variation = random(-12, 15);
-                    return Math.max(0, Math.round(v * ratio + variation));
-                });
-                monthlyComparisonChart.data.datasets[1].data = monthly2023;
-                monthlyComparisonChart.options.plugins.title.text = monthlyText;
-                monthlyComparisonChart.update('active');
+            function parsePrediction(full, monthly, julDec) {
+                const fullMatch = full.match(/(\d+\.\d+)%/);
+                const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
+                const julDecMatch = julDec.match(/(\d+\.\d+)%/);
+                return {
+                    full: fullMatch ? parseFloat(fullMatch[1]) : 50,
+                    monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
+                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
+                };
             }
 
-            // Chart 3: July–Dec
-            if (julDecChart) {
-                const baseJulDec2022 = [42,45,41,36,33,30];
-                const forecastJulDec = baseJulDec2022.map(v => {
-                    const ratio = julDec2023Count / 75;
-                    const variation = random(-15, 18);
-                    return Math.max(0, Math.round(v * ratio + variation));
-                });
-                julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
-                julDecChart.options.plugins.title.text = julDecText;
-                julDecChart.update('active');
+            function updateAllCharts(data) {
+                const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
+                const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
+                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
+                const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
+
+                const full2023Count = Math.round((full / 100) * 150);
+                const monthly2023Count = Math.round((monthly / 100) * 150);
+                const julDec2023Count = Math.round((julDec / 100) * 90);
+
+                // ROAD ACCIDENT CHARTS
+                if (yearlyPredictionChart) {
+                    yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
+                    yearlyPredictionChart.options.plugins.title.text = fullText;
+                    yearlyPredictionChart.update('active');
+                }
+
+                if (monthlyComparisonChart) {
+                    const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
+                    const monthly2023 = base2022.map(v => {
+                        const ratio = monthly2023Count / 92;
+                        const variation = random(-12, 15);
+                        return Math.max(0, Math.round(v * ratio + variation));
+                    });
+                    monthlyComparisonChart.data.datasets[1].data = monthly2023;
+                    monthlyComparisonChart.options.plugins.title.text = monthlyText;
+                    monthlyComparisonChart.update('active');
+                }
+
+                if (julDecChart) {
+                    const baseJulDec2022 = [42,45,41,36,33,30];
+                    const forecastJulDec = baseJulDec2022.map(v => {
+                        const ratio = julDec2023Count / 75;
+                        const variation = random(-15, 18);
+                        return Math.max(0, Math.round(v * ratio + variation));
+                    });
+                    julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
+                    julDecChart.options.plugins.title.text = julDecText;
+                    julDecChart.update('active');
+                }
+
+                // FIRE INCIDENT CHARTS (same data, same movement)
+                if (fireYearlyChart) {
+                    fireYearlyChart.data.datasets[0].data[3] = full2023Count;
+                    fireYearlyChart.options.plugins.title.text = `Fire - ${fullText}`;
+                    fireYearlyChart.update('active');
+                }
+
+                if (fireMonthlyChart) {
+                    const base2022Fire = [15,18,22,16,25,20,28,30,26,22,19,17];  // Example fire data
+                    const fireMonthly2023 = base2022Fire.map(v => {
+                        const ratio = monthly2023Count / 92;
+                        const variation = random(-10, 14);
+                        return Math.max(0, Math.round(v * ratio + variation));
+                    });
+                    fireMonthlyChart.data.datasets[1].data = fireMonthly2023;
+                    fireMonthlyChart.options.plugins.title.text = `Fire - ${monthlyText}`;
+                    fireMonthlyChart.update('active');
+                }
+
+                if (fireJulDecChart) {
+                    const baseJulDecFire = [28,30,26,22,19,17];
+                    const fireJulDec2023 = baseJulDecFire.map(v => {
+                        const ratio = julDec2023Count / 75;
+                        const variation = random(-12, 16);
+                        return Math.max(0, Math.round(v * ratio + variation));
+                    });
+                    fireJulDecChart.data.datasets[1].data = [null,null,null,null,null,null,...fireJulDec2023];
+                    fireJulDecChart.options.plugins.title.text = `Fire - ${julDecText}`;
+                    fireJulDecChart.update('active');
+                }
+
+                document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
             }
 
-            // Auto-scroll to charts
-            document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function initializeCharts() {
-            yearlyPredictionChart = new Chart('yearlyPredictionChart', {
-                type: 'line',
-                data: {
-                    labels: ['2020','2021','2022','2023 (Predicted)'],
-                    datasets: [{
-                        label: 'Road Accidents',
-                        data: [45,68,92,92],
-                        borderColor: '#e74c3c',
-                        backgroundColor: 'rgba(231,76,60,0.2)',
-                        borderWidth: 7,
-                        tension: 0.4,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 1800 },
-                    plugins: { title: { display: true, text: '2023 Full Year Risk: Loading...', font: { size: 26 } } }
-                }
-            });
-
-            monthlyComparisonChart = new Chart('monthlyComparisonChart', {
-                type: 'line',
-                data: {
-                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-                    datasets: [
-                        { label: '2022 Actual', data: [28,32,35,30,40,38,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
-                        { label: '2023 Forecast', data: [30,28,33,32,38,40,45,48,43,38,35,32], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { title: { display: true, text: '2023 Monthly Risk: Loading...', font: { size: 26 } } }
-                }
-            });
-
-            julDecChart = new Chart('julDecChart', {
-                type: 'line',
-                data: {
-                    labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-                    datasets: [
-                        { label: '2022 Jul–Dec', data: [null,null,null,null,null,null,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
-                        { label: '2023 Jul–Dec Forecast', data: [null,null,null,null,null,null,45,50,48,42,39,36], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)', fill: true }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { title: { display: true, text: 'July–Dec 2023 Risk: Loading...', font: { size: 26 } } }
-                }
-            });
-
-            fetch('/get_latest_prediction')
-                .then(r => r.json())
-                .then(d => {
-                    const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
-                    const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                    updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+            function initializeCharts() {
+                yearlyPredictionChart = new Chart('yearlyPredictionChart', {
+                    type: 'line',
+                    data: {
+                        labels: ['2020','2021','2022','2023 (Predicted)'],
+                        datasets: [{
+                            label: 'Road Accidents',
+                            data: [45,68,92,92],
+                            borderColor: '#e74c3c',
+                            backgroundColor: 'rgba(231,76,60,0.2)',
+                            borderWidth: 7,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 1800 },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '2023 Full Year Risk: Loading...',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50'
+                            }
+                        }
+                    }
                 });
-        }
-        socket.on('update_prediction_charts', updateAllCharts);
+
+                monthlyComparisonChart = new Chart('monthlyComparisonChart', {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                        datasets: [
+                            { label: '2022 Actual', data: [28,32,35,30,40,38,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
+                            { label: '2023 Forecast', data: [30,28,33,32,38,40,45,48,43,38,35,32], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)', fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '2023 Monthly Risk: Loading...',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50'
+                            }
+                        }
+                    }
+                });
+
+                julDecChart = new Chart('julDecChart', {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                        datasets: [
+                            { label: '2022 Jul–Dec', data: [null,null,null,null,null,null,42,45,41,36,33,30], borderColor: '#3498db', fill: false },
+                            { label: '2023 Jul–Dec Forecast', data: [null,null,null,null,null,null,45,50,48,42,39,36], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.2)', fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'July–Dec 2023 Risk: Loading...',
+                                font: { size: 26, weight: 'bold' },
+                                color: '#2c3e50'
+                            }
+                        }
+                    }
+                });
+            }
+
+            function initializeFireCharts() {
+                fireYearlyChart = new Chart('fireYearlyChart', {
+                    type: 'line',
+                    data: {
+                        labels: ['2020','2021','2022','2023 (Predicted)'],
+                        datasets: [{
+                            label: 'Fire Incidents',
+                            data: [20,35,48,48],
+                            borderColor: '#e67e22',
+                            backgroundColor: 'rgba(230,126,34,0.2)',
+                            borderWidth: 7,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: { duration: 1800 },
+                        plugins: { title: { display: true, text: 'Fire - 2023 Full Year Risk: Loading...', font: { size: 26 } } }
+                    }
+                });
+
+                fireMonthlyChart = new Chart('fireMonthlyChart', {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                        datasets: [
+                            { label: '2022 Actual', data: [15,18,22,16,25,20,28,30,26,22,19,17], borderColor: '#3498db', fill: false },
+                            { label: '2023 Forecast', data: [16,19,23,17,26,21,29,31,27,23,20,18], borderColor: '#e67e22', backgroundColor: 'rgba(230,126,34,0.1)', fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { title: { display: true, text: 'Fire - 2023 Monthly Risk: Loading...', font: { size: 26 } } }
+                    }
+                });
+
+                fireJulDecChart = new Chart('fireJulDecChart', {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                        datasets: [
+                            { label: '2022 Jul–Dec', data: [null,null,null,null,null,null,28,30,26,22,19,17], borderColor: '#3498db', fill: false },
+                            { label: '2023 Jul–Dec Forecast', data: [null,null,null,null,null,null,29,32,28,24,21,19], borderColor: '#e67e22', backgroundColor: 'rgba(230,126,34,0.2)', fill: true }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { title: { display: true, text: 'Fire - July–Dec 2023 Risk: Loading...', font: { size: 26 } } }
+                    }
+                });
+            }
+
+            // Initialize both
+            function initAllCharts() {
+                initializeCharts();       // Road Accident
+                initializeFireCharts();   // Fire Incident
+
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(d => {
+                        const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
+                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
+                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                    });
+
+                fetch('/get_latest_fire_prediction')
+                    .then(r => r.json())
+                    .then(d => {
+                        const pred = d.prediction || "Fire 2023 Full Year: 50.0% Risk | Fire 2023 Monthly: 60.0% Risk | Fire July-Dec 2023: 70.0% Risk";
+                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
+                        updateFireCharts({ fire_full: full, fire_monthly: monthly, fire_jul_dec: jul });
+                    });
+            }
+
+            // LIVE UPDATE FROM SERVER
+            socket.on('update_prediction_charts', updateAllCharts);
+
+            initAllCharts();
 
         
 
@@ -238,7 +367,6 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            initializeCharts();
             const lat = {{ lat_coord|default(14.0549) }};
             const lon = {{ lon_coord|default(121.3013) }};
             const mapboxToken = 'pk.eyJ1Ijoia3VtaXRva2lydSIsImEiOiJjbWNvZXpkdDQwNmdvMnNyMnNtNGw5NGI1In0.3Y9z5y4saOL76Eb5c-o0UQ';

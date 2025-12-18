@@ -38,6 +38,17 @@
             mainContent.classList.toggle('shifted');
         }
 
+        function moveToRecent(alertId) {
+            if (!liveAlerts.has(alertId)) return;
+            const { element } = liveAlerts.get(alertId);
+            liveAlerts.delete(alertId);
+            recentAlerts.set(alertId, { element, timestamp: Date.now() });
+            
+            element.querySelector('div:first-child').textContent = 'EXPIRED ALERT';
+            document.getElementById('recent-alert-container')
+                    .insertBefore(element, document.getElementById('recent-alert-container').firstChild);
+        }
+
         
 
         let yearlyPredictionChart = null;
@@ -559,7 +570,7 @@
                         }
                     }
                     predictionDiv.textContent = `Prediction: ${formattedPrediction}`;
-                    predictionDiv.style.display = 'block';
+                    predictionDiv.style.display = 'none';
                     predictionDiv.style.fontSize = '18px';
                     predictionDiv.style.color = 'black';
                 }

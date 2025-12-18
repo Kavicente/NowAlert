@@ -505,22 +505,21 @@ canvas {
         margin-top: -10px;
         margin: 50px auto;
         max-width: 1700px;
+        max-height: 1500px;
         padding: 0 20px;
     }
 
     .chart-box {
-        background: white;
         border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         padding: 25px;
-        height: 420px;
+        height: 480px;
         display: flex;
         flex-direction: column;
     }
 
     .chart-title {
         text-align: center;
-        font-size: 22px;
+        font-size: 20px;
         font-weight: bold;
         color: #2c3e50;
         margin-bottom: 15px;
@@ -529,10 +528,27 @@ canvas {
 
     #yearlyPredictionChart,
     #monthlyComparisonChart,
-    #julDecChart {
+    #julDecChart, 
+    #fireYearlyChart,
+    #fireMonthlyChart,
+    #fireJulDecChart {
         width: 100% !important;
         height: 100% !important;
         flex-grow: 1;
+    }
+    #alerts {
+        margin-top: 40px;  /* ← Was probably too large before */
+    }
+
+    /* If you have multiple prediction grids, reduce the bottom margin of the last one */
+    .prediction-charts-grid:last-of-type {
+        margin-bottom: 40px;  /* ← Smaller gap before alerts */
+    }
+
+    /* Optional: tighter spacing for the entire section */
+    .main-content > section#alerts {
+        margin-top: 30px;
+        padding-top: 0;
     }
     /* New: Row for Total Incidents and Responded */
     .stats-row {

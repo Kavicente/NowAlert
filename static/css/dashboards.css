@@ -259,38 +259,32 @@ main {
 }
 /* HEATMAP LEGEND */
 .prediction-charts-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 30px;
-    margin: 50px auto;
-    max-width: 1700px;
-    padding: 0 20px;
-}
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin-top: -10px;
+        margin: 50px auto;
+        max-width: 1700px;
+        max-height: 1500px;
+        padding: 0 20px;
+    }
 
-.chart-box {
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    padding: 25px;
-    height: 420px;
-    display: flex;
-    flex-direction: column;
-}
+    .chart-box {
+        border-radius: 20px;
+        padding: 25px;
+        height: 480px;
+        display: flex;
+        flex-direction: column;
+    }
 
-.chart-title {
-    text-align: center;
-    font-size: 22px;
-    font-weight: bold;
-    color: #2c3e50;
-    margin-bottom: 15px;
-}
-
-#yearlyPredictionChart,
-#monthlyComparisonChart,
-#julDecChart {
-    width: 100% !important;
-    height: 100% !important;
-}
+    .chart-title {
+        text-align: center;
+        font-size: 20px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 15px;
+        flex-shrink: 0;
+    }
 
 .alert-status {
     padding: 5px 10px;

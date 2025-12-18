@@ -105,26 +105,48 @@
             font-size: 16px;
         }
 
-        #prediction-section {
-            margin: 40px auto;
-            padding: 40px;
-            background: white;
+        .prediction-charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);  /* ← 3 charts per row */
+            gap: 40px;
+            margin: 60px auto;
+            max-width: 1800px;
+            padding: 0 30px;
+        }
+
+        .chart-box {
             border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            max-width: 1000px;
+            padding: 30px;
+            height: 480px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chart-title {
             text-align: center;
-            display: none;
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            flex-shrink: 0;
         }
-        #prediction-section.active { display: block; }
-        #prediction-chart-container {
-            height: 800px;
-            width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 16px;
-            box-shadow: inset 0 4px 10px rgba(0,0,0,0.05);
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            flex-grow: 1;
         }
+
+        #yearlyPredictionChart,
+            #monthlyComparisonChart,
+            #julDecChart, 
+            #fireYearlyChart,
+            #fireMonthlyChart,
+            #fireJulDecChart {
+                width: 100% !important;
+                height: 100% !important;
+                flex-grow: 1;
+            }
     </style>
 </head>
 <body>
@@ -188,16 +210,32 @@
         </div>
         <div class="prediction-charts-grid">
             <div class="chart-box">
-                <div class="chart-title">2023 Full Year Risk Forecast</div>
+                <div class="chart-title">Road Accident - 2023 Full Year Forecast</div>
                 <canvas id="yearlyPredictionChart"></canvas>
             </div>
             <div class="chart-box">
-                <div class="chart-title">2023 Monthly Risk Forecast</div>
+                <div class="chart-title">Road Accident - 2023 Monthly Forecast</div>
                 <canvas id="monthlyComparisonChart"></canvas>
             </div>
             <div class="chart-box">
-                <div class="chart-title">July–December 2023 High-Risk Forecast</div>
+                <div class="chart-title">Road Accident - July–December 2023 Forecast</div>
                 <canvas id="julDecChart"></canvas>
+            </div>
+        </div>
+
+        <!-- FIRE INCIDENT CHARTS (bottom row) -->
+        <div class="prediction-charts-grid" style="margin-top: 80px;">
+            <div class="chart-box">
+                <div class="chart-title">Fire Incident - 2023 Full Year Forecast</div>
+                <canvas id="fireYearlyChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <div class="chart-title">Fire Incident - 2023 Monthly Forecast</div>
+                <canvas id="fireMonthlyChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <div class="chart-title">Fire Incident - July–December 2023 Forecast</div>
+                <canvas id="fireJulDecChart"></canvas>
             </div>
         </div>
 

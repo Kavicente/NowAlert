@@ -30,6 +30,33 @@ except FileNotFoundError:
     logger.error("arima80_20.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading arima80_20.pkl: {e}")
+  
+f_arima_m = None
+try:
+    f_arima_m = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'fire_monthly_70_30.pkl'))
+    logger.info("fire_monthly_70_30.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("fire_monthly_70_30.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading fire_monthly_70_30.pkl: {e}")
+
+f_arima_22 = None
+try:
+    f_arima_22 = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'fire_forecast_70_30.pkl'))
+    logger.info("fire_forecast_70_30.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("fire_forecast_70_30.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading fire_forecast_70_30.pkl: {e}")
+
+f_arima_pred = None
+try:
+    f_arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'fire_arima_70_30.pkl'))
+    logger.info("fire_arima_70_30.pkl loaded successfully.")
+except FileNotFoundError:
+    logger.error("fire_arima_70_30.pkl not found.")
+except Exception as e:
+    logger.error(f"Error loading fire_arima_70_30.pkl: {e}")  
     
 # Load road accident model
 road_accident_predictor = None
@@ -40,6 +67,7 @@ except FileNotFoundError:
     logger.error("road_accident_predictor_lr.pkl not found.")
 except Exception as e:
     logger.error(f"Error loading road_accident_predictor_lr.pkl: {e}")
+    
     
 fire_accident_predictor = None
 try:
