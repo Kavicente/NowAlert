@@ -244,12 +244,20 @@ main {
     
     
 }
+#alertsPerMonthChart {
+        width: 40% !important;
+        height: 70% !important;
+        
+        transition: transform 0.3s ease;
+        
+    }
+#alertsPerMonthChart:hoover {
+    background-color: #66c2ff;
+    cursor: pointer;
+    transform: scale(1.05); /* Slight zoom in on hover (5% scale up) */
 
-.heatmap-blue { opacity: 0.9; background: radial-gradient(circle, #3498db, transparent); }
-.heatmap-yellow { opacity: 0.9; background: radial-gradient(circle, #f1c40f, transparent); }
-.heatmap-red { opacity: 0.9; background: radial-gradient(circle, #e74c3c, transparent); }
-
-/* Chart grid same as Barangay */
+}
+/* HEATMAP LEGEND */
 .prediction-charts-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -268,22 +276,42 @@ main {
     display: flex;
     flex-direction: column;
 }
-.alert-item .countdown {
-    display: none;
-}
-#alertsPerMonthChart {
-        width: 40% !important;
-        height: 70% !important;
-        
-        transition: transform 0.3s ease;
-        
-    }
-#alertsPerMonthChart:hoover {
-    background-color: #66c2ff;
-    cursor: pointer;
-    transform: scale(1.05); /* Slight zoom in on hover (5% scale up) */
 
+.chart-title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 15px;
 }
+
+#yearlyPredictionChart,
+#monthlyComparisonChart,
+#julDecChart {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.alert-status {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-weight: bold;
+    color: white;
+    text-align: center;
+}
+
+.alert-status.status-pending {
+    background-color: #e74c3c; /* Red for pending */
+}
+
+.alert-status.status-responded {
+    background-color: #27ae60; /* Green for responded */
+}
+
+.alert-status.status-expired {
+    background-color: #95a5a6; /* Grey for expired */
+}
+
 .dropdown-emergency {
     width: 100%; 
     padding: 10px; 

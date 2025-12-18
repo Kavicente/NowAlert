@@ -24,7 +24,7 @@ from SignUpType import download_apk_folder, generate_qr
 from BarangayDashboard import (get_barangay_stats, get_latest_alert, get_the_stats, get_new_alert, 
                                get_barangay_emergency_types, get_barangay_responded_count, emit_emergency_types_update)
 from CDRRMODashboard import (get_cdrrmo_stats, get_latest_alert, get_the_cdrrmo_stats, get_cdrrmo_new_alert, 
-                             get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update, get_heatmap_data)
+                             get_cdrrmo_alerts_per_month, get_cdrrmo_responded_count, emit_cdrrmo_alerts_per_month_update)
 from PNPDashboard import (get_pnp_stats, get_latest_alert, get_the_pnp_stats, get_pnp_new_alert, get_pnp_alerts_per_month, 
                           get_pnp_responded_count, emit_pnp_alerts_per_month_update)
 from BFPDashboard import (get_bfp_stats, get_latest_alert, get_the_stat_bfp, get_bfp_alerts_per_month, 
@@ -1025,12 +1025,6 @@ accepted_roles = {'bfp': False, 'cdrrmo': False, 'health': False, 'hospital': Fa
 
 TIME_RANGES = ['1-2 weeks', '2-4 weeks', '1 month', '2 months', '3-6 months', '1 year']
 
-
-@app.route('/heatmap_data')
-def heatmap_data():
-    data = get_heatmap_data()
-    return jsonify(data)
-
 @app.route('/get_latest_prediction')
 def get_latest_prediction():
     conn = get_db_connection()
@@ -1041,13 +1035,6 @@ def get_latest_prediction():
     ''').fetchone()
     conn.close()
     return jsonify({'prediction': result[0] if result else 'No prediction available'})
-
-@app.route('/barangay_accident_counts')
-def barangay_accident_counts():
-    conn = get_db_connection()
-    result = conn.execute('SELECT barangay, COUNT(*) FROM barangay_response GROUP BY barangay').fetchall()
-    conn.close()
-    return jsonify(dict(result))
 
 @socketio.on('barangay_response')
 def handle_barangay_response_submitted(data):
@@ -1146,8 +1133,6 @@ def handle_barangay_response_submitted(data):
         ))
         conn.commit()
         logger.info(f"Combined prediction saved: {combined_prediction}")
-        
-        current_total_incidents = conn.execute('SELECT COUNT(*) FROM barangay_response').fetchone()[0]
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
@@ -1170,8 +1155,6 @@ def handle_barangay_response_submitted(data):
     }, broadcast=True)
 
     logger.info(f"Live update sent → Full: {full_year_text} | Monthly: {monthly_text} | Jul-Dec: {jul_dec_text}")
-    emit('update_total_incidents', {'total': current_total_incidents}, broadcast=True)
-    logger.info(f"Total incidents broadcasted: {current_total_incidents}")
 
 
 @socketio.on('barangay_fire_submitted')

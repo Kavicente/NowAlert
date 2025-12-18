@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
@@ -135,20 +135,13 @@
         }
         #prediction-section.active { display: block; }
         #prediction-chart-container {
-            height: 800px;
+            height: 900px;
             width: 800px;
             margin: 40px auto;
             padding: 20px;
             background: #f8f9fa;
             border-radius: 16px;
             box-shadow: inset 0 4px 10px rgba(0,0,0,0.05);
-        }
-        #yearlyPredictionChart,
-        #monthlyComparisonChart,
-        #julDecChart {
-            width: 100% !important;
-            height: 100% !important;
-            flex-grow: 1;
         }
     </style>
 </head>
@@ -180,6 +173,7 @@
         <p class="p" style="position: relative; display: inline-block; margin: 0 auto;">Coordinates: <span id="map-coordinates">{{ lat_coord|default(14.0549) }}, {{ lon_coord|default(121.3013) }}</span> (Municipality: {{ municipality }})</p>
         <div class="dashboard-container">
             <div id="map"></div>
+            
             <section class="stats">
                 <div class="stats-row">
                     <div class="stat-item">
@@ -205,6 +199,7 @@
                 </div>
                 
             </section>
+
             <div class="prediction-charts-grid">
                 <div class="chart-box">
                     <div class="chart-title">2023 Full Year Risk Forecast</div>

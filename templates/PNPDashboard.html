@@ -136,7 +136,6 @@
                 <li><a href="#alerts"><span>🔔</span> Alerts</a></li>
                 <li><a href="#map"><span>📍</span> Map</a></li>
                 <li><a href="{{ url_for('pnp_charts') }}"><span>📊</span> Manage Reports</a></li>
-                <li><a href="#" id="prediction-link"></span>📈</span> Prediction</a></li>
                 <li><a href="#notifications"><span>📣</span> Notifications</a></li>
                 <li><a href="#settings"><span>⚙️</span> Settings</a></li>
                 <li><a href="{{ url_for('logout') }}"><span>🚪</span> Log Out</a></li>
@@ -187,6 +186,20 @@
                 </div>
             </section>
         </div>
+        <div class="prediction-charts-grid">
+            <div class="chart-box">
+                <div class="chart-title">2023 Full Year Risk Forecast</div>
+                <canvas id="yearlyPredictionChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <div class="chart-title">2023 Monthly Risk Forecast</div>
+                <canvas id="monthlyComparisonChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <div class="chart-title">July–December 2023 High-Risk Forecast</div>
+                <canvas id="julDecChart"></canvas>
+            </div>
+        </div>
 
         <section id="alerts" class="alerts">
             <h2 class="h2">PNP Alerts</h2>
@@ -209,11 +222,7 @@
             </div>
         </section>
 
-        <section id="prediction-section">
-            <div id="prediction-chart-container">
-                <canvas id="yearlyPredictionChart"></canvas>
-            </div>
-        </section>
+        
 
         <div id="notification"></div>
         <div id="image-modal" class="image-modal">
