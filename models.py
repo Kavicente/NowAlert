@@ -4,32 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-arima_m = None
-try:
-    arima_m = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'monthly_arima70_15_15.pkl'))
-    logger.info("monthly_arima70_15_15.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("monthly_arima70_15_15.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading monthly_arima70_15_15.pkl: {e}")
 
-arima_22 = None
-try:
-    arima_22 = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'forecast_70_15_15.pkl'))
-    logger.info("forecast_70_15_15.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("forecast_70_15_15.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading forecast_70_15_15.pkl: {e}")
-
-arima_pred = None
-try:
-    arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 'arima80_20.pkl'))
-    logger.info("arima80_20.pkl loaded successfully.")
-except FileNotFoundError:
-    logger.error("arima80_20.pkl not found.")
-except Exception as e:
-    logger.error(f"Error loading arima80_20.pkl: {e}")
   
 f_arima_m = None
 try:

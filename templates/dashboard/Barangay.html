@@ -218,16 +218,22 @@
             }
 
             function updateAllCharts(data) {
-                const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
-                const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
-                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
-                const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
+                const source = data.source || 'ARIMAX';
+                const suffix = source === 'ARIMA' ? ' (ARIMA)' : '';
+
+                const fullText = (data.full_year || "2023 Full Year: 50.0% Risk") + suffix;
+                const monthlyText = (data.monthly || "2023 Monthly: 60.0% Risk") + suffix;
+                const julDecText = (data.jul_dec || "July-Dec 2023: 70.0% Risk") + suffix;
+
+                const full = parsePrediction(fullText);
+                const monthly = parsePrediction(monthlyText);
+                const julDec = parsePrediction(julDecText);
 
                 const full2023Count = Math.round((full / 100) * 150);
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // ROAD ACCIDENT CHARTS
+                // Road Accident Charts Update
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
                     yearlyPredictionChart.options.plugins.title.text = fullText;
@@ -287,6 +293,17 @@
                     fireJulDecChart.data.datasets[1].data = [null,null,null,null,null,null,...fireJulDec2023];
                     fireJulDecChart.options.plugins.title.text = `Fire - ${julDecText}`;
                     fireJulDecChart.update('active');
+                }
+
+                // Optional: Change title color for visual distinction
+                if (source === 'ARIMAX') {
+                    yearlyPredictionChart.options.plugins.title.color = '#e67e22'; // orange for ARIMAX
+                    monthlyComparisonChart.options.plugins.title.color = '#e67e22';
+                    julDecChart.options.plugins.title.color = '#e67e22';
+                } else {
+                    yearlyPredictionChart.options.plugins.title.color = '#2c3e50'; // default
+                    monthlyComparisonChart.options.plugins.title.color = '#2c3e50';
+                    julDecChart.options.plugins.title.color = '#2c3e50';
                 }
 
                 document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
@@ -446,6 +463,26 @@
                         updateFireCharts({ fire_full: full, fire_monthly: monthly, fire_jul_dec: jul });
                     });
             }
+
+            // Original ARIMA listener (unchanged)
+            socket.on('update_prediction_charts', function(data) {
+                updateAllCharts({
+                    full_year: data.full_year,
+                    monthly: data.monthly,
+                    jul_dec: data.jul_dec,
+                    source: 'ARIMA'
+                });
+            });
+
+            // ARIMAX listener — reuse the same function
+            socket.on('update_arimax_charts', function(data) {
+                updateAllCharts({
+                    full_year: data.full_year,
+                    monthly: data.monthly,
+                    jul_dec: data.jul_dec,
+                    source: 'ARIMAX'
+                });
+            });
 
             // LIVE UPDATE FROM SERVER
             socket.on('update_prediction_charts', updateAllCharts);

@@ -58,7 +58,53 @@ body {
     transition: transform 0.2s;
     margin: 10px 0;
 }
+select {
+    width: 100%;
+    padding: 14px;
+    margin: 10px 0;
+    border: 2px solid #224380;
+    border-radius: 12px;
+    background-color: #deeaee;
+    color: #224380;
+    font-size: 16px;
+    font-weight: bold;
+    appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%23224380" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/><path d="M0 0h24v24H0z" fill="none"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    cursor: pointer;
+}
 
+select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+}
+
+/* Contact number - numbers only */
+input[type="tel"] {
+    width: 100%;
+    padding: 14px;
+    margin: 10px 0;
+    border: 2px solid #224380;
+    border-radius: 12px;
+    background-color: #deeaee;
+    color: #224380;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+input[type="tel"]::-webkit-inner-spin-button,
+input[type="tel"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type="tel"] {
+    
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
 /* RIGHT PANEL */
 .right-panel {
     flex: 1;
@@ -94,15 +140,14 @@ body {
 
 .signup-form input {
     width: 100%;
-    padding: 20px;
+    padding: 30px 12px 12px 12px;
     margin-top: 5px;
-    margin-right: -50px;
-    border: 2px solid #000000;
+    border: 2px solid #000;
+    font-size: 18px;
     background: #deeaee;
     border-radius: 8px;
     font-size: 16px;
     box-sizing: border-box;
-    transition: border 0.2s;
 }
 
 .signup-form input:focus {
