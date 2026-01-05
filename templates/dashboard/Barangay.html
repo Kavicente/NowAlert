@@ -192,10 +192,12 @@
                 emergencyTypeChart.update();
             });
 
+            // ROAD ACCIDENT CHARTS
             let yearlyPredictionChart = null;
             let monthlyComparisonChart = null;
             let julDecChart = null;
 
+            // FIRE INCIDENT CHARTS
             let fireYearlyChart = null;
             let fireMonthlyChart = null;
             let fireJulDecChart = null;
@@ -204,100 +206,90 @@
                 return Math.random() * (max - min) + min;
             }
 
-            function parsePrediction(text) {
-                const match = text.match(/(\d+\.\d+)%/);
-                return match ? parseFloat(match[1]) : 50;
+            function parsePrediction(full, monthly, julDec) {
+                const fullMatch = full.match(/(\d+\.\d+)%/);
+                const monthlyMatch = monthly.match(/(\d+\.\d+)%/);
+                const julDecMatch = julDec.match(/(\d+\.\d+)%/);
+                return {
+                    full: fullMatch ? parseFloat(fullMatch[1]) : 50,
+                    monthly: monthlyMatch ? parseFloat(monthlyMatch[1]) : 60,
+                    julDec: julDecMatch ? parseFloat(julDecMatch[1]) : 70
+                };
             }
 
             function updateAllCharts(data) {
-                // Road Accident Charts
-                const roadFullText = data.road_full || "2023 Full Year: 50.0% Risk";
-                const roadMonthlyText = data.road_monthly || "2023 Monthly: 60.0% Risk";
-                const roadJulDecText = data.road_jul_dec || "July-Dec 2023: 70.0% Risk";
+                const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
+                const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
+                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
+                const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
 
-                const roadFull = parsePrediction(roadFullText);
-                const roadMonthly = parsePrediction(roadMonthlyText);
-                const roadJulDec = parsePrediction(roadJulDecText);
+                const full2023Count = Math.round((full / 100) * 150);
+                const monthly2023Count = Math.round((monthly / 100) * 150);
+                const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                const roadFullCount = Math.round((roadFull / 100) * 150);
-                const roadMonthlyCount = Math.round((roadMonthly / 100) * 150);
-                const roadJulDecCount = Math.round((roadJulDec / 100) * 90);
-
+                // ROAD ACCIDENT CHARTS
                 if (yearlyPredictionChart) {
-                    yearlyPredictionChart.data.datasets[0].data[3] = roadFullCount;
-                    yearlyPredictionChart.options.plugins.title.text = roadFullText;
+                    yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
+                    yearlyPredictionChart.options.plugins.title.text = fullText;
                     yearlyPredictionChart.update('active');
                 }
 
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => {
-                        const ratio = roadMonthlyCount / 92;
+                        const ratio = monthly2023Count / 92;
                         const variation = random(-12, 15);
                         return Math.max(0, Math.round(v * ratio + variation));
                     });
                     monthlyComparisonChart.data.datasets[1].data = monthly2023;
-                    monthlyComparisonChart.options.plugins.title.text = roadMonthlyText;
+                    monthlyComparisonChart.options.plugins.title.text = monthlyText;
                     monthlyComparisonChart.update('active');
                 }
 
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
                     const forecastJulDec = baseJulDec2022.map(v => {
-                        const ratio = roadJulDecCount / 75;
+                        const ratio = julDec2023Count / 75;
                         const variation = random(-15, 18);
                         return Math.max(0, Math.round(v * ratio + variation));
                     });
                     julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
-                    julDecChart.options.plugins.title.text = roadJulDecText;
+                    julDecChart.options.plugins.title.text = julDecText;
                     julDecChart.update('active');
                 }
 
-                // Fire Incident Charts (same logic)
-                const fireFullText = data.fire_full || "Fire 2023 Full Year: 50.0% Risk";
-                const fireMonthlyText = data.fire_monthly || "Fire 2023 Monthly: 60.0% Risk";
-                const fireJulDecText = data.fire_jul_dec || "Fire July-Dec 2023: 70.0% Risk";
-
-                const fireFull = parsePrediction(fireFullText);
-                const fireMonthly = parsePrediction(fireMonthlyText);
-                const fireJulDec = parsePrediction(fireJulDecText);
-
-                const fireFullCount = Math.round((fireFull / 100) * 150);
-                const fireMonthlyCount = Math.round((fireMonthly / 100) * 150);
-                const fireJulDecCount = Math.round((fireJulDec / 100) * 90);
-
+                // FIRE INCIDENT CHARTS (same data, same movement)
                 if (fireYearlyChart) {
-                    fireYearlyChart.data.datasets[0].data[3] = fireFullCount;
-                    fireYearlyChart.options.plugins.title.text = fireFullText;
+                    fireYearlyChart.data.datasets[0].data[3] = full2023Count;
+                    fireYearlyChart.options.plugins.title.text = `Fire - ${fullText}`;
                     fireYearlyChart.update('active');
                 }
 
                 if (fireMonthlyChart) {
-                    const base2022Fire = [15,18,22,16,25,20,28,30,26,22,19,17];
+                    const base2022Fire = [15,18,22,16,25,20,28,30,26,22,19,17];  // Example fire data
                     const fireMonthly2023 = base2022Fire.map(v => {
-                        const ratio = fireMonthlyCount / 92;
-                        const variation = random(-12, 15);
+                        const ratio = monthly2023Count / 92;
+                        const variation = random(-10, 14);
                         return Math.max(0, Math.round(v * ratio + variation));
                     });
                     fireMonthlyChart.data.datasets[1].data = fireMonthly2023;
-                    fireMonthlyChart.options.plugins.title.text = fireMonthlyText;
+                    fireMonthlyChart.options.plugins.title.text = `Fire - ${monthlyText}`;
                     fireMonthlyChart.update('active');
                 }
 
                 if (fireJulDecChart) {
                     const baseJulDecFire = [28,30,26,22,19,17];
                     const fireJulDec2023 = baseJulDecFire.map(v => {
-                        const ratio = fireJulDecCount / 75;
-                        const variation = random(-15, 18);
+                        const ratio = julDec2023Count / 75;
+                        const variation = random(-12, 16);
                         return Math.max(0, Math.round(v * ratio + variation));
                     });
                     fireJulDecChart.data.datasets[1].data = [null,null,null,null,null,null,...fireJulDec2023];
-                    fireJulDecChart.options.plugins.title.text = fireJulDecText;
+                    fireJulDecChart.options.plugins.title.text = `Fire - ${julDecText}`;
                     fireJulDecChart.update('active');
                 }
 
-                // Auto-scroll to charts
-                document.querySelector('.prediction-charts-grid').scrollIntoView({ behavior: 'smooth' });
+                document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
             }
 
             function initializeCharts() {
@@ -375,8 +367,9 @@
                         }
                     }
                 });
+            }
 
-                // Fire Charts
+            function initializeFireCharts() {
                 fireYearlyChart = new Chart('fireYearlyChart', {
                     type: 'line',
                     data: {
@@ -442,7 +435,7 @@
                     .then(d => {
                         const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
                         const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateAllCharts({ road_full: full, road_monthly: monthly, road_jul_dec: jul });
+                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
                     });
 
                 fetch('/get_latest_fire_prediction')
@@ -454,28 +447,8 @@
                     });
             }
 
-            // Original ARIMA listener (unchanged)
-            socket.on('update_prediction_charts', function(data) {
-                updateAllCharts({
-                    full_year: data.full_year,
-                    monthly: data.monthly,
-                    jul_dec: data.jul_dec,
-                    source: 'ARIMAX'
-                });
-            });
-
-            // ARIMAX listener — reuse the same function
-            socket.on('update_arimax_charts', function(data) {
-                updateAllCharts({
-                    full_year: data.full_year,
-                    monthly: data.monthly,
-                    jul_dec: data.jul_dec,
-                    source: 'ARIMAX'
-                });
-            });
-
             // LIVE UPDATE FROM SERVER
-            socket.on('update_prediction_charts', updateAllCharts);
+            socket.on('update_arimax_charts', updateAllCharts);
 
             initAllCharts();
 
