@@ -10,32 +10,32 @@ logger = logging.getLogger(__name__)
 arima_m = None
 try:
     arima_m = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                       'ARIMA_ROAD', 'arima_monthly', 'monthly_arima70_30.pkl'))
-    logger.info("monthly_arima70_30.pkl loaded successfully.")
+                                       'ARIMA_ROAD', 'arima_monthly', 'monthly_arima80_20.pkl'))
+    logger.info("monthly_arima80_20.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("monthly_arima70_30.pkl not found.")
+    logger.error("monthly_arima80_20.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading monthly_arima70_30.pkl: {e}")
+    logger.error(f"Error loading monthly_arima80_20.pkl: {e}")
 
 arima_22 = None
 try:
     arima_22 = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                        'ARIMA_ROAD', 'arima_forecast', 'forecast_70_30.pkl'))
-    logger.info("forecast_70_30.pkl loaded successfully.")
+                                        'ARIMA_ROAD', 'arima_forecast', 'forecast_80_20.pkl'))
+    logger.info("forecast_80_20.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("forecast_70_30.pkl not found.")
+    logger.error("forecast_80_20.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading forecast_70_30.pkl: {e}")
+    logger.error(f"Error loading forecast_80_20.pkl: {e}")
 
 arima_pred = None
 try:
     arima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                          'ARIMA_ROAD', 'arima_pred', 'arima70_15_15.pkl'))
-    logger.info("arima70_15_15.pkl loaded successfully.")
+                                          'ARIMA_ROAD', 'arima_pred', 'arima70_30.pkl'))
+    logger.info("arima70_30.pkl loaded successfully.")
 except FileNotFoundError:
-    logger.error("arima70_15_15.pkl not found.")
+    logger.error("arima70_30.pkl not found.")
 except Exception as e:
-    logger.error(f"Error loading arima70_15_15.pkl: {e}")
+    logger.error(f"Error loading arima70_30.pkl: {e}")
     
 #ARIMAX MODEL  
     
