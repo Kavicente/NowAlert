@@ -197,7 +197,7 @@
             let monthlyComparisonChart = null;
             let julDecChart = null;
 
-            // FIRE INCIDENT CHARTS
+            // FIRE INCIDENT CHARTS (kept but not updated by ARIMAX)
             let fireYearlyChart = null;
             let fireMonthlyChart = null;
             let fireJulDecChart = null;
@@ -221,20 +221,20 @@
                 const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
                 const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
                 const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
+
                 const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
 
                 const full2023Count = Math.round((full / 100) * 150);
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // yearlyPredictionChart (Full Year)
+                // ROAD ACCIDENT CHARTS - Update % and move lines
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
                     yearlyPredictionChart.options.plugins.title.text = fullText;
                     yearlyPredictionChart.update('active');
                 }
 
-                // monthlyComparisonChart (Monthly)
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => {
@@ -247,7 +247,6 @@
                     monthlyComparisonChart.update('active');
                 }
 
-                // julDecChart (July–Dec)
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
                     const forecastJulDec = baseJulDec2022.map(v => {
@@ -369,6 +368,15 @@
                         }
                     }
                 });
+
+                // Initial load (ARIMA fallback)
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(d => {
+                        const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
+                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
+                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                    });
             }
 
             function initializeFireCharts() {
@@ -432,13 +440,7 @@
                 initializeCharts();       // Road Accident
                 initializeFireCharts();   // Fire Incident
 
-                fetch('/get_latest_prediction')
-                    .then(r => r.json())
-                    .then(d => {
-                        const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
-                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
-                    });
+                
 
                 fetch('/get_latest_fire_prediction')
                     .then(r => r.json())
@@ -450,6 +452,10 @@
             }
 
             // LIVE UPDATE FROM SERVER
+            // ARIMA updates (initial/default)
+            socket.on('update_prediction_charts', updateAllCharts);
+
+            // ARIMAX updates (now primary) - use the same function
             socket.on('update_arimax_charts', updateAllCharts);
 
             initAllCharts();
