@@ -609,6 +609,14 @@
                 scrollToCharts();
             });
 
+             // Update prediction display after submission
+            socket.on('barangay_arimax_submitted', () => {
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(data => updateChartsFromPrediction(data.prediction));
+                scrollToCharts();
+            });
+
             socket.on('barangay_fire_submitted', () => {
                 fetch('/get_latest_fire_prediction')
                     .then(r => r.json())
