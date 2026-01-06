@@ -130,7 +130,7 @@ def handle_barangay_response_submitted(data):
         logger.error(f"ARIMA Prediction failed: {e}")
 
     # === COMBINE BOTH INTO ONE STRING FOR SINGLE DB COLUMN ===
-    combined_prediction = f"{full_year_text} | {jul_dec_text}"
+    combined_prediction = f"{full_year_text} | {monthly_text}  | {jul_dec_text}"
     extracted_data['prediction'] = combined_prediction
 
     # === 3. Save to DB (only one column: prediction) ===
@@ -159,7 +159,7 @@ def handle_barangay_response_submitted(data):
             extracted_data['prediction']
         ))
         conn.commit()
-        logger.info(f"Combined prediction saved: {combined_prediction}")
+        logger.info(f"Combined prediction saved for ARIMAX: {combined_prediction}")
 
     except Exception as e:
         logger.error(f"DB Error: {e}")
@@ -181,7 +181,7 @@ def handle_barangay_response_submitted(data):
         'jul_decx': jul_dec_text
     }, broadcast=True)
 
-    logger.info(f"Live update sent → Full: {full_year_text} | Monthly: {monthly_text} | Jul-Dec: {jul_dec_text}")
+    logger.info(f"Live update of ARIMAX prediction sent → Full: {full_year_text} | Monthly: {monthly_text} | Jul-Dec: {jul_dec_text}")
 
 # === ARIMAX Handler (used first) ===
 def handle_barangay_arimax_submitted(data):
