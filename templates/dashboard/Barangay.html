@@ -192,12 +192,14 @@
                 emergencyTypeChart.update();
             });
 
+            
+
             // ROAD ACCIDENT CHARTS
             let yearlyPredictionChart = null;
             let monthlyComparisonChart = null;
             let julDecChart = null;
 
-            // FIRE INCIDENT CHARTS (kept but not updated by ARIMAX)
+            // FIRE INCIDENT CHARTS
             let fireYearlyChart = null;
             let fireMonthlyChart = null;
             let fireJulDecChart = null;
@@ -217,10 +219,11 @@
                 };
             }
 
-            function updateAllCharts(data) {
-                const fullText = data.full_yearx || "2023 Full Year: 50.0% Risk";
-                const monthlyText = data.monthlyx || "2023 Monthly: 60.0% Risk";
-                const julDecText = data.jul_decx || "July-Dec 2023: 70.0% Risk";
+            // Separate function for Road Accident charts
+            function updateRoadCharts(data) {
+                const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
+                const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
+                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
 
                 const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
 
@@ -261,15 +264,32 @@
                     julDecChart.update('active');
                 }
 
-                // FIRE INCIDENT CHARTS (same data, same movement)
+                // Auto-scroll to charts
+                document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            // Separate function for Fire Incident charts
+            function updateFireCharts(data) {
+                const fullText = data.fire_full || "Fire 2023 Full Year: 50.0% Risk";
+                const monthlyText = data.fire_monthly || "Fire 2023 Monthly: 60.0% Risk";
+                const julDecText = data.fire_jul_dec || "Fire July-Dec 2023: 70.0% Risk";
+
+                const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
+
+                const full2023Count = Math.round((full / 100) * 150);
+                const monthly2023Count = Math.round((monthly / 100) * 150);
+                const julDec2023Count = Math.round((julDec / 100) * 90);
+
+                // fireYearlyChart
                 if (fireYearlyChart) {
                     fireYearlyChart.data.datasets[0].data[3] = full2023Count;
                     fireYearlyChart.options.plugins.title.text = `Fire - ${fullText}`;
                     fireYearlyChart.update('active');
                 }
 
+                // fireMonthlyChart
                 if (fireMonthlyChart) {
-                    const base2022Fire = [15,18,22,16,25,20,28,30,26,22,19,17];  // Example fire data
+                    const base2022Fire = [15,18,22,16,25,20,28,30,26,22,19,17];
                     const fireMonthly2023 = base2022Fire.map(v => {
                         const ratio = monthly2023Count / 92;
                         const variation = random(-10, 14);
@@ -280,6 +300,7 @@
                     fireMonthlyChart.update('active');
                 }
 
+                // fireJulDecChart
                 if (fireJulDecChart) {
                     const baseJulDecFire = [28,30,26,22,19,17];
                     const fireJulDec2023 = baseJulDecFire.map(v => {
@@ -292,10 +313,12 @@
                     fireJulDecChart.update('active');
                 }
 
+                // Auto-scroll to charts
                 document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
             }
 
             function initializeCharts() {
+                // ROAD ACCIDENT CHARTS
                 yearlyPredictionChart = new Chart('yearlyPredictionChart', {
                     type: 'line',
                     data: {
@@ -371,10 +394,7 @@
                     }
                 });
 
-              
-            }
-
-            function initializeFireCharts() {
+                // FIRE INCIDENT CHARTS
                 fireYearlyChart = new Chart('fireYearlyChart', {
                     type: 'line',
                     data: {
@@ -393,7 +413,13 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         animation: { duration: 1800 },
-                        plugins: { title: { display: true, text: 'Fire - 2023 Full Year Risk: Loading...', font: { size: 26 } } }
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Fire - 2023 Full Year Risk: Loading...',
+                                font: { size: 26 }
+                            }
+                        }
                     }
                 });
 
@@ -409,7 +435,13 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { title: { display: true, text: 'Fire - 2023 Monthly Risk: Loading...', font: { size: 26 } } }
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Fire - 2023 Monthly Risk: Loading...',
+                                font: { size: 26 }
+                            }
+                        }
                     }
                 });
 
@@ -425,15 +457,15 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { title: { display: true, text: 'Fire - July–Dec 2023 Risk: Loading...', font: { size: 26 } } }
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Fire - July–Dec 2023 Risk: Loading...',
+                                font: { size: 26 }
+                            }
+                        }
                     }
                 });
-            }
-
-            // Initialize both
-            function initAllCharts() {
-                initializeCharts();       // Road Accident
-                initializeFireCharts();   // Fire Incident
 
                 // Initial load (ARIMA fallback)
                 fetch('/get_latest_prediction')
@@ -441,7 +473,7 @@
                     .then(d => {
                         const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
                         const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateAllCharts({ full_yearx: full, monthlyx: monthly, jul_decx: jul });
+                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
                     });
 
                 
@@ -455,14 +487,18 @@
                     });
             }
 
+            
+
+            
+
             // LIVE UPDATE FROM SERVER
             // ARIMA updates (initial/default)
-            // socket.on('update_prediction_charts', updateAllCharts);
+            socket.on('update_prediction_charts', updateFireCharts);
 
             // ARIMAX updates (now primary) - use the same function
-            socket.on('update_arimax_charts', updateAllCharts);
+            socket.on('update_arimax_charts', updateRoadCharts);
 
-            initAllCharts();
+            initializeCharts();
 
 
 
