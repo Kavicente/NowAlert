@@ -602,12 +602,7 @@
 
             // === ROAD ACCIDENT RESPONSE (Same Style as Fire) ===
             // Update prediction display after submission
-            socket.on('barangay_response', () => {
-                fetch('/get_latest_prediction')
-                    .then(r => r.json())
-                    .then(data => updateChartsFromPrediction(data.prediction));
-                scrollToCharts();
-            });
+            
 
              // Update prediction display after submission
             socket.on('barangay_arimax_submitted', () => {
