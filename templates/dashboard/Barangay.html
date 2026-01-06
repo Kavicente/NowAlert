@@ -452,7 +452,7 @@
                     .then(d => {
                         const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
                         const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateRoadCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                        updateRoadCharts({ full_year: full, monthly: monthly, jul_dec: julDec });
                     });
 
                 // Initial load from Fire prediction
