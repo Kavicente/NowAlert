@@ -219,7 +219,6 @@
                 };
             }
 
-            // Separate function for Road Accident charts
             function updateRoadCharts(data) {
                 const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
                 const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
@@ -268,7 +267,6 @@
                 document.querySelector('.prediction-charts-grid')?.scrollIntoView({ behavior: 'smooth' });
             }
 
-            // Separate function for Fire Incident charts
             function updateFireCharts(data) {
                 const fullText = data.fire_full || "Fire 2023 Full Year: 50.0% Risk";
                 const monthlyText = data.fire_monthly || "Fire 2023 Monthly: 60.0% Risk";
@@ -318,7 +316,6 @@
             }
 
             function initializeCharts() {
-                // ROAD ACCIDENT CHARTS
                 yearlyPredictionChart = new Chart('yearlyPredictionChart', {
                     type: 'line',
                     data: {
@@ -394,7 +391,7 @@
                     }
                 });
 
-                // FIRE INCIDENT CHARTS
+                // Fire charts initialization (kept for future use)
                 fireYearlyChart = new Chart('fireYearlyChart', {
                     type: 'line',
                     data: {
@@ -413,13 +410,7 @@
                         responsive: true,
                         maintainAspectRatio: false,
                         animation: { duration: 1800 },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Fire - 2023 Full Year Risk: Loading...',
-                                font: { size: 26 }
-                            }
-                        }
+                        plugins: { title: { display: true, text: 'Fire - 2023 Full Year Risk: Loading...', font: { size: 26 } } }
                     }
                 });
 
@@ -435,13 +426,7 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Fire - 2023 Monthly Risk: Loading...',
-                                font: { size: 26 }
-                            }
-                        }
+                        plugins: { title: { display: true, text: 'Fire - 2023 Monthly Risk: Loading...', font: { size: 26 } } }
                     }
                 });
 
@@ -457,27 +442,20 @@
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Fire - July–Dec 2023 Risk: Loading...',
-                                font: { size: 26 }
-                            }
-                        }
+                        plugins: { title: { display: true, text: 'Fire - July–Dec 2023 Risk: Loading...', font: { size: 26 } } }
                     }
                 });
 
-                // Initial load (ARIMA fallback)
+                // Initial load from ARIMA
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(d => {
                         const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
                         const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                        updateRoadCharts({ full_year: full, monthly: monthly, jul_dec: jul });
                     });
 
-                
-
+                // Initial load from Fire prediction
                 fetch('/get_latest_fire_prediction')
                     .then(r => r.json())
                     .then(d => {
