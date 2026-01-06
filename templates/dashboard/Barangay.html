@@ -220,7 +220,7 @@
             }
 
             function updateRoadCharts(data) {
-                // FIXED: Correct key names (no 'x')
+                // FIXED: Use correct keys from broadcast (no 'x')
                 const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
                 const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
                 const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
@@ -231,14 +231,14 @@
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // yearlyPredictionChart
+                // yearlyPredictionChart - DISPLAY % & MOVE LINE
                 if (yearlyPredictionChart) {
                     yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
                     yearlyPredictionChart.options.plugins.title.text = fullText;
                     yearlyPredictionChart.update('active');
                 }
 
-                // monthlyComparisonChart
+                // monthlyComparisonChart - DISPLAY % & MOVE LINE
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => {
@@ -251,7 +251,7 @@
                     monthlyComparisonChart.update('active');
                 }
 
-                // julDecChart — NOW DISPLAYS % & MOVES LINES
+                // julDecChart - DISPLAY % & MOVE LINE (NOW FIXED)
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
                     const forecastJulDec = baseJulDec2022.map(v => {
@@ -447,13 +447,13 @@
                     }
                 });
 
-                // Initial load from ARIMA
+                // Initial load (ARIMA fallback - can be removed if you no longer need it)
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(d => {
                         const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
-                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateRoadCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                        const [full, monthly, julDec] = pred.split('|').map(s => s.trim());
+                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: julDec });
                     });
 
                 // Initial load from Fire prediction
@@ -473,8 +473,6 @@
             // Listener for ARIMAX updates (live, no refresh)
             socket.on('update_arimax_charts', updateRoadCharts);
 
-            // ARIMAX updates (now primary) - use the same function
-            socket.on('update_arimax_charts', updateRoadCharts);
 
             initializeCharts();
 
