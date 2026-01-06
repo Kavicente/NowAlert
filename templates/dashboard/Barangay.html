@@ -371,14 +371,7 @@
                     }
                 });
 
-                // Initial load (ARIMA fallback)
-                fetch('/get_latest_prediction')
-                    .then(r => r.json())
-                    .then(d => {
-                        const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
-                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
-                    });
+              
             }
 
             function initializeFireCharts() {
@@ -441,6 +434,15 @@
             function initAllCharts() {
                 initializeCharts();       // Road Accident
                 initializeFireCharts();   // Fire Incident
+
+                // Initial load (ARIMA fallback)
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(d => {
+                        const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
+                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
+                        updateAllCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                    });
 
                 
 
