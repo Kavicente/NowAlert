@@ -218,9 +218,9 @@
             }
 
             function updateAllCharts(data) {
-                const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
-                const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
-                const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
+                const fullText = data.full_yearx || "2023 Full Year: 50.0% Risk";
+                const monthlyText = data.monthlyx || "2023 Monthly: 60.0% Risk";
+                const julDecText = data.jul_decx || "July-Dec 2023: 70.0% Risk";
 
                 const { full, monthly, julDec } = parsePrediction(fullText, monthlyText, julDecText);
 
