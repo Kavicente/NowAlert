@@ -55,7 +55,7 @@ except Exception as e:
 
 crime_predictor = None
 try:
-    crime_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Crime Models', 'crime_predictor_svm.pkl'))
+    crime_predictor = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Crime Models', 'crime_predictor_lr.pkl'))
     logger.info("crime_predictor_lr.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("crime_predictor_lr.pkl not found.")
