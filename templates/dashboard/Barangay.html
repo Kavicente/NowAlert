@@ -471,7 +471,16 @@
             
 
             // Listener for ARIMAX updates (live, no refresh)
-            socket.on('update_sarima_chart', updateRoadCharts);
+            socket.on('update_sarima_charts', updateRoadCharts);
+
+
+            // Update prediction display after submission
+            socket.on('barangay_sarima_submitted', () => {
+                fetch('/get_latest_prediction')
+                    .then(r => r.json())
+                    .then(data => updateChartsFromPrediction(data.prediction));
+                scrollToCharts();
+            });
 
 
             initializeCharts();
@@ -602,13 +611,7 @@
             // Update prediction display after submission
             
 
-             // Update prediction display after submission
-            socket.on('barangay_sarima_submitted', () => {
-                fetch('/get_latest_prediction')
-                    .then(r => r.json())
-                    .then(data => updateChartsFromPrediction(data.prediction));
-                scrollToCharts();
-            });
+             
 
             socket.on('barangay_fire_submitted', () => {
                 fetch('/get_latest_fire_prediction')
