@@ -42,7 +42,7 @@ except Exception as e:
 arimax_m = None
 try:
     arimax_m = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                       'ARIMAX ROAD', 'arimax_monthly', 'monthly_arimax70_15_15.pkl'))
+                                       'ARIMAX ROAD', 'arimax_monthly', 'monthly_arimax80_20.pkl'))
     logger.info("monthly_arimax70_15_15.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("monthly_arimax70_15_15.pkl not found.")
@@ -52,7 +52,7 @@ except Exception as e:
 arimax_22 = None
 try:
     arimax_22 = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                        'ARIMAX ROAD', 'arimax_forecast', 'arimax_forecast_70_15_15.pkl'))
+                                        'ARIMAX ROAD', 'arimax_forecast', 'arimax_forecast_80_20.pkl'))
     logger.info("arimax_forecast_70_15_15.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("arimax_forecast_70_15_15.pkl not found.")
@@ -62,7 +62,7 @@ except Exception as e:
 arimax_pred = None
 try:
     arimax_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                          'ARIMAX ROAD', 'arimax_pred', 'arimax70_30.pkl'))
+                                          'ARIMAX ROAD', 'arimax_pred', 'arimax70_15_15.pkl'))
     logger.info("arimax70_30.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("arimax70_30.pkl not found.")
