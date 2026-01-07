@@ -95,7 +95,7 @@ except Exception as e:
 sarima_pred = None
 try:
     sarima_pred = joblib.load(os.path.join(os.path.dirname(__file__), 'training', 'Road Models', 
-                                          'SARIMA ROAD', 'sarima_pred', 'sarima80_20.pkl'))
+                                          'SARIMA ROAD', 'sarima_pred', 'sarima70_15_15.pkl'))
     logger.info("sarima80_20.pkl loaded successfully.")
 except FileNotFoundError:
     logger.error("sarima80_20.pkl not found.")

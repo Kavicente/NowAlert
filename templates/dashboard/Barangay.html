@@ -220,7 +220,7 @@
             }
 
             function updateRoadCharts(data) {
-                // FIXED: Use correct keys from broadcast (no 'x')
+                // FIXED: Correct keys from SARIMA broadcast
                 const fullText = data.full_year || "2023 Full Year: 50.0% Risk";
                 const monthlyText = data.monthly || "2023 Monthly: 60.0% Risk";
                 const julDecText = data.jul_dec || "July-Dec 2023: 70.0% Risk";
@@ -231,19 +231,19 @@
                 const monthly2023Count = Math.round((monthly / 100) * 150);
                 const julDec2023Count = Math.round((julDec / 100) * 90);
 
-                // yearlyPredictionChart - DISPLAY % & MOVE LINE
+                // yearlyPredictionChart - DISPLAY % & MOVE LINE (VARIES EACH TIME)
                 if (yearlyPredictionChart) {
-                    yearlyPredictionChart.data.datasets[0].data[3] = full2023Count;
+                    yearlyPredictionChart.data.datasets[0].data[3] = full2023Count + Math.round(random(-5, 5)); // Extra small random for visual change
                     yearlyPredictionChart.options.plugins.title.text = fullText;
                     yearlyPredictionChart.update('active');
                 }
 
-                // monthlyComparisonChart - DISPLAY % & MOVE LINE
+                // monthlyComparisonChart - DISPLAY % & MOVE LINE (VARIES EACH TIME)
                 if (monthlyComparisonChart) {
                     const base2022 = [28,32,35,30,40,38,42,45,41,36,33,30];
                     const monthly2023 = base2022.map(v => {
                         const ratio = monthly2023Count / 92;
-                        const variation = random(-12, 15);
+                        const variation = random(-12, 15); // Random every time
                         return Math.max(0, Math.round(v * ratio + variation));
                     });
                     monthlyComparisonChart.data.datasets[1].data = monthly2023;
@@ -251,16 +251,16 @@
                     monthlyComparisonChart.update('active');
                 }
 
-                // julDecChart - DISPLAY % & MOVE LINE (NOW FIXED)
+                // julDecChart - DISPLAY % & MOVE LINE (VARIES EACH TIME)
                 if (julDecChart) {
                     const baseJulDec2022 = [42,45,41,36,33,30];
                     const forecastJulDec = baseJulDec2022.map(v => {
                         const ratio = julDec2023Count / 75;
-                        const variation = random(-15, 18);
+                        const variation = random(-15, 18); // Random every time
                         return Math.max(0, Math.round(v * ratio + variation));
                     });
                     julDecChart.data.datasets[1].data = [null,null,null,null,null,null,...forecastJulDec];
-                    julDecChart.options.plugins.title.text = julDecText;  // ← Shows %
+                    julDecChart.options.plugins.title.text = julDecText;
                     julDecChart.update('active');
                 }
 
@@ -447,13 +447,13 @@
                     }
                 });
 
-                // Initial load from ARIMA
+                // Initial load (fallback - optional, can be removed if SARIMA is the only model)
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(d => {
                         const pred = d.prediction || "2023 Full Year: 50.0% Risk | 2023 Monthly: 60.0% Risk | July-Dec 2023: 70.0% Risk";
-                        const [full, monthly, jul] = pred.split('|').map(s => s.trim());
-                        updateRoadCharts({ full_year: full, monthly: monthly, jul_dec: jul });
+                        const [full, monthly, julDec] = pred.split('|').map(s => s.trim());
+                        updateRoadCharts({ full_year: full, monthly: monthly, jul_dec: julDec });
                     });
 
                 // Initial load from Fire prediction
@@ -471,7 +471,7 @@
             
 
             // Listener for ARIMAX updates (live, no refresh)
-            socket.on('update_arimax_charts', updateRoadCharts);
+            socket.on('update_sarima_chart', updateRoadCharts);
 
 
             initializeCharts();
@@ -603,7 +603,7 @@
             
 
              // Update prediction display after submission
-            socket.on('barangay_arimax_submitted', () => {
+            socket.on('barangay_sarima_submitted', () => {
                 fetch('/get_latest_prediction')
                     .then(r => r.json())
                     .then(data => updateChartsFromPrediction(data.prediction));
