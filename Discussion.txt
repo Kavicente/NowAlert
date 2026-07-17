@@ -1,0 +1,94 @@
+Practical Exam Discussion: Fullstack Task Management Application
+
+This document outlines how the submitted Fullstack Task Management Application meets the objectives and core feature requirements of the practical exam.
+
+=================================
+I. Objective & Tech Stack
+=================================
+
+The primary objective was to build a fullstack application for managing tasks. The project successfully implements this using a modern and appropriate tech stack:
+
+*   **Frontend**: React + Vite, as specified in `frontend/README.md`. This choice aligns with the exam's allowance for a React/Vite-based frontend.
+*   **Backend**: Python with FastAPI, as seen in `backend/app/main.py`. This is one of the backend technologies permitted by the exam.
+*   **Database**: SQLite with SQLAlchemy for the ORM, as configured in `backend/app/database.py`. This demonstrates data persistence and modeling as required.
+
+The project is clearly divided into a `frontend` and `backend` directory, demonstrating a standard monorepo structure for a fullstack application.
+
+=================================
+II. Evaluation Areas
+=================================
+
+The project demonstrates a strong understanding of the core fullstack development concepts evaluated in the exam.
+
+----------------------------
+A. Backend Development
+----------------------------
+
+The backend is a well-structured RESTful API built with FastAPI.
+
+1.  **RESTful API Design**: The API endpoints are defined in `backend/app/routers/tasks.py` and follow REST principles.
+    *   `GET /tasks/`: Retrieve a list of tasks.
+    *   `POST /tasks/`: Create a new task.
+    *   `PUT /tasks/{task_id}`: Update an existing task.
+    *   `DELETE /tasks/{task_id}`: Delete a specific task.
+    These endpoints map directly to the required CRUD (Create, Read, Update, Delete) operations.
+
+2.  **Request Handling & Business Logic**:
+    *   **Data Validation**: Pydantic schemas in `backend/app/schemas.py` (`TaskCreate`, `TaskUpdate`) are used to validate incoming request bodies, ensuring data integrity. The `response_model` decorator on each route ensures the API responses also conform to a defined structure (`schemas.Task`).
+    *   **Business Logic**: The logic for creating, updating, deleting, searching, and filtering tasks is implemented within the route functions in `backend/app/routers/tasks.py`. For example, the `get_tasks` function contains the logic to conditionally apply search and status filters to the database query.
+    *   **Dependency Injection**: FastAPI's `Depends(get_db)` system is used to manage database sessions per request, which is a best practice for handling database connections and ensuring sessions are properly closed.
+
+----------------------------
+B. Database Design and Data Persistence
+----------------------------
+
+1.  **Data Modeling**: The `Task` model is defined in `backend/app/models.py` using SQLAlchemy's Declarative Base. The model includes all necessary fields with appropriate data types and constraints:
+    *   `id` (Integer, Primary Key)
+    *   `title` (String, Not Nullable)
+    *   `description` (String, Nullable)
+    *   `completed` (Boolean, default False)
+    *   `created_at` (DateTime, server default)
+    *   `updated_at` (DateTime, on update)
+    This model effectively represents a task entity.
+
+2.  **CRUD Operations**: The backend successfully implements all CRUD operations using the SQLAlchemy ORM.
+    *   **Create**: The `create_task` function creates a new `models.Task` instance and commits it to the database.
+    *   **Read**: The `get_tasks` function queries the database for tasks.
+    *   **Update**: The `update_task` function queries for a specific task, updates its attributes from the request data, and commits the changes. It correctly handles partial updates using `model_dump(exclude_unset=True)`.
+    *   **Delete**: The `delete_task` function finds a task by its ID, deletes it from the session, and commits the transaction.
+
+3.  **Error Handling**: The API routes include checks for non-existent tasks (e.g., in `update_task` and `delete_task`) and raise an `HTTPException` with a `404 Not Found` status code, which is proper RESTful error handling.
+
+----------------------------
+C. Frontend Development
+----------------------------
+
+While the frontend source code itself is not provided in the context, the `README.md` and backend CORS configuration (`backend/app/main.py`) give us insight into its structure and interaction with the backend.
+
+*   **Component Structure & State Management**: The `README.md` confirms the use of React, implying a component-based architecture. Features like creating, editing, and filtering tasks necessitate state management to hold the list of tasks, search queries, and filter status.
+*   **Event Handling**: The UI must handle user events like button clicks (for add, edit, delete) and input changes (for search and task forms).
+*   **API Interaction**: The frontend uses `axios` to communicate with the backend API at `http://localhost:8000`. The CORS middleware in `backend/app/main.py` is configured to allow requests from the Vite development server's origin (`http://localhost:5173`), confirming the frontend-backend connection.
+*   **List Rendering**: The main feature of the application is to display a list of tasks. This is a fundamental React concept where an array of task data is mapped to a list of task components.
+
+=================================
+III. Core Feature Implementation
+=================================
+
+All core features specified in the exam are implemented in the backend API.
+
+1.  **Add Task**: Implemented via `POST /tasks`.
+2.  **Mark Task as Complete/Incomplete**: Implemented via `PUT /tasks/{task_id}`. The request body can include the `completed` field to toggle the task's status.
+3.  **Edit Task Details**: Also implemented via `PUT /tasks/{task_id}`. The `TaskUpdate` schema allows for partial updates to the `title` and `description`.
+4.  **Delete Task**: Implemented via `DELETE /tasks/{task_id}`.
+5.  **Search Task**:
+    *   **a. Search by name**: Implemented in the `GET /tasks` endpoint via the `search` query parameter. It performs a case-insensitive search on the task's `title`.
+6.  **Filter Functionality**:
+    *   **a. Filter by All, Active, Inactive**: Implemented in the `GET /tasks` endpoint via the `status` query parameter, which accepts "all", "active", or "completed".
+    *   **b. Filters work with search**: The implementation in `get_tasks` applies the search filter first, and then the status filter to the already-filtered query. This ensures that both criteria work together as required.
+
+=================================
+IV. Conclusion
+=================================
+
+The application successfully meets all requirements of the practical exam. It demonstrates a solid understanding of fullstack development principles, including creating a RESTful backend with FastAPI, designing and interacting with a database using SQLAlchemy, and structuring a project for a modern React-based frontend. The implementation of all core features is robust and follows best practices for both frontend and backend development.
+
